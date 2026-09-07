@@ -8,6 +8,7 @@ import { query, transaction } from "@/lib/db";
 import { isLocale, LOCALE_COOKIE, text, type Locale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 import type { FormState, RiderStatus } from "@/lib/types";
+import { pickupMapUrl } from "@/lib/map-url";
 
 export async function setLocale(formData: FormData) {
   const locale = formData.get("locale");
@@ -75,6 +76,7 @@ async function runMutation(work: () => Promise<void>, paths: string[], success: 
   try {
     await work();
     for (const path of paths) revalidatePath(path);
+    revalidatePath("/schedule/dispatch");
     return { ok: true, message: success[locale] };
   } catch (error) {
     console.error("KidLoop mutation failed", error);
@@ -102,15 +104,18 @@ export async function createDriver(_: FormState, formData: FormData): Promise<Fo
 
 export async function createSchool(_: FormState, formData: FormData): Promise<FormState> {
   return runMutation(async () => {
+    const rawMapUrl = optional(formData, "pickupMapUrl");
+    const mapUrl = pickupMapUrl(rawMapUrl);
+    if (rawMapUrl && !mapUrl) throw new Error("Pickup map must be an HTTPS URL without credentials");
     await query(`
       insert into schools (name, address, pickup_map_url, pickup_instructions, dismissal_time)
       values ($1, $2, $3, $4, $5::time)
     `, [
       required(formData, "name"),
       required(formData, "address"),
-      required(formData, "pickupMapUrl"),
+      mapUrl,
       required(formData, "pickupInstructions"),
-      required(formData, "dismissalTime"),
+      optional(formData, "dismissalTime") || null,
     ]);
   }, ["/resources", "/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
 }
@@ -135,7 +140,7 @@ export async function createClassroom(_: FormState, formData: FormData): Promise
       "insert into classrooms (school_id, name) values ($1::uuid, $2)",
       [required(formData, "schoolId"), required(formData, "name")],
     );
-  }, ["/students"], { zh: "班级已添加。", en: "Class added." });
+  }, ["/students", "/schedule"], { zh: "班级已添加。", en: "Class added." });
 }
 
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
@@ -318,5 +323,5 @@ export async function updateRiderStatus(tripStudentId: string, nextStatus: Rider
     await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id) values ($1, $2, $3, $4)", [tripStudentId, rider.status, nextStatus, user.id]);
     await recomputeTrip(client, target.rows[0].trip_id);
   });
-  for (const path of ["/", "/schedule", "/driver", "/parent"]) revalidatePath(path);
+  for (const path of ["/", "/schedule/dispatch", "/driver", "/parent"]) revalidatePath(path);
 }

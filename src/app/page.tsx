@@ -50,7 +50,7 @@ export default async function DashboardPage() {
         </div>
         <div className="trip-list">
           {trips.length ? trips.map((trip) => <TripCard key={trip.id} trip={trip} locale={locale} />) : (
-            <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "创建司机、车辆和学生后，即可发布第一条路线。", "Create drivers, vehicles, and students, then publish the first route.")} href="/schedule" action={text(locale, "打开排班", "Open schedule")} />
+            <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "创建司机、车辆和学生后，即可发布第一条路线。", "Create drivers, vehicles, and students, then publish the first route.")} href="/schedule/dispatch" action={text(locale, "当天调度", "Daily dispatch")} />
           )}
         </div>
       </section>

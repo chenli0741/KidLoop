@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { FormPanel } from "@/components/form-panel";
-import { Clock3, Map, MapPin, School } from "lucide-react";
+import { MapPin, School } from "lucide-react";
+import { LocationMap } from "@/components/location-map";
 import { createProgram, createSchool } from "@/app/actions";
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
-import { formatTime } from "@/lib/date";
+
 import { getPrograms, getSchools } from "@/lib/data";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
@@ -22,7 +24,7 @@ export async function LocationResources({ section }: { section: "schools" | "pro
           {schools.length ? <div className="location-list">{schools.map((school) => (
             <article className="location-card" key={school.id}>
               <div className="location-title"><span className="record-icon"><School size={20} /></span><div><h3>{school.name}</h3><p><MapPin size={14} /> {school.address}</p></div></div>
-              <div className="location-details"><span><Clock3 size={15} /> {text(locale, "放学", "Dismissal")} {formatTime(school.dismissalTime, locale)}</span><p>{school.pickupInstructions}</p><a href={school.pickupMapUrl ?? "#"} target="_blank" rel="noreferrer"><Map size={14} /> {text(locale, "接送地图", "Pickup map")}</a></div>
+              <div className="location-details"><Link href={`/schedule?school=${school.id}`}>{text(locale, "学校日历与接送规则", "School calendar & pickup rules")} →</Link><p>{school.pickupInstructions}</p><div className="route-links"><LocationMap name={school.name} address={school.address} /><LocationMap name={school.name} url={school.pickupMapUrl} /></div></div>
             </article>
           ))}</div> : <EmptyState title={text(locale, "暂无学校", "No schools")} body={text(locale, "添加第一个接学生地点。", "Add the first pickup location.")} />}
         </section>
@@ -30,8 +32,7 @@ export async function LocationResources({ section }: { section: "schools" | "pro
           <ActionForm action={createSchool} submitLabel={text(locale, "添加学校", "Add school")}>
             <label><span>{text(locale, "学校名称", "School name")}</span><input name="name" required /></label>
             <label><span>{text(locale, "地址", "Address")}</span><input name="address" required /></label>
-            <label><span>{text(locale, "接送地图 URL", "Pickup map URL")}</span><input name="pickupMapUrl" type="url" placeholder="https://..." required /></label>
-            <label><span>{text(locale, "放学时间", "Dismissal time")}</span><input name="dismissalTime" type="time" required /></label>
+            <label><span>{text(locale, "接送示意图 URL（选填）", "Pickup diagram URL (optional)")}</span><input name="pickupMapUrl" type="url" pattern="https://.*" placeholder="https://..." /></label>
             <label className="full"><span>{text(locale, "接送要求", "Pickup requirements")}</span><textarea name="pickupInstructions" rows={3} required /></label>
           </ActionForm>
         </FormPanel>

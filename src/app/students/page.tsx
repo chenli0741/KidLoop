@@ -1,9 +1,9 @@
 import { requireUser } from "@/lib/auth";
-import { FormPanel } from "@/components/form-panel";
+import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { StudentRecordActions } from "@/components/student-record-actions";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, GraduationCap, Phone, School, UserPlus, UsersRound } from "lucide-react";
+import { ArrowRight, GraduationCap, Phone, UsersRound } from "lucide-react";
 import { createClassroom, createStudent } from "@/app/actions";
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
@@ -14,24 +14,59 @@ import { getLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentsPage() {
+export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ school?: string | string[] }> }) {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
   const [students, classrooms, schools, programs] = await Promise.all([
     getStudents(), getClassrooms(), getSchools(), getPrograms(),
   ]);
-  const canAddStudent = classrooms.length > 0 && programs.length > 0;
+  const requestedSchool = (await searchParams).school;
+  const selectedSchool = schools.find((school) => school.id === requestedSchool) ?? schools[0];
+  const schoolClassrooms = classrooms.filter((classroom) => classroom.schoolId === selectedSchool?.id);
+  const visibleStudents = students.filter((student) => student.schoolId === selectedSchool?.id);
+  const canAddStudent = schoolClassrooms.length > 0 && programs.length > 0;
 
   return (
     <div className="page-container">
-      <PageHeader eyebrow={text(locale, "学生名册", "Roster")} title={text(locale, "学生", "Students")} description={text(locale, "集中管理每名学生的接送身份、班级、目的地和家长联系方式。", "Keep each student’s pickup identity, class, destination, and parent contact together.")} />
+      <PageHeader eyebrow={text(locale, "学生名册", "Roster")} title={text(locale, "学生", "Students")} description={text(locale, "选择学校，查看和管理该校学生的接送资料。", "Select a school to view and manage its student roster.")} />
 
-      <div className="students-layout">
+      <div className="roster-toolbar"><SchoolFilter schools={schools} selected={selectedSchool?.id ?? ""} label={text(locale, "学校", "School")} />
+        <div className="roster-create-actions" key={selectedSchool?.id ?? "empty"}>
+          <RosterCreateDialog title={text(locale, "添加班级", "Add class")} closeLabel={text(locale, "关闭", "Close")}>
+            {schools.length ? (
+              <ActionForm action={createClassroom} submitLabel={text(locale, "添加班级", "Add class")}>
+                <label className="full"><span>{text(locale, "学校", "School")}</span><select name="schoolId" required defaultValue={selectedSchool?.id ?? ""}><option value="" disabled>{text(locale, "选择学校", "Select school")}</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
+                <label className="full"><span>{text(locale, "班级名称", "Class name")}</span><input name="name" placeholder={text(locale, "三年级 2 班", "Room 12")} required /></label>
+              </ActionForm>
+            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/resources?tab=schools">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
+          </RosterCreateDialog>
+
+          <RosterCreateDialog title={text(locale, "添加学生", "Add student")} closeLabel={text(locale, "关闭", "Close")}>
+            {canAddStudent ? (
+              <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
+                <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
+                <label><span>{text(locale, "照片 URL", "Photo URL")}</span><input name="photoUrl" type="url" placeholder="https://..." required /></label>
+                <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue={schoolClassrooms.length === 1 ? schoolClassrooms[0].id : ""}><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{schoolClassrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
+                <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
+                <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
+                <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min="3" max="20" required /></label>
+                <label><span>{text(locale, "家长姓名", "Parent name")}</span><input name="parentName" required /></label>
+                <label><span>{text(locale, "与学生关系", "Relationship")}</span><input name="relationship" placeholder={text(locale, "母亲", "Mother")} required /></label>
+                <label><span>{text(locale, "家长电话", "Parent phone")}</span><input name="parentPhone" type="tel" required /></label>
+                <label><span>{text(locale, "备用电话", "Backup phone")}</span><input name="backupPhone" type="tel" /></label>
+                <label className="full"><span>{text(locale, "家长邮箱", "Parent email")}</span><input name="email" type="email" /></label>
+                <label className="full"><span>{text(locale, "接送备注", "Pickup notes")}</span><textarea name="notes" rows={2} /></label>
+              </ActionForm>
+            ) : <p className="setup-callout">{text(locale, "请先为当前学校添加班级，并在资料中设置培训学校。", "Add a class for this school and configure an after-school program in Resources first.")}</p>}
+          </RosterCreateDialog>
+        </div>
+      </div>
+      <div className="school-roster">
         <section className="content-section">
-          <div className="section-heading"><div><span className="eyebrow">{text(locale, "在册学生", "Active roster")}</span><h2>{students.length} {text(locale, "名学生", "students")}</h2></div></div>
-          {students.length ? (
+          <div className="section-heading"><div><span className="eyebrow">{selectedSchool?.name ?? text(locale, "在册学生", "Active roster")}</span><h2>{visibleStudents.length} {text(locale, "名学生", "students")}</h2></div></div>
+          {visibleStudents.length ? (
             <div className="student-grid">
-              {students.map((student) => (
+              {visibleStudents.map((student) => (
                 <article className="student-card" key={student.id}>
                   <div className="student-card-photo">{student.photoUrl ? <Image src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
                   <div className="student-card-body">
@@ -48,38 +83,8 @@ export default async function StudentsPage() {
                 </article>
               ))}
             </div>
-          ) : <EmptyState title={text(locale, "暂无学生", "No students yet")} body={text(locale, "请先添加学校、班级和课外班，再创建第一名学生。", "Add a school, class, and after-school program before creating the first student.")} href="/resources?tab=schools" action={text(locale, "设置地点", "Set up locations")} />}
+          ) : <EmptyState title={text(locale, "暂无学生", "No students yet")} body={selectedSchool ? text(locale, "该学校还没有在册学生，可使用上方“添加学生”录入。", "This school has no students yet. Use Add student above to create one.") : text(locale, "请先在资料中添加学校。", "Add a school in Resources first.")} href="/resources?tab=schools" action={text(locale, "设置地点", "Set up locations")} />}
         </section>
-
-        <div className="form-stack">
-          <FormPanel heading={<div className="panel-heading"><School size={19} /><div><h2>{text(locale, "添加班级", "Add class")}</h2><p>{text(locale, "学校内的简单分组", "Simple school grouping")}</p></div></div>}>
-            {schools.length ? (
-              <ActionForm action={createClassroom} submitLabel={text(locale, "添加班级", "Add class")}>
-                <label className="full"><span>{text(locale, "学校", "School")}</span><select name="schoolId" required defaultValue=""><option value="" disabled>{text(locale, "选择学校", "Select school")}</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
-                <label className="full"><span>{text(locale, "班级名称", "Class name")}</span><input name="name" placeholder={text(locale, "三年级 2 班", "Room 12")} required /></label>
-              </ActionForm>
-            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/resources?tab=schools">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
-          </FormPanel>
-
-          <FormPanel heading={<div className="panel-heading"><UserPlus size={19} /><div><h2>{text(locale, "添加学生", "Add student")}</h2><p>{text(locale, "接送身份和家长信息", "Pickup identity and parent")}</p></div></div>}>
-            {canAddStudent ? (
-              <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
-                <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
-                <label><span>{text(locale, "照片 URL", "Photo URL")}</span><input name="photoUrl" type="url" placeholder="https://..." required /></label>
-                <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue=""><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{classrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
-                <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
-                <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
-                <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min="3" max="20" required /></label>
-                <label><span>{text(locale, "家长姓名", "Parent name")}</span><input name="parentName" required /></label>
-                <label><span>{text(locale, "与学生关系", "Relationship")}</span><input name="relationship" placeholder={text(locale, "母亲", "Mother")} required /></label>
-                <label><span>{text(locale, "家长电话", "Parent phone")}</span><input name="parentPhone" type="tel" required /></label>
-                <label><span>{text(locale, "备用电话", "Backup phone")}</span><input name="backupPhone" type="tel" /></label>
-                <label className="full"><span>{text(locale, "家长邮箱", "Parent email")}</span><input name="email" type="email" /></label>
-                <label className="full"><span>{text(locale, "接送备注", "Pickup notes")}</span><textarea name="notes" rows={2} /></label>
-              </ActionForm>
-            ) : <p className="setup-callout">{text(locale, "添加学生前需要先创建班级和课外班。", "A class and after-school program are required before adding students.")}</p>}
-          </FormPanel>
-        </div>
       </div>
     </div>
   );

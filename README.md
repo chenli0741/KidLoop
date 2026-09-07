@@ -99,3 +99,9 @@ KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres npm run test:role
 The account menu contains personal information, password change, language and sign-out. Parents also get a child-information editor. `/profile` allows changes to the signed-in user's name, phone and email (email changes require the current password). Password changes revoke all sessions. `/parent/children` permits updates only to explicitly linked children and preserves school/class/program assignments. Apply migration `005_personal_profiles.sql` before using these pages.
 
 Run local profile and ownership checks with `KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres npm run test:profiles`.
+
+### 接送设置
+
+管理员从「接送设置」选择学校，维护学期、假期与特殊日期、班级每周接送时间，再添加学校到课外班的线路。多条线路共享学校日历和时间规则；日程预览按学期计算，无需司机或车辆。实际任务仍由「当天调度」处理。
+
+新增数据库迁移 `006_pickup_settings.sql`，启动前运行 `npm run db:migrate`。`npm run test:pickup` 验证共享日历、星期规则、日期覆盖和并发版本检查，需要显式设置本机 `KIDLOOP_TEST_DATABASE_URL`。

@@ -17,7 +17,7 @@ export async function updateDayPlan(_: FormState, form: FormData): Promise<FormS
       studentId: String(form.get("studentId") ?? ""), date: String(form.get("date") ?? ""),
       absent: attendance === "absent", note: String(form.get("note") ?? "").trim(),
     }));
-    for (const path of ["/parent", "/driver", "/", "/schedule"]) revalidatePath(path);
+    for (const path of ["/parent", "/driver", "/", "/schedule/dispatch"]) revalidatePath(path);
     return { ok: true, message: text(locale, "已保存，管理员和相关司机可查看。", "Saved. The administrator and assigned driver can view your update.") };
   } catch (error) {
     const pickedUp = error instanceof Error && error.message === "ALREADY_PICKED_UP";

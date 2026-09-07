@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { BusFront, Clock3, ExternalLink, MapPin, Navigation, UsersRound } from "lucide-react";
+import { BusFront, Clock3, UsersRound } from "lucide-react";
+import { LocationMap } from "@/components/location-map";
 import { formatTime } from "@/lib/date";
 import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
@@ -8,8 +9,6 @@ import { text, type Locale } from "@/lib/i18n";
 
 export function TripCard({ trip, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
   const completed = trip.riders.filter((rider) => rider.status === "DROPPED_OFF" || rider.status === "ABSENT").length;
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.schoolAddress)}`;
-  const programMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.programAddress)}`;
 
   return (
     <article className="trip-card">
@@ -39,8 +38,8 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
             <strong>{trip.schoolAddress}</strong>
             <p>{trip.pickupInstructions}</p>
             <div className="route-links">
-              <a href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={14} /> {text(locale, "导航", "Navigate")}</a>
-              {trip.pickupMapUrl ? <a href={trip.pickupMapUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> {text(locale, "接送地图", "Pickup map")}</a> : null}
+              <LocationMap name={trip.schoolName} address={trip.schoolAddress} />
+              <LocationMap name={trip.schoolName} url={trip.pickupMapUrl} />
             </div>
           </div>
         </div>
@@ -51,7 +50,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
             <small>{text(locale, "送达", "Dropoff")}</small>
             <strong>{trip.programAddress}</strong>
             <p>{trip.dropoffInfo}{trip.programRequirements ? ` · ${trip.programRequirements}` : ""}</p>
-            <a href={programMapsUrl} target="_blank" rel="noreferrer"><MapPin size={14} /> {text(locale, "打开地图", "Open map")}</a>
+            <LocationMap name={trip.programName} address={trip.programAddress} />
           </div>
         </div>
       </div>

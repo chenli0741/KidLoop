@@ -13,7 +13,8 @@
     "ios:open": "open ios/App/KidLoop.xcodeproj",
     "auth:create-admin": "node --env-file=.env.local --import tsx scripts/create-admin.ts",
     "test:roles": "node --conditions=react-server --import tsx --test tests/roles.test.ts",
-    "test:profiles": "node --conditions=react-server --import tsx --test tests/profile.test.ts"
+    "test:profiles": "node --conditions=react-server --import tsx --test tests/profile.test.ts",
+    "test:pickup": "node --conditions=react-server --import tsx --test tests/pickup-settings.test.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.1",

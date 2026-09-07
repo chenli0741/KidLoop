@@ -13,7 +13,7 @@ async function mutate(form: FormData, deleting: boolean): Promise<FormState> {
   const locale = await getLocale();
   try {
     await transaction((client) => deleting ? archiveStudent(client, form) : saveStudent(client, form));
-    for (const path of ["/students", "/", "/schedule", "/parent", "/driver"]) revalidatePath(path);
+    for (const path of ["/students", "/", "/schedule", "/schedule/dispatch", "/parent", "/driver"]) revalidatePath(path);
     return { ok: true, message: deleting ? text(locale, "学生已移出名册。", "Student removed from roster.") : text(locale, "学生资料已保存。", "Student saved.") };
   } catch (error) {
     const messages: Record<string, [string, string]> = {
