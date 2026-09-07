@@ -129,6 +129,12 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .route-stop a { margin-top: 7px; color: var(--blue); font-size: 11px; font-weight: 700; }
 .route-links { flex-wrap: wrap; }
 .route-links a { margin-right: 7px; }
+.route-notes { margin-top: 4px; }
+.route-notes summary { width: fit-content; min-height: 44px; align-content: center; cursor: pointer; color: var(--muted); font-size: 12px; }
+.route-notes summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+.route-notes[open] summary { color: var(--ink); }
+.route-stop .route-notes p { margin: 0 0 8px; white-space: pre-line; overflow-wrap: anywhere; }
+.route-requirements-flag { display: inline-block; margin-left: 8px; color: #925e14; font-size: 11px; font-weight: 700; }
 
 .manifest-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 9px; }
 .manifest-header h4 { margin: 0; font-size: 13px; }
@@ -167,6 +173,9 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .form-grid .full { grid-column: 1 / -1; }
 input, select, textarea { width: 100%; min-width: 0; color: var(--ink); background: #fff; border: 1px solid #cfd7d2; border-radius: 5px; outline: none; }
 input, select { height: 40px; padding: 0 10px; }
+/* iOS time controls must use the form column's width, including padding. */
+.form-grid input[type="time"] { -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
+.form-grid input[type="time"]::-webkit-date-and-time-value { min-width: 0; text-align: left; }
 textarea { padding: 9px 10px; resize: vertical; line-height: 1.4; }
 input:focus, select:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23, 107, 77, .1); }
 .form-footer { display: flex; grid-column: 1 / -1; min-height: 42px; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 3px; }
@@ -421,3 +430,44 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .photo-drop-zone { display: flex; gap: 10px; align-items: center; border: 1px dashed var(--line); padding: 16px; border-radius: 12px; color: var(--muted); font-size: 13px; }
 .photo-drop-zone.dragging, .photo-drop-zone:focus-visible { background: var(--green-soft); border-color: var(--green); outline: 2px solid var(--green); }
 @media (pointer: coarse) { .photo-drop-zone { display: none; } }
+
+.calendar-toolbar { display: flex; align-items: center; gap: 8px; }
+.calendar-toolbar h2 { flex: 1; margin: 0; text-align: center; font-size: 18px; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; font-size: 12px; }
+.calendar-legend span { border-radius: 5px; padding: 4px 8px; }
+.school-month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
+.calendar-weekday { text-align: center; color: var(--muted); padding: 8px 0; font-size: 12px; }
+.calendar-day { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 100px; padding: 8px; background: #f7f9f8; border: 1px solid transparent; border-radius: 8px; text-align: left; color: var(--ink); cursor: pointer; }
+.calendar-day span { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.calendar-day small { font-size: 11px; }
+.calendar-holiday { background: #fcebe6; color: #a03c2d; }
+.calendar-special { background: #fff2cf; color: #825a13; }
+.calendar-pickup { background: #e7f3ed; color: #176b4d; }
+.calendar-day[aria-pressed=true] { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+.calendar-day[aria-current=date] strong { text-decoration: underline; text-underline-offset: 4px; }
+.calendar-day:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.calendar-day-detail { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.calendar-day-detail h3 { margin: 0 0 8px; }
+.calendar-day-detail p { font-size: 13px; padding: 6px 0; }
+.calendar-pickup-detail { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.calendar-pickup-detail span { color: var(--muted); }
+@media (max-width: 600px) {
+  .calendar-day { min-height: 72px; padding: 6px 3px; }
+  .calendar-day strong { font-size: 13px; }
+  .calendar-day small { font-size: 9px; letter-spacing: -.3px; }
+  .calendar-toolbar { gap: 4px; }
+  .calendar-toolbar h2 { font-size: 16px; }
+}
+.fixed-stop-list { display: grid; gap: 12px; }
+.fixed-stop-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.fixed-stop-heading { display: flex; gap: 6px; align-items: center; }
+.fixed-stop-heading strong { flex: 1; }
+.fixed-riders { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.fixed-rider { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.fixed-stop-editor .form-hint { display: flex; gap: 6px; flex-wrap: wrap; }
+.fixed-trip-stops { list-style: none; margin: 0; padding: 16px 20px; background: #f8faf8; display: grid; gap: 8px; }
+.fixed-trip-stops li { display: flex; gap: 10px; }
+.fixed-trip-stops li > div { min-width: 0; flex: 1; }
+.fixed-trip-stops strong { display: block; font-size: 14px; }
+.fixed-trip-stops small { color: var(--green); font-size: 12px; }
+.fixed-stop-number { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 12px; }

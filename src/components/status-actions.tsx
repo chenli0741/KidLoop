@@ -40,7 +40,7 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
             <Check size={16} /> {text(locale, "已送达", "Dropped off")}
           </button>
         ) : null}
-        {status === "SCHEDULED" || status === "EXCEPTION" ? (
+        {status === "SCHEDULED" || status === "EXCEPTION" || status === "PICKED_UP" ? (
           <button type="button" className="icon-button" title={text(locale, "标记缺席", "Mark absent")} aria-label={text(locale, "标记缺席", "Mark absent")} disabled={pending} onClick={() => update("ABSENT")}>
             <UserX size={17} />
           </button>

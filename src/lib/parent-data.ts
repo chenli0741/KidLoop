@@ -1,3 +1,4 @@
+import { ensureRouteTasks } from "./ensure-route-tasks";
 import "server-only";
 import { editableNote } from "@/lib/student-management";
 import { requireUser } from "@/lib/auth";
@@ -26,6 +27,7 @@ export async function getParentChildren() {
 
 export async function getParentSchedule(date: string) {
   const user = await requireUser(["PARENT"]);
+  await ensureRouteTasks(date);
   const [rides, plans] = await Promise.all([
     query<{
       id: string; studentId: string; date: string; departure: string; status: RiderStatus;
@@ -33,14 +35,14 @@ export async function getParentSchedule(date: string) {
       vehicleName: string; vehiclePlate: string; pickedUpAt: string | null; droppedOffAt: string | null;
     }>(`
       select ts.id, ts.student_id as "studentId", t.scheduled_date::text as date,
-        t.departure_time::text as departure, ts.status,
-        sc.name as "schoolName", p.name as "programName", d.name as "driverName", d.phone as "driverPhone",
+        coalesce((select stop->>'time' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.pickup_stop_id::text),t.departure_time::text) as departure, ts.status,
+        coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.pickup_stop_id::text),sc.name) as "schoolName", coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.dropoff_stop_id::text),p.name) as "programName", d.name as "driverName", d.phone as "driverPhone",
         v.name as "vehicleName", v.plate as "vehiclePlate",
         ts.picked_up_at::text as "pickedUpAt", ts.dropped_off_at::text as "droppedOffAt"
       from user_students us join trip_students ts on ts.student_id = us.student_id
       join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
       join drivers d on d.id = sh.driver_id join vehicles v on v.id = sh.vehicle_id
-      join schools sc on sc.id = t.school_id join after_school_programs p on p.id = t.program_id
+      left join schools sc on sc.id = t.school_id left join after_school_programs p on p.id = t.program_id
       where us.user_id = $1 and t.scheduled_date = $2::date and t.status not in ('DRAFT', 'CANCELED')
       order by t.departure_time
     `, [user.id, date]),

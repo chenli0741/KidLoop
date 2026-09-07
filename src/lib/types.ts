@@ -86,6 +86,7 @@ export type Shift = {
 };
 
 export type Rider = {
+  pickupStopId?:string|null; dropoffStopId?:string|null; schoolName?:string;
   id: string;
   studentId: string;
   name: string;
@@ -101,6 +102,7 @@ export type Rider = {
 };
 
 export type Trip = {
+  routeName?:string|null; routeStops?:import("./fixed-route-types").RouteStop[]|null;
   id: string;
   scheduledDate: string;
   departureTime: string;

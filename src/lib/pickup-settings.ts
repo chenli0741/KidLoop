@@ -59,16 +59,13 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   const weekdays = days(f);
   if (kind === "rule") {
     const pickupTime = time(f);
-    const classes = [...new Set(f.getAll("classroomIds").map(String))];
-    if (!classes.length || (await c.query("select id from classrooms where school_id=$1 and id=any($2::uuid[])",[school,classes])).rowCount !== classes.length) fail("请选择当前学校的班级。", "Select classes belonging to this school.");
-    if ((await c.query(`select 1 from school_pickup_rules p join school_pickup_rule_classes pc on pc.rule_id=p.id where p.school_id=$1 and p.id<>coalesce($2::uuid,gen_random_uuid()) and p.weekdays && $3::integer[] and pc.classroom_id=any($4::uuid[])`,[school,id||null,weekdays,classes])).rowCount) fail("所选班级在这些星期已有接送时间，请修改已有规则。", "These classes already have pickup times on these weekdays.");
+    const grades = [...new Set(f.getAll("grades").map(v => String(v).trim()))];
+    if (!grades.length || grades.length > 30 || grades.some(g => !g || g.length > 30)) fail("请至少选择一个有效年级。", "Select at least one valid grade.");
+    if ((await c.query(`select 1 from school_pickup_rules p where p.school_id=$1 and p.id<>coalesce($2::uuid,gen_random_uuid()) and p.weekdays && $3::integer[] and p.grades && $4::text[]`,[school,id||null,weekdays,grades])).rowCount) fail("所选年级在这些星期已有接送时间，请修改已有规则。", "These grades already have pickup times on these weekdays.");
     if (id && (await c.query("select 1 from pickup_routes where rule_id=$1 and not weekdays <@ $2::integer[]",[id,weekdays])).rowCount) fail("已有线路使用了被移除的星期，请先调整线路。", "Update routes before removing weekdays they use.");
-    const result = id
-      ? await c.query("update school_pickup_rules set name=$2,weekdays=$3,pickup_time=$4,updated_at=clock_timestamp() where id=$1 returning id",[id,n,weekdays,pickupTime])
-      : await c.query("insert into school_pickup_rules(school_id,name,weekdays,pickup_time) values($1,$2,$3,$4) returning id",[school,n,weekdays,pickupTime]);
-    const rule = result.rows[0].id;
-    await c.query("delete from school_pickup_rule_classes where rule_id=$1",[rule]);
-    await c.query("insert into school_pickup_rule_classes(rule_id,classroom_id) select $1,unnest($2::uuid[])",[rule,classes]);
+    if (id)
+      await c.query("update school_pickup_rules set name=$2,weekdays=$3,pickup_time=$4,grades=$5,updated_at=clock_timestamp() where id=$1 returning id",[id,n,weekdays,pickupTime,grades]);
+    else await c.query("insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades) values($1,$2,$3,$4,$5) returning id",[school,n,weekdays,pickupTime,grades]);
   } else {
     const rule = field(f,"ruleId"), program = field(f,"programId");
     if (!(await c.query("select id from school_pickup_rules where id=$1 and school_id=$2 and $3::integer[] <@ weekdays",[rule,school,weekdays])).rowCount) fail("请选择本校规则，线路星期必须在规则范围内。", "Select this school's rule and a subset of its weekdays.");
@@ -81,7 +78,7 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
 export const pickupPreviewSql = `
  select d::date::text as date,r.name as route,p.name as rule,a.name as destination,
         to_char(coalesce(e.pickup_time,p.pickup_time),'HH24:MI') as time,
-        (select string_agg(c.name,', ' order by c.name) from school_pickup_rule_classes pc join classrooms c on c.id=pc.classroom_id where pc.rule_id=p.id) as classes
+        p.grades as grades
  from school_terms t
  cross join lateral generate_series(t.starts_on::timestamp,t.ends_on::timestamp,interval '1 day') d
  join school_pickup_rules p on p.school_id=t.school_id

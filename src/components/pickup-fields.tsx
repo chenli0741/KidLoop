@@ -12,7 +12,7 @@ export function RouteFields({ rules, initial, locale }: { rules: PickupSetting[]
   const rule = rules.find(r => r.id===ruleId);
   return <>
     <label className="full"><span>{text(locale,"学校接送规则","School pickup rule")}</span><select name="ruleId" value={ruleId} onChange={e=>setRule(e.target.value)} required><option value="" disabled>{text(locale,"选择规则","Choose a rule")}</option>{rules.map(r=><option key={r.id} value={r.id}>{r.name} · {r.pickupTime}</option>)}</select></label>
-    {rule && <p className="form-hint full">{rule.classNames} · {text(locale,"时间和日历沿用学校设置。","Time and calendar follow the school settings.")}</p>}
+    {rule && <p className="form-hint full">{rule.grades?.join("、")} · {text(locale,"时间和日历沿用学校设置。","Time and calendar follow the school settings.")}</p>}
     <Weekdays key={ruleId} allowed={rule?.weekdays ?? []} selected={ruleId===initial?.ruleId ? initial.weekdays : rule?.weekdays} locale={locale} />
   </>;
 }

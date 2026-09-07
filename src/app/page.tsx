@@ -1,3 +1,4 @@
+import { RouteTaskIssues } from "@/components/route-task-issues";
 import { ParentRequests } from "@/components/parent-requests";
 import { requireUser } from "@/lib/auth";
 import Link from "next/link";
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
         eyebrow={formatDate(today, locale)}
         title={text(locale, "今日运营", "Today’s operations")}
         description={text(locale, "跟踪每辆车、每位司机和每名学生从接到到送达的全过程。", "Track every vehicle, driver, and student from pickup through dropoff.")}
-        actions={<Link className="button primary" href={`/schedule?date=${today}`}><CalendarPlus size={17} /> {text(locale, "安排今日行程", "Plan today")}</Link>}
+        actions={<Link className="button primary" href="/schedule?tab=routes"><CalendarPlus size={17} /> {text(locale, "管理固定线路", "Recurring routes")}</Link>}
       />
 
       <section className="stat-grid" aria-label={text(locale, "今日概览", "Today's summary")}>
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
         ))}
       </section>
 
+      <RouteTaskIssues date={today} locale={locale}/>
       <ParentRequests date={today} locale={locale} />
       <section className="content-section">
         <div className="section-heading">
@@ -50,7 +52,7 @@ export default async function DashboardPage() {
         </div>
         <div className="trip-list">
           {trips.length ? trips.map((trip) => <TripCard key={trip.id} trip={trip} locale={locale} />) : (
-            <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "创建司机、车辆和学生后，即可发布第一条路线。", "Create drivers, vehicles, and students, then publish the first route.")} href="/schedule/dispatch" action={text(locale, "当天调度", "Daily dispatch")} />
+            <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "已启用的固定线路会按学校日历自动显示每日任务。", "Enabled recurring routes generate daily tasks using school calendars.")} href="/schedule?tab=routes" action={text(locale, "固定线路", "Recurring routes")} />
           )}
         </div>
       </section>

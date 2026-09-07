@@ -15,7 +15,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
       <header className="trip-header">
         <div>
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
-          <h3>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</h3>
+          <h3>{trip.routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
         </div>
         <StatusBadge status={trip.status} />
       </header>
@@ -30,17 +30,20 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      <div className="route-strip">
+      {trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
           <span className="route-dot pickup" />
           <div>
             <small>{text(locale, "接学生 · 放学", "Pickup · dismissal")} {formatTime(trip.dismissalTime, locale)}</small>
             <strong>{trip.schoolAddress}</strong>
-            <p>{trip.pickupInstructions}</p>
             <div className="route-links">
               <LocationMap name={trip.schoolName} address={trip.schoolAddress} />
-              <LocationMap name={trip.schoolName} url={trip.pickupMapUrl} />
+              {trip.pickupMapUrl && <LocationMap name={trip.schoolName} url={trip.pickupMapUrl} />}
             </div>
+            {trip.pickupInstructions?.trim() && <details className="route-notes">
+              <summary>{text(locale, "接送说明", "Pickup details")}</summary>
+              <p>{trip.pickupInstructions}</p>
+            </details>}
           </div>
         </div>
         <div className="route-line" />
@@ -49,15 +52,19 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
           <div>
             <small>{text(locale, "送达", "Dropoff")}</small>
             <strong>{trip.programAddress}</strong>
-            <p>{trip.dropoffInfo}{trip.programRequirements ? ` · ${trip.programRequirements}` : ""}</p>
             <LocationMap name={trip.programName} address={trip.programAddress} />
+            {(trip.dropoffInfo?.trim() || trip.programRequirements?.trim()) && <details className="route-notes">
+              <summary>{text(locale, "送达说明", "Dropoff details")}{trip.programRequirements?.trim() && <span className="route-requirements-flag">{text(locale, "有特殊要求", "Special requirements")}</span>}</summary>
+              {trip.dropoffInfo?.trim() && <p>{trip.dropoffInfo}</p>}
+              {trip.programRequirements?.trim() && <p><b>{text(locale, "特殊要求：", "Special requirements: ")}</b>{trip.programRequirements}</p>}
+            </details>}
           </div>
         </div>
-      </div>
+      </div>}
 
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
-        <span>{text(locale, `${trip.riders.length}/${trip.capacity} 个座位`, `${trip.riders.length} of ${trip.capacity} seats`)}</span>
+        <span>{trip.routeName ? text(locale, `${trip.riders.length} 名学生 · ${trip.capacity} 座`, `${trip.riders.length} riders · ${trip.capacity} seats`) : text(locale, `${trip.riders.length}/${trip.capacity} 个座位`, `${trip.riders.length} of ${trip.capacity} seats`)}</span>
       </div>
       <div className="manifest-list">
         {trip.riders.map((rider) => (
@@ -67,6 +74,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
             </div>
             <div className="rider-primary">
               <strong>{rider.name}</strong>
+              {trip.routeStops && <span>{trip.routeStops.find(s=>s.id===rider.pickupStopId)?.name} → {trip.routeStops.find(s=>s.id===rider.dropoffStopId)?.name}</span>}
               <span>{rider.classroomName} · {text(locale, "年级", "Grade")} {rider.grade || text(locale, "待定", "pending")} · {text(locale, "年龄", "Age")} {rider.age ?? text(locale, "待定", "pending")}</span>
             </div>
             <div className="rider-contact">

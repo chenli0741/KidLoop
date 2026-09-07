@@ -1,3 +1,5 @@
+import { ensureRouteTasks } from "./ensure-route-tasks";
+import type { RouteStop } from "./fixed-route-types";
 import "server-only";
 
 import { requireUser } from "@/lib/auth";
@@ -162,16 +164,17 @@ export async function getShifts(fromDate?: string) {
 
 export async function getTrips(date: string) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
+  await ensureRouteTasks(date);
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
-      id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
+      route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
       driver_name: string; driver_phone: string; vehicle_name: string; vehicle_plate: string; capacity: number;
       school_name: string; school_address: string; pickup_map_url: string | null;
       pickup_instructions: string; dismissal_time: string | null; program_name: string;
       program_address: string; dropoff_info: string; program_requirements: string;
     }>(`
-      select t.id, t.scheduled_date::text, t.departure_time::text, t.status,
+      select t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
              d.name as driver_name, d.phone as driver_phone,
              v.name as vehicle_name, v.plate as vehicle_plate, v.capacity,
              sc.name as school_name, sc.address as school_address,
@@ -182,18 +185,18 @@ export async function getTrips(date: string) {
       join driver_shifts sh on sh.id = t.shift_id
       join drivers d on d.id = sh.driver_id
       join vehicles v on v.id = sh.vehicle_id
-      join schools sc on sc.id = t.school_id
-      join after_school_programs p on p.id = t.program_id
-      where t.scheduled_date = $1::date
+      left join schools sc on sc.id = t.school_id
+      left join after_school_programs p on p.id = t.program_id
+      where t.scheduled_date = $1::date and t.status <> 'CANCELED'
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by t.departure_time, d.name
     `, [date, driverId]),
     query<{
       trip_id: string; id: string; student_id: string; name: string; photo_url: string;
       classroom_name: string; grade: string; age: number | null; parent_name: string;
-      parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean;
+      parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean; pickup_stop_id: string|null; dropoff_stop_id:string|null; school_name:string;
     }>(`
-      select ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
+      select ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=c.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
              c.name as classroom_name, st.grade, st.age,
              coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
              coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent
@@ -204,7 +207,7 @@ export async function getTrips(date: string) {
       join students st on st.id = ts.student_id
       join classrooms c on c.id = st.classroom_id
       left join parents pa on pa.id = st.parent_id
-      where t.scheduled_date = $1::date
+      where t.scheduled_date = $1::date and t.status <> 'CANCELED'
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by c.name, st.name
     `, [date, driverId]),
@@ -226,12 +229,14 @@ export async function getTrips(date: string) {
       status: row.status,
       parentNote: row.parent_note,
       parentAbsent: row.parent_absent,
+      pickupStopId: row.pickup_stop_id, dropoffStopId:row.dropoff_stop_id, schoolName:row.school_name,
     });
     ridersByTrip.set(row.trip_id, riders);
   }
 
   return tripResult.rows.map((row): Trip => ({
     id: row.id,
+    routeName: row.route_name, routeStops:row.route_stops,
     scheduledDate: row.scheduled_date,
     departureTime: row.departure_time,
     status: row.status,
@@ -255,6 +260,7 @@ export async function getTrips(date: string) {
 
 export async function getDashboardCounts(date: string) {
   await requireUser(["ADMIN"]);
+  await ensureRouteTasks(date);
   const result = await query<{
     vehicles: string; drivers: string; students: string; active_trips: string; attention: string;
   }>(`

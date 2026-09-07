@@ -1,0 +1,22 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { calendarDays } from "../src/lib/pickup-calendar";
+import type { PickupSetting } from "../src/lib/pickup-types";
+const setting = (v: Partial<PickupSetting>): PickupSetting => ({id:"id",name:"Test",updatedAt:"",...v});
+test("month calendar shows closures without routes, overrides pickup times and respects term bounds", () => {
+  const terms=[setting({startsOn:"2026-09-07",endsOn:"2026-09-11"})];
+  const exceptions=[setting({startsOn:"2026-09-07",endsOn:"2026-09-07",pickupTime:null}),setting({startsOn:"2026-09-08",endsOn:"2026-09-08",pickupTime:"12:00"})];
+  const rules=[setting({id:"rule",weekdays:[1,2,3,4,5],grades:["1","2","3"],pickupTime:"14:30"})];
+  const routes=[setting({ruleId:"rule",weekdays:[1,2,3,4,5],destination:"Program"})];
+  const days=calendarDays("2026-09",terms,exceptions,rules,routes);
+  assert.equal(days.length,30);
+  assert.equal(days[6].closed,true); assert.equal(days[6].pickups.length,0);
+  assert.equal(days[7].pickups[0].time,"12:00");
+  assert.deepEqual(days[8].pickups[0].grades,["1","2","3"]);
+  assert.equal(days[8].pickups[0].time,"14:30");
+  assert.equal(days[11].pickups.length,0);
+  assert.equal(days[13].pickups.length,0);
+  assert.equal(calendarDays("2026-09",[],exceptions,[],[])[6].closed,true);
+  assert.equal(calendarDays("2028-02",[],[],[],[]).length,29);
+  assert.equal(calendarDays("2027-02",[],[],[],[]).length,28);
+});
