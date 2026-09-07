@@ -329,3 +329,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .account-details summary svg { vertical-align: middle; margin-right: 6px; }
 .account-details > form { padding-top: 8px; }
 .account-details .student-checklist { max-height: 300px; overflow-y: auto; }
+
+.form-grid .login-remember { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.login-remember input { flex: none; width: 20px; height: 20px; min-height: 20px; accent-color: var(--green); }
+.form-grid .login-remember > span { color: var(--ink); font-size: 13px; font-weight: 500; }

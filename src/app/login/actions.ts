@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { query } from "@/lib/db";
 import { hashPassword, tokenHash, verifyPassword } from "@/lib/password";
-import { homeFor, SESSION_COOKIE, SESSION_SECONDS } from "@/lib/auth";
+import { homeFor, SESSION_COOKIE } from "@/lib/auth";
+import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState, UserRole } from "@/lib/types";
@@ -33,12 +34,20 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const user = result.rows[0];
   const valid = await verifyPassword(password, user?.password_hash ?? await dummyHash);
   if (!valid || !user?.active) return fail;
+  const remember = form.get("remember") === "on";
+  const sessionSeconds = remember ? REMEMBERED_SESSION_SECONDS : TEMPORARY_SESSION_SECONDS;
   const token = randomBytes(32).toString("hex");
-  await query("insert into user_sessions (token_hash, user_id, expires_at) values ($1, $2, now() + interval '7 days')", [tokenHash(token), user.id]);
+  await query("insert into user_sessions (token_hash, user_id, expires_at) values ($1, $2, now() + $3 * interval '1 second')", [tokenHash(token), user.id, sessionSeconds]);
   const jar = await cookies();
   const old = jar.get(SESSION_COOKIE)?.value;
   if (old) await query("delete from user_sessions where token_hash = $1", [tokenHash(old)]);
-  jar.set(SESSION_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: SESSION_SECONDS });
+  const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
+  jar.set(SESSION_COOKIE, token, { ...cookieOptions, ...(remember ? { maxAge: sessionSeconds } : {}) });
+  if (remember) {
+    jar.set(LOGIN_EMAIL_COOKIE, encodeURIComponent(email), { ...cookieOptions, maxAge: LOGIN_EMAIL_SECONDS });
+  } else {
+    jar.delete(LOGIN_EMAIL_COOKIE);
+  }
   await query("delete from login_limits where key_hash = $1", [tokenHash(email)]);
   redirect(homeFor(user.role));
 }

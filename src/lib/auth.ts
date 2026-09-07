@@ -7,7 +7,6 @@ import { tokenHash } from "@/lib/password";
 import type { AuthUser, UserRole } from "@/lib/types";
 
 export const SESSION_COOKIE = "kidloop_session";
-export const SESSION_SECONDS = 60 * 60 * 24 * 7;
 
 export const getUser = cache(async (): Promise<AuthUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;

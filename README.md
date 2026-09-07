@@ -80,6 +80,8 @@ Run the database migrations, then create the first administrator with `npm run a
 
 Sign in at `/login`. Administrators land on `/`, drivers on `/driver`, and parents on `/parent`. The administrator's Accounts page creates accounts, binds a driver or children, updates child bindings, disables accounts and resets passwords. There is no public self-registration. Parent access comes only from explicit child bindings.
 
+The login form defaults to remembering the session for 30 days. Unchecking this option creates a browser-session cookie with a 12-hour server expiry. Successful remembered logins retain the last email for 180 days, including after sign-out; unremembered logins clear that hint. Password fields support the system password manager, and the app never writes passwords to cookies or browser storage.
+
 Parents can browse dates, see their children's profiles and ride progress, and save daily absences or special-request notes. Absences work before scheduling and propagate to existing unpicked-up assignments. Canceling a parent absence does not undo a driver's manually recorded absence. All plan changes and propagated status changes retain their actor and history.
 
 For local integration tests (temporary schemas are created and removed, and remote database hosts are rejected):
