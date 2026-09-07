@@ -10,6 +10,13 @@ test("month calendar shows closures without routes, overrides pickup times and r
   const routes=[setting({ruleId:"rule",weekdays:[1,2,3,4,5],destination:"Program"})];
   const days=calendarDays("2026-09",terms,exceptions,rules,routes);
   assert.equal(days.length,30);
+  const withoutRoutes=calendarDays("2026-09",terms,exceptions,rules,[]);
+  assert.equal(withoutRoutes[7].schoolTimes[0].time,"12:00");
+  assert.equal(withoutRoutes[8].schoolTimes[0].time,"14:30");
+  assert.equal(withoutRoutes[8].pickups.length,0);
+  assert.equal(withoutRoutes[6].schoolTimes.length,0);
+  assert.equal(withoutRoutes[11].schoolTimes.length,0);
+  assert.equal(withoutRoutes[13].schoolTimes.length,0);
   assert.equal(days[6].closed,true); assert.equal(days[6].pickups.length,0);
   assert.equal(days[7].pickups[0].time,"12:00");
   assert.deepEqual(days[8].pickups[0].grades,["1","2","3"]);
@@ -19,4 +26,24 @@ test("month calendar shows closures without routes, overrides pickup times and r
   assert.equal(calendarDays("2026-09",[],exceptions,[],[])[6].closed,true);
   assert.equal(calendarDays("2028-02",[],[],[],[]).length,29);
   assert.equal(calendarDays("2027-02",[],[],[],[]).length,28);
+});
+
+test("school attendance and pickup requirement do not depend on enabled routes", () => {
+  const terms = [setting({ startsOn: "2026-09-01", endsOn: "2026-09-20" })];
+  const rules = [setting({ id: "tue", weekdays: [2], grades: ["1"], pickupTime: "12:45" }), setting({ id: "other", weekdays: [1,3,4,5], grades: ["1"], pickupTime: "13:45" })];
+  const exceptions = [setting({ startsOn: "2026-09-07", endsOn: "2026-09-07", pickupTime: null }), setting({ startsOn: "2026-09-09", endsOn: "2026-09-09", pickupTime: "12:00" })];
+  const days = calendarDays("2026-09", terms, exceptions, rules);
+  assert.equal(days[6].status, "holiday");
+  assert.equal(days[7].status, "pickup");
+  assert.equal(days[7].schoolTimes[0].time, "12:45");
+  assert.equal(days[8].status, "adjusted");
+  assert.equal(days[8].schoolTimes[0].time, "12:00");
+  assert.equal(days[16].status, "pickup");
+  assert.equal(days[16].schoolTimes[0].time, "13:45");
+  assert.equal(days[11].status, "weekend");
+  assert.equal(days[20].status, "outside-term");
+  assert.equal(calendarDays("2026-09", terms, [], [])[16].status, "unconfigured");
+  assert.equal(calendarDays("2026-09", [], [], rules)[16].status, "unconfigured");
+  const weekendRule = setting({ weekdays: [6], grades: ["1"], pickupTime: "10:00" });
+  assert.equal(calendarDays("2026-09", terms, [], [weekendRule])[11].status, "pickup");
 });

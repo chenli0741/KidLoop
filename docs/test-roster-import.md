@@ -25,7 +25,20 @@ The route seed adds two clearly labelled test vehicles and two test drivers, wit
 
 These are simulated test departure times, not a verified operational pickup schedule or recurring routes. The seed preserves rider statuses on reruns, records initial status history, and checks roster membership, capacity, existing student assignments and driver/vehicle shift overlap. Stable IDs prevent duplicate vehicles, shifts, trips and history on repeated runs for the same date.
 
+The independent `/routes` module reads `fixed_routes`, not these dated test trips. Existing test trips remain in history and are not automatically converted to recurring routes. Configure confirmed school terms and recurring routes before expecting future daily assignments; do not invent term dates to populate the calendar.
+
 ```sh
 node --env-file=.env.local scripts/seed-test-routes.mjs 2026-09-07
 node --env-file=.env.local scripts/seed-test-routes.mjs 2026-09-07 --apply
 ```
+
+## Default School Rules and Closures
+
+The later user-confirmed weekly defaults and US federal holiday closures are recorded in `PROJECT_OVERVIEW.md`. These editable test defaults take precedence over historical roster times for the school rules; they do not rewrite old trips or claim to be verified official dismissal times.
+
+```sh
+node --env-file=.env.local scripts/seed-school-calendar.mjs
+node --env-file=.env.local scripts/seed-school-calendar.mjs --apply
+```
+
+This seeds only Ellis, McAuliffe and Stratford School: six weekly rules and 23 holiday entries per school for 2026-2027, including the observed 2028 New Year closure on 2027-12-31. It does not set school terms or infer winter/spring/summer breaks. Private roster data and photos are not embedded in this script.

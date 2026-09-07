@@ -30,15 +30,18 @@ function days(f: FormData) {
 export async function savePickupSetting(c: PoolClient, f: FormData) {
   const school = field(f,"schoolId"), kind = field(f,"kind"), id = field(f,"id"), remove = field(f,"remove") === "1";
   // Serialize all changes for one school, including overlap checks and route edits.
-  if (!(await c.query("select id from schools where id=$1 for update",[school])).rowCount) fail("学校不存在。", "School not found.");
+  const locked = await c.query('select calendar_archived_through::text as cutoff from schools where id=$1 for update',[school]);
+  if (!locked.rowCount) fail("学校不存在。", "School not found.");
+  const cutoff: string | null = locked.rows[0].cutoff;
   const tables: Record<string,string> = {term:"school_terms",exception:"school_calendar_exceptions",rule:"school_pickup_rules",route:"pickup_routes"};
   const table = tables[kind];
   if (!table) fail("设置类型无效。", "Invalid setting type.");
   if (id) {
     const existing = kind === "route"
       ? await c.query("select r.updated_at::text from pickup_routes r join school_pickup_rules p on p.id=r.rule_id where r.id=$1 and p.school_id=$2",[id,school])
-      : await c.query(`select updated_at::text from ${table} where id=$1 and school_id=$2`,[id,school]);
+      : await c.query(`select updated_at::text${kind === "term" || kind === "exception" ? ', ends_on::text as end' : ''} from ${table} where id=$1 and school_id=$2`,[id,school]);
     if (!existing.rowCount) fail("该设置不属于当前学校。", "This setting does not belong to this school.");
+    if (cutoff && existing.rows[0].end <= cutoff) fail("已存档日期不可修改或删除。", "Archived dates cannot be changed or deleted.");
     if (existing.rows[0].updated_at !== field(f,"updatedAt")) fail("设置已被更新，请刷新后再试。", "Settings changed. Refresh before saving.");
   }
   if (remove) {
@@ -50,6 +53,7 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   const n = name(f);
   if (kind === "term" || kind === "exception") {
     const [a,b] = dates(f);
+    if (cutoff && a <= cutoff) fail("日期必须晚于已存档日期。", "Dates must be after the archive cutoff.");
     if ((await c.query(`select 1 from ${table} where school_id=$1 and id<>coalesce($2::uuid,gen_random_uuid()) and starts_on<=$4::date and ends_on>=$3::date`,[school,id||null,a,b])).rowCount) fail("日期与该学校已有设置重叠，请编辑已有记录。", "Dates overlap an existing entry. Edit that entry instead.");
     const t = kind === "exception" && field(f,"exceptionType") === "time" ? time(f) : null;
     if (id) await c.query(`update ${table} set name=$2,starts_on=$3,ends_on=$4,updated_at=clock_timestamp()${kind === "exception" ? ",pickup_time=$5" : ""} where id=$1`,kind === "exception" ? [id,n,a,b,t] : [id,n,a,b]);
@@ -80,10 +84,30 @@ export const pickupPreviewSql = `
         to_char(coalesce(e.pickup_time,p.pickup_time),'HH24:MI') as time,
         p.grades as grades
  from school_terms t
+ join schools s on s.id=t.school_id
  cross join lateral generate_series(t.starts_on::timestamp,t.ends_on::timestamp,interval '1 day') d
  join school_pickup_rules p on p.school_id=t.school_id
  join pickup_routes r on r.rule_id=p.id and extract(isodow from d)::integer=any(r.weekdays)
  join after_school_programs a on a.id=r.program_id
  left join school_calendar_exceptions e on e.school_id=t.school_id and d::date between e.starts_on and e.ends_on
  where t.id=$1 and t.school_id=$2 and (e.id is null or e.pickup_time is not null)
+ and (s.calendar_archived_through is null or d::date > s.calendar_archived_through)
  order by d,coalesce(e.pickup_time,p.pickup_time),r.name`;
+
+export async function archiveSchoolCalendar(c: PoolClient, f: FormData, today: string) {
+  const school = field(f, "schoolId");
+  const locked = await c.query('select calendar_archived_through::text as cutoff from schools where id=$1 for update', [school]);
+  if (!locked.rowCount) fail("学校不存在。", "School not found.");
+  const term = (await c.query('select ends_on::text as end, updated_at::text as version from school_terms where id=$1 and school_id=$2', [field(f, "id"), school])).rows[0];
+  if (!term) fail("该学期不属于当前学校。", "Term does not belong to this school.");
+  if (term.version !== field(f, "updatedAt")) fail("设置已被更新，请刷新后再试。", "Settings changed. Refresh before archiving.");
+  if (term.end >= today) fail("只能存档已经结束的学期。", "Only ended terms can be archived.");
+  if (locked.rows[0].cutoff && term.end <= locked.rows[0].cutoff) fail("该学期已存档。", "Term is already archived.");
+  // Keep the historical segment and a separately editable future segment.
+  await c.query(`insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time)
+    select school_id,name,$2::date+1,ends_on,pickup_time from school_calendar_exceptions
+    where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
+  await c.query(`update school_calendar_exceptions set ends_on=$2,updated_at=clock_timestamp()
+    where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
+  await c.query('update schools set calendar_archived_through=$2,calendar_archived_at=clock_timestamp() where id=$1', [school, term.end]);
+}

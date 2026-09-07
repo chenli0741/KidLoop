@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import pg from "pg";
-import { savePickupSetting, pickupPreviewSql } from "../src/lib/pickup-settings";
+import { archiveSchoolCalendar, savePickupSetting, pickupPreviewSql } from "../src/lib/pickup-settings";
 
 test("school rules share calendars across routes without drivers and validate edits",async()=>{
   const url=process.env.KIDLOOP_TEST_DATABASE_URL;
@@ -55,5 +55,37 @@ test("school rules share calendars across routes without drivers and validate ed
     assert.equal((await preview()).filter(r=>r.route==="Updated route").length,0);
     assert.equal((await c.query("select count(*)::int as n from drivers")).rows[0].n,0);
     assert.equal((await c.query("select count(*)::int as n from trips")).rows[0].n,0);
+    const archive = async (values:Record<string,string>, today="2026-09-14") => {
+      await c.query("begin");
+      try { await archiveSchoolCalendar(c,form(values),today); await c.query("commit"); }
+      catch(error) { await c.query("rollback"); throw error; }
+    };
+    const archiveForm={schoolId:school,id:termId,updatedAt:await version("school_terms",termId)};
+    await assert.rejects(archive(archiveForm,"2026-09-13"),/Only ended/);
+    await assert.rejects(archive({...archiveForm,schoolId:other}),/belong/);
+    await assert.rejects(archive({...archiveForm,updatedAt:"stale"}),/Refresh/);
+    await save({...term,name:"Next term",startsOn:"2026-09-14",endsOn:"2026-12-20"});
+    await save({schoolId:school,kind:"exception",name:"Spanning holiday",startsOn:"2026-09-13",endsOn:"2026-09-15",exceptionType:"closed"});
+    const rulesBefore=(await c.query("select * from school_pickup_rules order by id")).rows;
+    const routesBefore=(await c.query("select * from pickup_routes order by id")).rows;
+    await archive(archiveForm);
+    assert.equal((await preview()).length,0);
+    assert.deepEqual((await c.query("select * from school_pickup_rules order by id")).rows,rulesBefore);
+    assert.deepEqual((await c.query("select * from pickup_routes order by id")).rows,routesBefore);
+    assert.equal((await c.query("select calendar_archived_through from schools where id=$1",[other])).rows[0].calendar_archived_through,null);
+    assert.equal((await c.query("select count(*)::int as n from school_terms")).rows[0].n,2);
+    const visibleTerms=await c.query(`select t.name from school_terms t join schools s on s.id=t.school_id
+      where t.school_id=$1 and t.ends_on>s.calendar_archived_through`,[school]);
+    assert.deepEqual(visibleTerms.rows.map(r=>r.name),["Next term"]);
+    const segments=(await c.query(`select starts_on::text as start,ends_on::text as end from school_calendar_exceptions where name='Spanning holiday' order by starts_on`)).rows;
+    assert.deepEqual(segments,[{start:"2026-09-13",end:"2026-09-13"},{start:"2026-09-14",end:"2026-09-15"}]);
+    await assert.rejects(archive(archiveForm),/already archived/);
+    await assert.rejects(save({...term,id:termId,updatedAt:archiveForm.updatedAt,remove:"1"}),/Archived dates/);
+    await assert.rejects(save({...term,id:termId,updatedAt:archiveForm.updatedAt}),/Archived dates/);
+    await assert.rejects(save({...term,name:"Recreated history"}),/archive cutoff/);
+    const oldHoliday=(await c.query("select id,updated_at::text as version from school_calendar_exceptions where name='Holiday'")).rows[0];
+    await assert.rejects(save({schoolId:school,kind:"exception",id:oldHoliday.id,updatedAt:oldHoliday.version,remove:"1"}),/Archived dates/);
+    const futureHoliday=(await c.query("select id,updated_at::text as version from school_calendar_exceptions where name='Spanning holiday' and starts_on='2026-09-14'")).rows[0];
+    await save({schoolId:school,kind:"exception",id:futureHoliday.id,updatedAt:futureHoliday.version,name:"Future change",startsOn:"2026-09-14",endsOn:"2026-09-15",exceptionType:"time",pickupTime:"12:30"});
   }finally{await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });

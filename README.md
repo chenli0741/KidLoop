@@ -102,8 +102,14 @@ Run local profile and ownership checks with `KIDLOOP_TEST_DATABASE_URL=postgresq
 
 ### 接送设置
 
-管理员从「接送设置」选择学校，维护学期、假期与特殊日期、班级每周接送时间，再添加学校到课外班的线路。多条线路共享学校日历和时间规则；日程预览按学期计算，无需司机或车辆。实际任务仍由「当天调度」处理。
+已确认业务要求见 [需求与实现边界](docs/confirmed-requirements.md)，详细实施记录见 [项目总览](PROJECT_OVERVIEW.md)。
 
-新增数据库迁移 `006_pickup_settings.sql`，启动前运行 `npm run db:migrate`。`npm run test:pickup` 验证共享日历、星期规则、日期覆盖和并发版本检查，需要显式设置本机 `KIDLOOP_TEST_DATABASE_URL`。
+管理员在 `/schedule` 维护学校学期、假期和年级接送时间（年级可多选），通过月历查看安排。在独立 `/routes` 规划固定多站线路，绑定学生、司机和车辆；保存及读取指定日期时自动生成每日任务，放假自动跳过，无需每天人工调度。改变线路司机影响未开始和后续任务；已执行记录保留。旧 `/schedule/dispatch` 跳转到线路管理。
+
+启动前运行 `npm run db:migrate`，学校规则与固定线路涉及迁移 `006`、`008`、`009`。测试使用本机隔离数据库：
+
+```sh
+KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres node --conditions=react-server --import tsx --test tests/fixed-routes.test.ts tests/pickup-settings.test.ts tests/pickup-calendar.test.ts tests/roles.test.ts
+```
 
 学生照片支持上传：配置私有 Vercel Blob 的 `BLOB_READ_WRITE_TOKEN`，运行迁移 `007_student_photos.sql`。照片经压缩和服务端重编码后存储，读取需要登录并具备对应学生权限。

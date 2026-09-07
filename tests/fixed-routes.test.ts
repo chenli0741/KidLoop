@@ -27,7 +27,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   const stops=[{id:randomUUID(),name:'',address:'',schoolId:school,programId:null,time:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:schoolB,programId:null,time:'14:20'},{id:randomUUID(),name:'',address:'',schoolId:null,programId:program,time:'15:00'}];
   const make=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({name:'Route',startsOn:'2026-09-01',endsOn:'2026-09-30',driverId:driver,vehicleId:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify(ids.map((studentId,i)=>({studentId,pickupStopId:stops[i].id,dropoffStopId:stops[2].id}))),...extra}))f.set(k,v);for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;};
   await tx(()=>saveFixedRoute(c,make()));
-  let route=(await readFixedRoutes(c))[0];assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
+  let route=(await readFixedRoutes(c))[0];assert.equal(route.name,'A → B → P');assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
   await assert.rejects(tx(()=>saveFixedRoute(c,make({name:'Overlap'}))),/overlapping/);
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,1);

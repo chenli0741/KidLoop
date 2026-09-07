@@ -3,11 +3,23 @@ import { todayInOperationsTimeZone } from "@/lib/date";
 import { saveFixedRoute, materializeRoutes } from "@/lib/fixed-routes";
 import { requireUser } from "@/lib/auth";
 import { transaction } from "@/lib/db";
-import { PickupError, savePickupSetting } from "@/lib/pickup-settings";
+import { archiveSchoolCalendar, PickupError, savePickupSetting } from "@/lib/pickup-settings";
 import { revalidatePath } from "next/cache";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
+
+export async function archiveCalendar(_: FormState, form: FormData): Promise<FormState> {
+  await requireUser(["ADMIN"]);
+  const locale = await getLocale();
+  try {
+    await transaction(c => archiveSchoolCalendar(c, form, todayInOperationsTimeZone()));
+    revalidatePath("/schedule");
+    return { ok: true, message: text(locale,"历史日历已存档。","Historical calendar archived.") };
+  } catch (error) {
+    return { ok: false, message: error instanceof PickupError ? text(locale,error.zh,error.en) : text(locale,"存档失败，请稍后重试。","Could not archive. Try again.") };
+  }
+}
 
 export async function saveSetting(_: FormState, form: FormData): Promise<FormState> {
   await requireUser(["ADMIN"]);

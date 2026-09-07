@@ -453,6 +453,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .calendar-day-detail { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
 .calendar-day-detail h3 { margin: 0 0 8px; }
 .calendar-day-detail p { font-size: 13px; padding: 6px 0; }
+.calendar-detail-dialog { width: min(520px, calc(100vw - 24px)); }
+.calendar-detail-dialog .calendar-day-detail { margin: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
 .calendar-pickup-detail { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .calendar-pickup-detail span { color: var(--muted); }
 @media (max-width: 600px) {

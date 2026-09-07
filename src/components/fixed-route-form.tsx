@@ -1,4 +1,5 @@
 "use client";
+import { routeName } from "@/lib/route-name";
 import { useState } from "react";
 import { SettingsForm } from "./settings-form";
 import { Weekdays } from "./pickup-fields";
@@ -18,7 +19,7 @@ export function FixedRouteForm({initial,schools,programs,drivers,vehicles,studen
  function reorder(i:number,d:number){setStops(prev=>{const next=[...prev];[next[i],next[i+d]]=[next[i+d],next[i]];return next;});}
  return <SettingsForm action={saveRoute} submitLabel={text(locale,"保存固定线路","Save recurring route")}>
   <input type="hidden" name="id" value={initial?.id??""}/><input type="hidden" name="updatedAt" value={initial?.updatedAt??""}/><input type="hidden" name="stops" value={JSON.stringify(stops)}/><input type="hidden" name="students" value={JSON.stringify(riders)}/>
-  <label className="full"><span>{text(locale,"线路名称","Route name")}</span><input name="name" defaultValue={initial?.name} required maxLength={160}/></label>
+  <label className="full"><span>{text(locale,"线路名称","Route name")}</span><input name="name" value={routeName(stops)} readOnly placeholder={text(locale,"选择站点后自动生成","Generated from stops")}/><small className="form-hint">{text(locale,"根据站点顺序自动生成","Generated from stop order")}</small></label>
   <label><span>{text(locale,"开始日期","Start date")}</span><input type="date" name="startsOn" defaultValue={initial?.startsOn??today} required/></label>
   <label><span>{text(locale,"结束日期","End date")}</span><input type="date" name="endsOn" defaultValue={initial?.endsOn} required/></label>
   <Weekdays selected={initial?.weekdays} locale={locale}/>

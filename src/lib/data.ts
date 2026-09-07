@@ -187,7 +187,7 @@ export async function getTrips(date: string) {
       join vehicles v on v.id = sh.vehicle_id
       left join schools sc on sc.id = t.school_id
       left join after_school_programs p on p.id = t.program_id
-      where t.scheduled_date = $1::date and t.status <> 'CANCELED'
+      where t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by t.departure_time, d.name
     `, [date, driverId]),
@@ -207,7 +207,7 @@ export async function getTrips(date: string) {
       join students st on st.id = ts.student_id
       join classrooms c on c.id = st.classroom_id
       left join parents pa on pa.id = st.parent_id
-      where t.scheduled_date = $1::date and t.status <> 'CANCELED'
+      where t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by c.name, st.name
     `, [date, driverId]),
@@ -264,12 +264,16 @@ export async function getDashboardCounts(date: string) {
   const result = await query<{
     vehicles: string; drivers: string; students: string; active_trips: string; attention: string;
   }>(`
+    with daily_trips as (
+      select t.id,t.shift_id,t.status from trips t
+      where t.scheduled_date=$1::date and t.status not in ('DRAFT','CANCELED')
+    )
     select
-      (select count(*) from vehicles where active = true) as vehicles,
-      (select count(*) from drivers where active = true) as drivers,
-      (select count(*) from students where active = true) as students,
-      (select count(*) from trips where scheduled_date = $1::date and status not in ('COMPLETED', 'CANCELED')) as active_trips,
-      (select count(*) from trips where scheduled_date = $1::date and status = 'NEEDS_ATTENTION') as attention
+      (select count(distinct sh.vehicle_id) from daily_trips t join driver_shifts sh on sh.id=t.shift_id) as vehicles,
+      (select count(distinct sh.driver_id) from daily_trips t join driver_shifts sh on sh.id=t.shift_id) as drivers,
+      (select count(distinct ts.student_id) from trip_students ts join daily_trips t on t.id=ts.trip_id) as students,
+      (select count(*) from daily_trips where status<>'COMPLETED') as active_trips,
+      (select count(*) from daily_trips where status='NEEDS_ATTENTION') as attention
   `, [date]);
   const row = result.rows[0];
   return {

@@ -20,8 +20,8 @@ export default async function DashboardPage() {
   const [counts, trips] = await Promise.all([getDashboardCounts(today), getTrips(today)]);
   const stats = [
     { label: text(locale, "进行中行程", "Active trips"), value: counts.activeTrips, icon: Route, tone: "green" },
-    { label: text(locale, "学生", "Students"), value: counts.students, icon: UsersRound, tone: "blue" },
-    { label: text(locale, "车辆", "Vehicles"), value: counts.vehicles, icon: BusFront, tone: "yellow" },
+    { label: text(locale, "今日学生", "Today’s riders"), value: counts.students, icon: UsersRound, tone: "blue" },
+    { label: text(locale, "今日车辆", "Today’s vehicles"), value: counts.vehicles, icon: BusFront, tone: "yellow" },
     { label: text(locale, "需要处理", "Needs attention"), value: counts.attention, icon: AlertTriangle, tone: "red" },
   ];
 

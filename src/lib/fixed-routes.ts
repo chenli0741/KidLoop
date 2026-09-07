@@ -1,4 +1,5 @@
 import "server-only";
+import { routeName } from "./route-name";
 import type { PoolClient } from "pg";
 import type { FixedRoute, RouteStop, RouteStudent } from "./fixed-route-types";
 import { PickupError } from "./pickup-settings";
@@ -15,10 +16,10 @@ export async function readFixedRoutes(c:Pick<PoolClient,"query">):Promise<FixedR
 export async function saveFixedRoute(c:PoolClient,f:FormData) {
  await lockRoutes(c);
  const str=(key:string)=>String(f.get(key)??"").trim();
- const id=str("id"), name=str("name"), starts=str("startsOn"), ends=str("endsOn"), driver=str("driverId")||null, vehicle=str("vehicleId")||null, enabled=str("enabled")==="on";
+ const id=str("id"), starts=str("startsOn"), ends=str("endsOn"), driver=str("driverId")||null, vehicle=str("vehicleId")||null, enabled=str("enabled")==="on";
  const weekdays=[...new Set(f.getAll("weekdays").map(Number))];
  const stops:RouteStop[]=JSON.parse(str("stops")||"[]"), students:RouteStudent[]=JSON.parse(str("students")||"[]");
- if(!name || name.length>160 || !validServiceDate(starts)||!validServiceDate(ends)||starts>ends||Date.parse(ends)-Date.parse(starts)>550*86400000) error("请填写线路名称和有效起止日期（不超过 550 天）。","Enter a route name and valid dates (up to 550 days).");
+ if(!validServiceDate(starts)||!validServiceDate(ends)||starts>ends||Date.parse(ends)-Date.parse(starts)>550*86400000) error("请填写有效起止日期（不超过 550 天）。","Enter valid dates (up to 550 days).");
  if(!weekdays.length||weekdays.some(d=>!Number.isInteger(d)||d<1||d>7)) error("请选择接送星期。","Select valid weekdays.");
  if(!Array.isArray(stops)||stops.length<2||stops.length>30||new Set(stops.map(s=>s.id)).size!==stops.length) error("线路至少需要两个不同站点。","Add at least two distinct stops.");
  for(let i=0;i<stops.length;i++) {
@@ -32,6 +33,9 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
   }
   if(!s.name?.trim()||!s.address?.trim()||s.name.length>160||s.address.length>500) error("请填写站点名称和地址。","Enter each stop's name and address.");
  }
+ const baseName=routeName(stops);
+ let name=baseName, suffix=2;
+ while((await c.query("select 1 from fixed_routes where lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
  if(!Array.isArray(students)||students.length>200||new Set(students.map(s=>s.studentId)).size!==students.length) error("学生清单无效。","Invalid student list.");
  const studentRows=(await c.query("select s.id,s.program_id,c.school_id from students s join classrooms c on c.id=s.classroom_id where s.active and s.id=any($1::uuid[])",[students.map(s=>s.studentId)])).rows;
  for(const a of students) {

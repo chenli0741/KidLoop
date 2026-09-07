@@ -2,7 +2,7 @@
 
 import { useId, useRef, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Archive, Plus, Pencil, Trash2, X } from "lucide-react";
 
 export function SchoolFilter({ schools, selected, label, page = "/students", tab }: {
   schools: { id: string; name: string }[]; selected: string; label: string;
@@ -25,11 +25,11 @@ export function SchoolFilter({ schools, selected, label, page = "/students", tab
 }
 
 export function RosterCreateDialog({ title, closeLabel, children, icon = "add" }: {
-  title: string; closeLabel: string; children: ReactNode; icon?: "add" | "edit" | "remove";
+  title: string; closeLabel: string; children: ReactNode; icon?: "add" | "edit" | "remove" | "archive";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const Icon = icon === "edit" ? Pencil : icon === "remove" ? Trash2 : Plus;
+  const Icon = icon === "edit" ? Pencil : icon === "remove" ? Trash2 : icon === "archive" ? Archive : Plus;
   return <>
     <button type="button" className="button secondary compact" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}><Icon size={16} />{title}</button>
     <dialog ref={dialog} className="record-dialog" aria-labelledby={titleId}>
