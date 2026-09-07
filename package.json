@@ -12,7 +12,8 @@
     "ios:sync": "node scripts/sync-ios.mjs",
     "ios:open": "open ios/App/KidLoop.xcodeproj",
     "auth:create-admin": "node --env-file=.env.local --import tsx scripts/create-admin.ts",
-    "test:roles": "node --conditions=react-server --import tsx --test tests/roles.test.ts"
+    "test:roles": "node --conditions=react-server --import tsx --test tests/roles.test.ts",
+    "test:profiles": "node --conditions=react-server --import tsx --test tests/profile.test.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.1",

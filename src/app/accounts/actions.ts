@@ -26,7 +26,7 @@ export async function createAccount(_: FormState, form: FormData): Promise<FormS
         for (const id of studentIds) await client.query("insert into user_students (user_id, student_id) values ($1, $2::uuid)", [result.rows[0].id, id]);
       }
     });
-    revalidatePath("/accounts");
+    revalidatePath("/admin/accounts");
     return { ok: true, message: text(locale, "账号已创建。请将登录信息交给对应用户。", "Account created. Share the login details with the user.") };
   } catch {
     return { ok: false, message: text(locale, "创建失败。邮箱和司机不能重复，密码需 12–128 个字符，家长需绑定孩子，司机需绑定司机资料。", "Could not create account. Email and driver must be unique, password must have 12–128 characters, and the required child or driver link must be selected.") };
@@ -57,7 +57,7 @@ export async function setAccountActive(form: FormData) {
     await client.query("update app_users set active = $2 where id = $1::uuid", [id, form.get("active") === "true"]);
     await client.query("delete from user_sessions where user_id = $1::uuid", [id]);
   });
-  revalidatePath("/accounts");
+  revalidatePath("/admin/accounts");
 }
 
 export async function updateChildLinks(_: FormState, form: FormData): Promise<FormState> {
@@ -72,7 +72,7 @@ export async function updateChildLinks(_: FormState, form: FormData): Promise<Fo
       await client.query("delete from user_students where user_id = $1", [userId]);
       for (const id of studentIds) await client.query("insert into user_students (user_id, student_id) values ($1, $2::uuid)", [userId, id]);
     });
-    revalidatePath("/accounts"); revalidatePath("/parent");
+    revalidatePath("/admin/accounts"); revalidatePath("/parent");
     return { ok: true, message: text(locale, "孩子绑定已更新。", "Child links updated.") };
   } catch {
     return { ok: false, message: text(locale, "无法更新绑定，请重试。", "Could not update child links. Please retry.") };

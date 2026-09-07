@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BusFront, CalendarDays, Gauge, MapPinned, UsersRound, ShieldCheck, LogOut } from "lucide-react";
-import { logout } from "@/app/login/actions";
+import { BusFront, CalendarDays, Gauge, MapPinned, UsersRound, ShieldCheck } from "lucide-react";
+import { AccountMenu } from "@/components/account-menu";
 import type { AuthUser } from "@/lib/types";
-import { setLocale } from "@/app/actions";
 import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 
@@ -19,10 +18,8 @@ export function AppNavigation({ user }: { user: AuthUser }) {
   ] : [
     { href: "/", label: text(locale, "今日", "Today"), icon: Gauge },
     { href: "/schedule", label: text(locale, "排班", "Schedule"), icon: CalendarDays },
-    { href: "/students", label: text(locale, "学生", "Students"), icon: UsersRound, ShieldCheck, LogOut },
-    { href: "/fleet", label: text(locale, "车队", "Fleet"), icon: BusFront },
-    { href: "/accounts", label: text(locale, "账号", "Accounts"), icon: ShieldCheck },
-    { href: "/locations", label: text(locale, "地点", "Locations"), icon: MapPinned },
+    { href: "/students", label: text(locale, "学生", "Students"), icon: UsersRound },
+    { href: "/resources", label: text(locale, "资料", "Resources"), icon: MapPinned },
   ];
 
   return (
@@ -45,12 +42,8 @@ export function AppNavigation({ user }: { user: AuthUser }) {
           );
         })}
       </nav>
-      <form action={setLocale} className="language-switcher" aria-label={text(locale, "语言", "Language")}>
-        <button type="submit" name="locale" value="zh" className={locale === "zh" ? "active" : ""} aria-pressed={locale === "zh"}>中文</button>
-        <button type="submit" name="locale" value="en" className={locale === "en" ? "active" : ""} aria-pressed={locale === "en"}>EN</button>
-      </form>
-      <form action={logout} className="logout-form"><button type="submit" title={text(locale, "退出登录", "Sign out")}><LogOut size={18} /><span>{text(locale, "退出", "Sign out")}</span></button></form>
-      <div className="sidebar-footer">{user.name}</div>
+      {user.role === "ADMIN" && <Link className="nav-link desktop-only admin-entry" href="/admin/accounts" aria-current={pathname.startsWith("/admin/accounts") ? "page" : undefined}><ShieldCheck size={19} />{text(locale, "后台账号管理", "Account administration")}</Link>}
+      <AccountMenu user={user} />
     </aside>
   );
 }

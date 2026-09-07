@@ -88,7 +88,7 @@ export async function createVehicle(_: FormState, formData: FormData): Promise<F
       "insert into vehicles (name, plate, capacity) values ($1, $2, $3)",
       [required(formData, "name"), required(formData, "plate").toUpperCase(), positiveInteger(formData, "capacity")],
     );
-  }, ["/", "/fleet", "/schedule"], { zh: "车辆已添加。", en: "Vehicle added." });
+  }, ["/", "/resources", "/schedule"], { zh: "车辆已添加。", en: "Vehicle added." });
 }
 
 export async function createDriver(_: FormState, formData: FormData): Promise<FormState> {
@@ -97,7 +97,7 @@ export async function createDriver(_: FormState, formData: FormData): Promise<Fo
       "insert into drivers (name, phone) values ($1, $2)",
       [required(formData, "name"), required(formData, "phone")],
     );
-  }, ["/", "/fleet", "/schedule"], { zh: "司机已添加。", en: "Driver added." });
+  }, ["/", "/resources", "/schedule"], { zh: "司机已添加。", en: "Driver added." });
 }
 
 export async function createSchool(_: FormState, formData: FormData): Promise<FormState> {
@@ -112,7 +112,7 @@ export async function createSchool(_: FormState, formData: FormData): Promise<Fo
       required(formData, "pickupInstructions"),
       required(formData, "dismissalTime"),
     ]);
-  }, ["/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
+  }, ["/resources", "/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
 }
 
 export async function createProgram(_: FormState, formData: FormData): Promise<FormState> {
@@ -126,7 +126,7 @@ export async function createProgram(_: FormState, formData: FormData): Promise<F
       required(formData, "dropoffInfo"),
       required(formData, "requirements"),
     ]);
-  }, ["/students", "/schedule"], { zh: "课外班已添加。", en: "After-school program added." });
+  }, ["/resources", "/students", "/schedule"], { zh: "课外班已添加。", en: "After-school program added." });
 }
 
 export async function createClassroom(_: FormState, formData: FormData): Promise<FormState> {
@@ -208,7 +208,7 @@ export async function createShift(_: FormState, formData: FormData): Promise<For
         values ($1::uuid, $2::uuid, $3::date, $4::time, $5::time)
       `, [driverId, vehicleId, shiftDate, startTime, endTime]);
     });
-  }, ["/", "/fleet", "/schedule"], { zh: "司机排班已创建。", en: "Driver shift scheduled." });
+  }, ["/", "/resources", "/schedule"], { zh: "司机排班已创建。", en: "Driver shift scheduled." });
 }
 
 export async function createTrip(_: FormState, formData: FormData): Promise<FormState> {

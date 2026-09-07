@@ -48,7 +48,7 @@ export default async function StudentsPage() {
                 </article>
               ))}
             </div>
-          ) : <EmptyState title={text(locale, "暂无学生", "No students yet")} body={text(locale, "请先添加学校、班级和课外班，再创建第一名学生。", "Add a school, class, and after-school program before creating the first student.")} href="/locations" action={text(locale, "设置地点", "Set up locations")} />}
+          ) : <EmptyState title={text(locale, "暂无学生", "No students yet")} body={text(locale, "请先添加学校、班级和课外班，再创建第一名学生。", "Add a school, class, and after-school program before creating the first student.")} href="/resources?tab=schools" action={text(locale, "设置地点", "Set up locations")} />}
         </section>
 
         <div className="form-stack">
@@ -58,7 +58,7 @@ export default async function StudentsPage() {
                 <label className="full"><span>{text(locale, "学校", "School")}</span><select name="schoolId" required defaultValue=""><option value="" disabled>{text(locale, "选择学校", "Select school")}</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
                 <label className="full"><span>{text(locale, "班级名称", "Class name")}</span><input name="name" placeholder={text(locale, "三年级 2 班", "Room 12")} required /></label>
               </ActionForm>
-            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/locations">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
+            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/resources?tab=schools">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
           </FormPanel>
 
           <FormPanel heading={<div className="panel-heading"><UserPlus size={19} /><div><h2>{text(locale, "添加学生", "Add student")}</h2><p>{text(locale, "接送身份和家长信息", "Pickup identity and parent")}</p></div></div>}>

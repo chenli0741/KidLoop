@@ -13,7 +13,7 @@ async function mutate(kind: FleetKind, form: FormData, deleting: boolean): Promi
   const locale = await getLocale();
   try {
     await transaction((client) => changeFleetRecord(client, kind, form, deleting));
-    for (const path of ["/fleet", "/schedule", "/", "/driver", "/parent"]) revalidatePath(path);
+    for (const path of ["/resources", "/schedule", "/", "/driver", "/parent"]) revalidatePath(path);
     return { ok: true, message: deleting ? text(locale, "已删除，历史记录已保留。", "Removed. History retained.") : text(locale, "资料已保存。", "Details saved.") };
   } catch (error) {
     const messages: Record<string, [string, string]> = {

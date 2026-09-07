@@ -91,3 +91,11 @@ KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres npm run test:role
 ```
 
 `node --env-file=.env.local --import tsx scripts/create-test-accounts.ts` creates one test account per role against the configured database, only when labelled test drivers and historical test-roster children exist. Passwords are written to `.local-data/test-accounts.md` with owner-only permissions; the script refuses to overwrite existing accounts or the credentials file.
+
+## Resources and personal accounts
+
+`/resources` combines fleet, schools and programs. System account administration moves to `/admin/accounts` and its navigation entry is desktop-only. All account administration actions still require ADMIN regardless of device. Legacy `/fleet`, `/locations`, and `/accounts` URLs redirect to the new locations.
+
+The account menu contains personal information, password change, language and sign-out. Parents also get a child-information editor. `/profile` allows changes to the signed-in user's name, phone and email (email changes require the current password). Password changes revoke all sessions. `/parent/children` permits updates only to explicitly linked children and preserves school/class/program assignments. Apply migration `005_personal_profiles.sql` before using these pages.
+
+Run local profile and ownership checks with `KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres npm run test:profiles`.

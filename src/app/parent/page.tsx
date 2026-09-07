@@ -32,6 +32,7 @@ export default async function ParentPage({ searchParams }: { searchParams: Promi
         <header className="family-child"><div className="family-photo">{child.photoUrl ? <Image src={child.photoUrl} alt={child.name} fill sizes="72px" /> : <UsersRound size={30} />}</div><div><h2>{child.name}</h2><p>{child.schoolName} · {child.classroomName}</p><small>{text(locale, "年级", "Grade")} {child.grade || "—"} · {child.age === null ? text(locale, "年龄待补充", "Age pending") : text(locale, `${child.age} 岁`, `Age ${child.age}`)}</small></div></header>
         <p className="family-destination"><MapPin size={16} />{child.programName}</p>
         {child.notes && <p className="family-note">{child.notes}</p>}
+        <Link className="text-link" href={`/parent/children#child-${child.id}`}>{text(locale, "编辑孩子资料", "Edit child information")}</Link>
         <section className="family-rides"><h3>{text(locale, "接送状态", "Ride status")}</h3>
           {plan?.absent && <p className="absence-notice">{text(locale, "当天已请假，不需接送", "Absent on this date — no ride needed")}</p>}
           {!rides.length && <p className="form-hint">{text(locale, "当天暂无已发布的接送行程。", "No published ride for this date.")}</p>}

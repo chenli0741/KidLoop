@@ -8,13 +8,17 @@ export async function getParentChildren() {
   const user = await requireUser(["PARENT"]);
   const result = await query<{
     id: string; name: string; photoUrl: string; grade: string; age: number | null;
-    schoolName: string; classroomName: string; programName: string; notes: string;
+    schoolName: string; classroomName: string; programName: string; notes: string; updatedAt: string;
+    parentName: string; relationship: string; parentPhone: string; backupPhone: string; email: string;
   }>(`
     select st.id, st.name, st.photo_url as "photoUrl", st.grade, st.age, st.notes,
-      sc.name as "schoolName", c.name as "classroomName", p.name as "programName"
+      sc.name as "schoolName", c.name as "classroomName", p.name as "programName", st.updated_at::text as "updatedAt",
+      coalesce(pa.name, '') as "parentName", coalesce(pa.relationship, '') as relationship,
+      coalesce(pa.phone, '') as "parentPhone", coalesce(pa.backup_phone, '') as "backupPhone", coalesce(pa.email, '') as email
     from user_students us join students st on st.id = us.student_id
     join classrooms c on c.id = st.classroom_id join schools sc on sc.id = c.school_id
     join after_school_programs p on p.id = st.program_id
+    left join parents pa on pa.id = st.parent_id
     where us.user_id = $1 and st.active order by st.name
   `, [user.id]);
   return result.rows.map((child) => ({ ...child, notes: editableNote(child.notes) }));
