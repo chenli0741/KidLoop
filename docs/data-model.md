@@ -67,3 +67,7 @@ When all students are `DROPPED_OFF` or `ABSENT`, the trip becomes `COMPLETED`. A
 ## Planned additions
 
 The MVP schema does not yet include authentication, organization membership, teachers, recurring weekly schedules, object-storage upload metadata, push notification devices, or offline synchronization queues.
+
+## Implemented login and parent-plan tables
+
+Migration `003_accounts_and_parent_requests.sql` adds `app_users` (ADMIN/DRIVER/PARENT), `user_students` (explicit parent-child links), `user_sessions` (hashed session tokens), `login_limits`, `student_day_plans` and append-only `student_day_plan_history`. `status_history.actor_id` records the authenticated operator; `trip_students.parent_absence` distinguishes parent absences from driver-recorded absences. One daily plan exists per child/date and can exist without a trip. Students, trips and assignments are locked in that order when applying a parent absence or updating a ride status, preventing a concurrent pickup from being overwritten.

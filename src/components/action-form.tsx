@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { CheckCircle2, Plus, TriangleAlert } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
+import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
 const initialState: FormState = { ok: false, message: "" };
@@ -14,6 +16,7 @@ type ActionFormProps = {
 };
 
 export function ActionForm({ action, children, submitLabel, className = "form-grid" }: ActionFormProps) {
+  const locale = useLocale();
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -33,7 +36,7 @@ export function ActionForm({ action, children, submitLabel, className = "form-gr
         ) : <span />}
         <button className="button primary" type="submit" disabled={pending}>
           <Plus size={17} aria-hidden="true" />
-          {pending ? "Saving..." : submitLabel}
+          {pending ? text(locale, "保存中...", "Saving...") : submitLabel}
         </button>
       </div>
     </form>

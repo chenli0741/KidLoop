@@ -1,30 +1,36 @@
 import "server-only";
 
+import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import type { Classroom, Driver, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
 
 export async function getVehicles() {
+  await requireUser(["ADMIN"]);
   const result = await query<Vehicle>(`
-    select id, name, plate, capacity, status
+    select id, name, plate, capacity, status, updated_at::text as "updatedAt"
     from vehicles
+    where active = true
     order by name
   `);
   return result.rows;
 }
 
 export async function getDrivers() {
+  await requireUser(["ADMIN"]);
   const result = await query<Driver>(`
-    select id, name, phone, status
+    select id, name, phone, status, updated_at::text as "updatedAt"
     from drivers
+    where active = true
     order by name
   `);
   return result.rows;
 }
 
 export async function getSchools() {
+  await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; name: string; address: string; pickup_map_url: string | null;
-    pickup_instructions: string; dismissal_time: string;
+    pickup_instructions: string; dismissal_time: string | null;
   }>(`
     select id, name, address, pickup_map_url, pickup_instructions,
            dismissal_time::text
@@ -42,6 +48,7 @@ export async function getSchools() {
 }
 
 export async function getPrograms() {
+  await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; name: string; address: string; dropoff_info: string; requirements: string;
   }>(`
@@ -59,6 +66,7 @@ export async function getPrograms() {
 }
 
 export async function getClassrooms() {
+  await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; school_id: string; school_name: string; name: string;
   }>(`
@@ -76,21 +84,26 @@ export async function getClassrooms() {
 }
 
 export async function getStudents() {
+  await requireUser(["ADMIN"]);
   const result = await query<{
-    id: string; name: string; photo_url: string; grade: string; age: number;
+    id: string; name: string; photo_url: string; grade: string; age: number | null;
     classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
+    backup_phone: string; email: string; notes: string; updated_at: string;
   }>(`
     select st.id, st.name, st.photo_url, st.grade, st.age,
            c.name as classroom_name, c.id as classroom_id,
            sc.id as school_id, sc.name as school_name,
            p.id as program_id, p.name as program_name,
-           pa.name as parent_name, pa.phone as parent_phone, pa.relationship
+           coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone,
+           coalesce(pa.relationship, '') as relationship,
+           coalesce(pa.backup_phone, '') as backup_phone, coalesce(pa.email, '') as email,
+           st.notes, st.updated_at::text
     from students st
     join classrooms c on c.id = st.classroom_id
     join schools sc on sc.id = c.school_id
     join after_school_programs p on p.id = st.program_id
-    join parents pa on pa.id = st.parent_id
+    left join parents pa on pa.id = st.parent_id
     where st.active = true
     order by sc.name, c.name, st.name
   `);
@@ -109,10 +122,15 @@ export async function getStudents() {
     parentName: row.parent_name,
     parentPhone: row.parent_phone,
     relationship: row.relationship,
+    backupPhone: row.backup_phone,
+    email: row.email,
+    notes: row.notes,
+    updatedAt: row.updated_at,
   }));
 }
 
 export async function getShifts(fromDate?: string) {
+  await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; shift_date: string; start_time: string; end_time: string; status: Shift["status"];
     driver_id: string; driver_name: string; vehicle_id: string; vehicle_name: string;
@@ -143,12 +161,14 @@ export async function getShifts(fromDate?: string) {
 }
 
 export async function getTrips(date: string) {
+  const user = await requireUser(["ADMIN", "DRIVER"]);
+  const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
       id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
       driver_name: string; driver_phone: string; vehicle_name: string; vehicle_plate: string; capacity: number;
       school_name: string; school_address: string; pickup_map_url: string | null;
-      pickup_instructions: string; dismissal_time: string; program_name: string;
+      pickup_instructions: string; dismissal_time: string | null; program_name: string;
       program_address: string; dropoff_info: string; program_requirements: string;
     }>(`
       select t.id, t.scheduled_date::text, t.departure_time::text, t.status,
@@ -165,24 +185,29 @@ export async function getTrips(date: string) {
       join schools sc on sc.id = t.school_id
       join after_school_programs p on p.id = t.program_id
       where t.scheduled_date = $1::date
+        and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by t.departure_time, d.name
-    `, [date]),
+    `, [date, driverId]),
     query<{
       trip_id: string; id: string; student_id: string; name: string; photo_url: string;
-      classroom_name: string; grade: string; age: number; parent_name: string;
-      parent_phone: string; status: Rider["status"];
+      classroom_name: string; grade: string; age: number | null; parent_name: string;
+      parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean;
     }>(`
       select ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
              c.name as classroom_name, st.grade, st.age,
-             pa.name as parent_name, pa.phone as parent_phone, ts.status
+             coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
+             coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent
       from trip_students ts
       join trips t on t.id = ts.trip_id
+      join driver_shifts sh on sh.id = t.shift_id
+      left join student_day_plans dp on dp.student_id = ts.student_id and dp.service_date = t.scheduled_date
       join students st on st.id = ts.student_id
       join classrooms c on c.id = st.classroom_id
-      join parents pa on pa.id = st.parent_id
+      left join parents pa on pa.id = st.parent_id
       where t.scheduled_date = $1::date
+        and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by c.name, st.name
-    `, [date]),
+    `, [date, driverId]),
   ]);
 
   const ridersByTrip = new Map<string, Rider[]>();
@@ -199,6 +224,8 @@ export async function getTrips(date: string) {
       parentName: row.parent_name,
       parentPhone: row.parent_phone,
       status: row.status,
+      parentNote: row.parent_note,
+      parentAbsent: row.parent_absent,
     });
     ridersByTrip.set(row.trip_id, riders);
   }
@@ -227,12 +254,13 @@ export async function getTrips(date: string) {
 }
 
 export async function getDashboardCounts(date: string) {
+  await requireUser(["ADMIN"]);
   const result = await query<{
     vehicles: string; drivers: string; students: string; active_trips: string; attention: string;
   }>(`
     select
-      (select count(*) from vehicles) as vehicles,
-      (select count(*) from drivers) as drivers,
+      (select count(*) from vehicles where active = true) as vehicles,
+      (select count(*) from drivers where active = true) as drivers,
       (select count(*) from students where active = true) as students,
       (select count(*) from trips where scheduled_date = $1::date and status not in ('COMPLETED', 'CANCELED')) as active_trips,
       (select count(*) from trips where scheduled_date = $1::date and status = 'NEEDS_ATTENTION') as attention

@@ -2,11 +2,11 @@
 
 > 文档状态：第一版架构基线
 >
-> 更新日期：2026-09-06
+> 更新日期：2026-09-07
 
 ## 1. 架构决策
 
-KidLoop 采用 Web 优先架构，并使用原生薄壳将移动 Web 应用封装为 iOS 和 Android App。
+KidLoop 采用 Web 优先架构。第一版使用 Capacitor 原生薄壳将移动 Web 应用封装为 iPhone App，Android 不在当前范围内。
 
 系统只维护一套核心业务代码、权限规则、状态模型和后端 API。App 壳层不重复开发管理者、司机、家长或老师的业务页面。
 
@@ -39,10 +39,17 @@ KidLoop 采用 Web 优先架构，并使用原生薄壳将移动 Web 应用封�
 - 管理者端以桌面浏览器为主要使用方式。
 - 司机、家长和老师端以移动界面为主要使用方式。
 - 同一功能在浏览器和 App 内保持相同的数据及状态含义。
+- Web 界面支持简体中文和英文，默认语言为中文。
+- 当前语言通过 `kidloop_locale` Cookie 保存，由服务端页面和客户端交互组件共同读取。
+- 业务状态在数据库中继续使用稳定的英文枚举值，仅在展示层进行本地化。
 
 ### 3.2 App 壳层
 
-- 分别生成 iOS 和 Android 安装包。
+- 使用 Capacitor 8 封装移动 Web 应用。
+- 生成仅支持 iPhone 的 Xcode 工程和 iOS 安装包。
+- Xcode 工程、Target、Scheme 和 App 产品名统一为 `KidLoop`。
+- Bundle ID 初始配置为 `com.chenli0741.kidloop`。
+- iOS Deployment Target 为 iOS 15.0，`TARGETED_DEVICE_FAMILY` 只包含 iPhone。
 - 加载和承载 KidLoop Web 客户端。
 - 管理登录会话、应用生命周期、网络状态和安全存储。
 - 向 Web 客户端提供受控的原生能力桥接。
@@ -80,7 +87,7 @@ Desktop / Tablet Browser
           |
 Mobile Browser ---- Next.js Web App ---- Next.js Backend API ---- PostgreSQL
           |                    |                     |
-iOS / Android Shell ----------+                     +---- Object Storage
+iPhone Capacitor Shell -------+                     +---- Object Storage
           |
 Camera / Push / Maps / Network / Secure Storage
 ```
@@ -124,8 +131,42 @@ Camera / Push / Maps / Network / Secure Storage
 
 以下是实现选型，不改变 Web 优先和 App 薄壳的架构决策：
 
-- App 包壳与原生桥接框架。
 - ORM 和数据库迁移工具。
 - API 组织方式与接口规范。
 - 对象存储和部署平台。
 - Push Notification 与地图服务供应商。
+
+## 10. iPhone 工程
+
+- Xcode 工程：`ios/App/KidLoop.xcodeproj`
+- Target：`KidLoop`
+- Scheme：`KidLoop`
+- App 产品：`KidLoop.app`
+- 支持设备：iPhone
+- 最低系统：iOS 15.0
+
+Capacitor 同步：
+
+```bash
+npm run ios:sync
+```
+
+打开 Xcode：
+
+```bash
+npm run ios:open
+```
+
+在 iPhone 模拟器中连接本机 Next.js 开发服务：
+
+```bash
+CAPACITOR_SERVER_URL=http://127.0.0.1:3010 npm run ios:sync
+```
+
+真机开发时，将 `127.0.0.1` 替换为 Mac 在同一局域网内的地址。正式构建必须使用已部署的 HTTPS 地址：
+
+```bash
+CAPACITOR_SERVER_URL=https://your-kidloop-domain.example npm run ios:sync
+```
+
+不提供 `CAPACITOR_SERVER_URL` 时，App 使用内置的安全回退页面，不会把开发地址写入正式构建。

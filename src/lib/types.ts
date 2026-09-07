@@ -15,6 +15,7 @@ export type Vehicle = {
   plate: string;
   capacity: number;
   status: VehicleStatus;
+  updatedAt: string;
 };
 
 export type Driver = {
@@ -22,6 +23,7 @@ export type Driver = {
   name: string;
   phone: string;
   status: DriverStatus;
+  updatedAt: string;
 };
 
 export type School = {
@@ -30,7 +32,7 @@ export type School = {
   address: string;
   pickupMapUrl: string | null;
   pickupInstructions: string;
-  dismissalTime: string;
+  dismissalTime: string | null;
 };
 
 export type Program = {
@@ -53,7 +55,7 @@ export type Student = {
   name: string;
   photoUrl: string;
   grade: string;
-  age: number;
+  age: number | null;
   classroomName: string;
   classroomId: string;
   schoolId: string;
@@ -63,6 +65,10 @@ export type Student = {
   parentName: string;
   parentPhone: string;
   relationship: string;
+  backupPhone: string;
+  email: string;
+  notes: string;
+  updatedAt: string;
 };
 
 export type Shift = {
@@ -86,10 +92,12 @@ export type Rider = {
   photoUrl: string;
   classroomName: string;
   grade: string;
-  age: number;
+  age: number | null;
   parentName: string;
   parentPhone: string;
   status: RiderStatus;
+  parentNote: string;
+  parentAbsent: boolean;
 };
 
 export type Trip = {
@@ -106,10 +114,14 @@ export type Trip = {
   schoolAddress: string;
   pickupMapUrl: string | null;
   pickupInstructions: string;
-  dismissalTime: string;
+  dismissalTime: string | null;
   programName: string;
   programAddress: string;
   dropoffInfo: string;
   programRequirements: string;
   riders: Rider[];
 };
+
+export type UserRole = "ADMIN" | "DRIVER" | "PARENT";
+export type AuthUser = { id: string; email: string; name: string; role: UserRole; driverId: string | null };
+export type DayPlan = { studentId: string; serviceDate: string; absent: boolean; note: string; updatedAt: string };

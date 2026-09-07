@@ -1,0 +1,20 @@
+"use client";
+import { useState } from "react";
+import { ActionForm } from "@/components/action-form";
+import { createAccount } from "@/app/accounts/actions";
+import { useLocale } from "@/components/locale-provider";
+import { text } from "@/lib/i18n";
+import type { UserRole } from "@/lib/types";
+
+export function AccountForm({ drivers, students }: { drivers: { id: string; name: string }[]; students: { id: string; name: string; schoolName: string }[] }) {
+  const locale = useLocale();
+  const [role, setRole] = useState<UserRole>("PARENT");
+  return <ActionForm action={createAccount} submitLabel={text(locale, "创建账号", "Create account")}>
+    <label><span>{text(locale, "姓名", "Name")}</span><input name="name" maxLength={100} required /></label>
+    <label><span>{text(locale, "登录邮箱", "Login email")}</span><input name="email" type="email" maxLength={254} autoComplete="off" required /></label>
+    <label className="full"><span>{text(locale, "初始密码（12–128 字符）", "Initial password (12–128 characters)")}</span><input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label>
+    <label className="full"><span>{text(locale, "角色", "Role")}</span><select name="role" value={role} onChange={(event) => setRole(event.target.value as UserRole)}><option value="PARENT">{text(locale, "家长", "Parent")}</option><option value="DRIVER">{text(locale, "司机", "Driver")}</option><option value="ADMIN">{text(locale, "管理员", "Admin")}</option></select></label>
+    {role === "DRIVER" && <label className="full"><span>{text(locale, "绑定司机", "Link driver")}</span><select name="driverId" required defaultValue=""><option value="" disabled>{text(locale, "选择司机", "Select driver")}</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>}
+    {role === "PARENT" && <fieldset className="student-checklist"><legend>{text(locale, "绑定孩子（至少一名）", "Link children (at least one)")}</legend>{students.map((student) => <label key={student.id}><input name="studentIds" type="checkbox" value={student.id} /><span><strong>{student.name}</strong><small>{student.schoolName}</small></span></label>)}</fieldset>}
+  </ActionForm>;
+}

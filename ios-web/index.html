@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17211d" />
+    <title>KidLoop</title>
+    <style>
+      :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { display: grid; min-height: 100vh; min-height: 100dvh; margin: 0; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); place-items: center; color: #17211d; background: #f5f7f5; }
+      main { width: min(100%, 360px); text-align: center; }
+      .mark { display: grid; width: 64px; height: 64px; margin: 0 auto 22px; place-items: center; color: #17211d; background: #91d8b5; border-radius: 8px; }
+      svg { width: 34px; height: 34px; }
+      h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+      p { margin: 12px 0 0; color: #65716b; font-size: 15px; line-height: 1.55; }
+      small { display: block; margin-top: 22px; color: #87918c; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6v6m8-6v6M6 15h12M6 3h12l2 9v7H4v-7L6 3Z" />
+          <path d="M7 19v2m10-2v2M8 9h8" />
+        </svg>
+      </div>
+      <h1>KidLoop</h1>
+      <p>The app server has not been configured for this build.</p>
+      <small>Set CAPACITOR_SERVER_URL before syncing the iOS project.</small>
+    </main>
+  </body>
+</html>

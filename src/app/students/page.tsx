@@ -1,3 +1,6 @@
+import { requireUser } from "@/lib/auth";
+import { FormPanel } from "@/components/form-panel";
+import { StudentRecordActions } from "@/components/student-record-actions";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, GraduationCap, Phone, School, UserPlus, UsersRound } from "lucide-react";
@@ -6,10 +9,14 @@ import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { getClassrooms, getPrograms, getSchools, getStudents } from "@/lib/data";
+import { text } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
+  await requireUser(["ADMIN"]);
+  const locale = await getLocale();
   const [students, classrooms, schools, programs] = await Promise.all([
     getStudents(), getClassrooms(), getSchools(), getPrograms(),
   ]);
@@ -17,62 +24,61 @@ export default async function StudentsPage() {
 
   return (
     <div className="page-container">
-      <PageHeader eyebrow="Roster" title="Students" description="Keep each student’s pickup identity, class, destination, and parent contact together." />
+      <PageHeader eyebrow={text(locale, "学生名册", "Roster")} title={text(locale, "学生", "Students")} description={text(locale, "集中管理每名学生的接送身份、班级、目的地和家长联系方式。", "Keep each student’s pickup identity, class, destination, and parent contact together.")} />
 
       <div className="students-layout">
         <section className="content-section">
-          <div className="section-heading"><div><span className="eyebrow">Active roster</span><h2>{students.length} students</h2></div></div>
+          <div className="section-heading"><div><span className="eyebrow">{text(locale, "在册学生", "Active roster")}</span><h2>{students.length} {text(locale, "名学生", "students")}</h2></div></div>
           {students.length ? (
             <div className="student-grid">
               {students.map((student) => (
                 <article className="student-card" key={student.id}>
-                  <div className="student-card-photo"><Image src={student.photoUrl} alt={`${student.name} profile`} fill sizes="96px" /></div>
+                  <div className="student-card-photo">{student.photoUrl ? <Image src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
                   <div className="student-card-body">
                     <h3>{student.name}</h3>
                     <p>{student.schoolName}</p>
                     <div className="student-facts">
-                      <span><GraduationCap size={14} /> {student.classroomName} · Grade {student.grade}</span>
-                      <span><UsersRound size={14} /> Age {student.age}</span>
-                      <span><Phone size={14} /> {student.parentName} · {student.parentPhone}</span>
+                      <span><GraduationCap size={14} /> {student.classroomName} · {text(locale, "年级", "Grade")} {student.grade || text(locale, "待定", "pending")}</span>
+                      <span><UsersRound size={14} /> {text(locale, "年龄", "Age")} {student.age ?? text(locale, "待定", "pending")}</span>
+                      <span><Phone size={14} /> {student.parentName ? `${student.parentName} · ${student.parentPhone}` : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
                     </div>
-                    <div className="destination"><span>Dropoff</span><strong>{student.programName}</strong></div>
+                    <div className="destination"><span>{text(locale, "送达", "Dropoff")}</span><strong>{student.programName}</strong></div>
+                    <StudentRecordActions student={student} classrooms={classrooms} programs={programs} locale={locale} />
                   </div>
                 </article>
               ))}
             </div>
-          ) : <EmptyState title="No students yet" body="Add a school, class, and after-school program before creating the first student." href="/locations" action="Set up locations" />}
+          ) : <EmptyState title={text(locale, "暂无学生", "No students yet")} body={text(locale, "请先添加学校、班级和课外班，再创建第一名学生。", "Add a school, class, and after-school program before creating the first student.")} href="/locations" action={text(locale, "设置地点", "Set up locations")} />}
         </section>
 
         <div className="form-stack">
-          <aside className="form-panel">
-            <div className="panel-heading"><School size={19} /><div><h2>Add class</h2><p>Simple school grouping</p></div></div>
+          <FormPanel heading={<div className="panel-heading"><School size={19} /><div><h2>{text(locale, "添加班级", "Add class")}</h2><p>{text(locale, "学校内的简单分组", "Simple school grouping")}</p></div></div>}>
             {schools.length ? (
-              <ActionForm action={createClassroom} submitLabel="Add class">
-                <label className="full"><span>School</span><select name="schoolId" required defaultValue=""><option value="" disabled>Select school</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
-                <label className="full"><span>Class name</span><input name="name" placeholder="Room 12" required /></label>
+              <ActionForm action={createClassroom} submitLabel={text(locale, "添加班级", "Add class")}>
+                <label className="full"><span>{text(locale, "学校", "School")}</span><select name="schoolId" required defaultValue=""><option value="" disabled>{text(locale, "选择学校", "Select school")}</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
+                <label className="full"><span>{text(locale, "班级名称", "Class name")}</span><input name="name" placeholder={text(locale, "三年级 2 班", "Room 12")} required /></label>
               </ActionForm>
-            ) : <p className="setup-callout">Add a school first. <Link href="/locations">Open locations <ArrowRight size={14} /></Link></p>}
-          </aside>
+            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/locations">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
+          </FormPanel>
 
-          <aside className="form-panel">
-            <div className="panel-heading"><UserPlus size={19} /><div><h2>Add student</h2><p>Pickup identity and parent</p></div></div>
+          <FormPanel heading={<div className="panel-heading"><UserPlus size={19} /><div><h2>{text(locale, "添加学生", "Add student")}</h2><p>{text(locale, "接送身份和家长信息", "Pickup identity and parent")}</p></div></div>}>
             {canAddStudent ? (
-              <ActionForm action={createStudent} submitLabel="Add student">
-                <label><span>Student name</span><input name="name" required /></label>
-                <label><span>Photo URL</span><input name="photoUrl" type="url" placeholder="https://..." required /></label>
-                <label><span>Class</span><select name="classroomId" required defaultValue=""><option value="" disabled>Select class</option>{classrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
-                <label><span>After-school program</span><select name="programId" required defaultValue=""><option value="" disabled>Select program</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
-                <label><span>Grade</span><input name="grade" placeholder="3" required /></label>
-                <label><span>Age</span><input name="age" type="number" min="3" max="20" required /></label>
-                <label><span>Parent name</span><input name="parentName" required /></label>
-                <label><span>Relationship</span><input name="relationship" placeholder="Mother" required /></label>
-                <label><span>Parent phone</span><input name="parentPhone" type="tel" required /></label>
-                <label><span>Backup phone</span><input name="backupPhone" type="tel" /></label>
-                <label className="full"><span>Parent email</span><input name="email" type="email" /></label>
-                <label className="full"><span>Pickup notes</span><textarea name="notes" rows={2} /></label>
+              <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
+                <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
+                <label><span>{text(locale, "照片 URL", "Photo URL")}</span><input name="photoUrl" type="url" placeholder="https://..." required /></label>
+                <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue=""><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{classrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
+                <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
+                <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
+                <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min="3" max="20" required /></label>
+                <label><span>{text(locale, "家长姓名", "Parent name")}</span><input name="parentName" required /></label>
+                <label><span>{text(locale, "与学生关系", "Relationship")}</span><input name="relationship" placeholder={text(locale, "母亲", "Mother")} required /></label>
+                <label><span>{text(locale, "家长电话", "Parent phone")}</span><input name="parentPhone" type="tel" required /></label>
+                <label><span>{text(locale, "备用电话", "Backup phone")}</span><input name="backupPhone" type="tel" /></label>
+                <label className="full"><span>{text(locale, "家长邮箱", "Parent email")}</span><input name="email" type="email" /></label>
+                <label className="full"><span>{text(locale, "接送备注", "Pickup notes")}</span><textarea name="notes" rows={2} /></label>
               </ActionForm>
-            ) : <p className="setup-callout">A class and after-school program are required before adding students.</p>}
-          </aside>
+            ) : <p className="setup-callout">{text(locale, "添加学生前需要先创建班级和课外班。", "A class and after-school program are required before adding students.")}</p>}
+          </FormPanel>
         </div>
       </div>
     </div>

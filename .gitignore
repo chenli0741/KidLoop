@@ -12,3 +12,7 @@ out/
 .DS_Store
 *.log
 *.tsbuildinfo
+.vercel
+
+# Private source rosters and import previews.
+.local-data/

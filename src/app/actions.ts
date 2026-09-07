@@ -1,8 +1,24 @@
 "use server";
 
+import { requireUser } from "@/lib/auth";
+import { recomputeTrip } from "@/lib/day-plans";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { query, transaction } from "@/lib/db";
+import { isLocale, LOCALE_COOKIE, text, type Locale } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 import type { FormState, RiderStatus } from "@/lib/types";
+
+export async function setLocale(formData: FormData) {
+  const locale = formData.get("locale");
+  if (typeof locale !== "string" || !isLocale(locale)) return;
+  (await cookies()).set(LOCALE_COOKIE, locale, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
 
 function required(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -21,28 +37,48 @@ function positiveInteger(formData: FormData, key: string) {
   return value;
 }
 
-function messageFor(error: unknown) {
+function messageFor(error: unknown, locale: Locale) {
   if (error instanceof Error) {
-    if (error.message.includes("duplicate key")) return "This record already exists.";
-    if (error.message.includes("violates foreign key")) return "A related record no longer exists.";
+    if (error.message.includes("duplicate key")) return text(locale, "该记录已存在。", "This record already exists.");
+    if (error.message.includes("violates foreign key")) return text(locale, "关联记录已不存在。", "A related record no longer exists.");
     const expected = [
       "is required", "must be", "already has", "does not have enough seats",
       "must fall within", "no longer available", "already have a trip",
       "Every student", "At least one student",
     ];
-    if (expected.some((part) => error.message.includes(part))) return error.message;
+    if (expected.some((part) => error.message.includes(part))) {
+      if (locale === "en") return error.message;
+      const messages: Array<[string, string]> = [
+        ["is required", "请填写所有必填信息。"],
+        ["positive number", "请输入有效的正整数。"],
+        ["between 3 and 20", "年龄必须在 3 到 20 岁之间。"],
+        ["after startTime", "结束时间必须晚于开始时间。"],
+        ["driver already", "该司机在此时段已有排班。"],
+        ["vehicle already", "该车辆在此时段已有排班。"],
+        ["no longer available", "所选排班已不可用。"],
+        ["date must match", "行程日期必须与排班日期一致。"],
+        ["fall within", "出发时间必须在所选排班时段内。"],
+        ["enough seats", "所选车辆座位数不足。"],
+        ["Every student", "所有学生必须属于所选学校和课外班，且当天未请假。"],
+        ["already have a trip", "一名或多名学生当天已有行程。"],
+        ["At least one student", "请至少选择一名学生。"],
+      ];
+      return messages.find(([part]) => error.message.includes(part))?.[1] ?? "提交的信息无效。";
+    }
   }
-  return "Could not save the change. Please review the details and try again.";
+  return text(locale, "无法保存更改，请检查信息后重试。", "Could not save the change. Please review the details and try again.");
 }
 
-async function runMutation(work: () => Promise<void>, paths: string[], success: string): Promise<FormState> {
+async function runMutation(work: () => Promise<void>, paths: string[], success: { zh: string; en: string }): Promise<FormState> {
+  await requireUser(["ADMIN"]);
+  const locale = await getLocale();
   try {
     await work();
     for (const path of paths) revalidatePath(path);
-    return { ok: true, message: success };
+    return { ok: true, message: success[locale] };
   } catch (error) {
     console.error("KidLoop mutation failed", error);
-    return { ok: false, message: messageFor(error) };
+    return { ok: false, message: messageFor(error, locale) };
   }
 }
 
@@ -52,7 +88,7 @@ export async function createVehicle(_: FormState, formData: FormData): Promise<F
       "insert into vehicles (name, plate, capacity) values ($1, $2, $3)",
       [required(formData, "name"), required(formData, "plate").toUpperCase(), positiveInteger(formData, "capacity")],
     );
-  }, ["/", "/fleet", "/schedule"], "Vehicle added.");
+  }, ["/", "/fleet", "/schedule"], { zh: "车辆已添加。", en: "Vehicle added." });
 }
 
 export async function createDriver(_: FormState, formData: FormData): Promise<FormState> {
@@ -61,7 +97,7 @@ export async function createDriver(_: FormState, formData: FormData): Promise<Fo
       "insert into drivers (name, phone) values ($1, $2)",
       [required(formData, "name"), required(formData, "phone")],
     );
-  }, ["/", "/fleet", "/schedule"], "Driver added.");
+  }, ["/", "/fleet", "/schedule"], { zh: "司机已添加。", en: "Driver added." });
 }
 
 export async function createSchool(_: FormState, formData: FormData): Promise<FormState> {
@@ -76,7 +112,7 @@ export async function createSchool(_: FormState, formData: FormData): Promise<Fo
       required(formData, "pickupInstructions"),
       required(formData, "dismissalTime"),
     ]);
-  }, ["/students", "/schedule"], "School added.");
+  }, ["/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
 }
 
 export async function createProgram(_: FormState, formData: FormData): Promise<FormState> {
@@ -90,7 +126,7 @@ export async function createProgram(_: FormState, formData: FormData): Promise<F
       required(formData, "dropoffInfo"),
       required(formData, "requirements"),
     ]);
-  }, ["/students", "/schedule"], "After-school program added.");
+  }, ["/students", "/schedule"], { zh: "课外班已添加。", en: "After-school program added." });
 }
 
 export async function createClassroom(_: FormState, formData: FormData): Promise<FormState> {
@@ -99,7 +135,7 @@ export async function createClassroom(_: FormState, formData: FormData): Promise
       "insert into classrooms (school_id, name) values ($1::uuid, $2)",
       [required(formData, "schoolId"), required(formData, "name")],
     );
-  }, ["/students"], "Class added.");
+  }, ["/students"], { zh: "班级已添加。", en: "Class added." });
 }
 
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
@@ -135,7 +171,7 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
         optional(formData, "notes"),
       ]);
     });
-  }, ["/", "/students", "/schedule"], "Student added.");
+  }, ["/", "/students", "/schedule"], { zh: "学生已添加。", en: "Student added." });
 }
 
 export async function createShift(_: FormState, formData: FormData): Promise<FormState> {
@@ -147,26 +183,32 @@ export async function createShift(_: FormState, formData: FormData): Promise<For
     const endTime = required(formData, "endTime");
     if (startTime >= endTime) throw new Error("endTime must be after startTime");
 
-    const conflict = await query<{ driver_conflict: boolean; vehicle_conflict: boolean }>(`
-      select
-        bool_or(driver_id = $1::uuid) as driver_conflict,
-        bool_or(vehicle_id = $2::uuid) as vehicle_conflict
-      from driver_shifts
-      where shift_date = $3::date
-        and status <> 'CANCELED'
-        and start_time < $5::time
-        and end_time > $4::time
-        and (driver_id = $1::uuid or vehicle_id = $2::uuid)
-    `, [driverId, vehicleId, shiftDate, startTime, endTime]);
+    await transaction(async (client) => {
+      const resources = await client.query(`select v.id from vehicles v cross join drivers d
+        where v.id=$1 and d.id=$2 and v.active and d.active
+          and v.status='AVAILABLE' and d.status='AVAILABLE' for update of v,d`, [vehicleId, driverId]);
+      if (!resources.rowCount) throw new Error("The selected vehicle or driver is no longer available.");
+      const conflict = await client.query<{ driver_conflict: boolean; vehicle_conflict: boolean }>(`
+        select
+          bool_or(driver_id = $1::uuid) as driver_conflict,
+          bool_or(vehicle_id = $2::uuid) as vehicle_conflict
+        from driver_shifts
+        where shift_date = $3::date
+          and status <> 'CANCELED'
+          and start_time < $5::time
+          and end_time > $4::time
+          and (driver_id = $1::uuid or vehicle_id = $2::uuid)
+      `, [driverId, vehicleId, shiftDate, startTime, endTime]);
 
-    if (conflict.rows[0]?.driver_conflict) throw new Error("The driver already has an overlapping shift.");
-    if (conflict.rows[0]?.vehicle_conflict) throw new Error("The vehicle already has an overlapping shift.");
+      if (conflict.rows[0]?.driver_conflict) throw new Error("The driver already has an overlapping shift.");
+      if (conflict.rows[0]?.vehicle_conflict) throw new Error("The vehicle already has an overlapping shift.");
 
-    await query(`
-      insert into driver_shifts (driver_id, vehicle_id, shift_date, start_time, end_time)
-      values ($1::uuid, $2::uuid, $3::date, $4::time, $5::time)
-    `, [driverId, vehicleId, shiftDate, startTime, endTime]);
-  }, ["/", "/fleet", "/schedule"], "Driver shift scheduled.");
+      await client.query(`
+        insert into driver_shifts (driver_id, vehicle_id, shift_date, start_time, end_time)
+        values ($1::uuid, $2::uuid, $3::date, $4::time, $5::time)
+      `, [driverId, vehicleId, shiftDate, startTime, endTime]);
+    });
+  }, ["/", "/fleet", "/schedule"], { zh: "司机排班已创建。", en: "Driver shift scheduled." });
 }
 
 export async function createTrip(_: FormState, formData: FormData): Promise<FormState> {
@@ -180,12 +222,15 @@ export async function createTrip(_: FormState, formData: FormData): Promise<Form
     if (!studentIds.length) throw new Error("At least one student is required");
 
     await transaction(async (client) => {
+      await client.query("select id from students where id = any($1::uuid[]) order by id for update", [studentIds]);
       const shift = await client.query<{ capacity: number; shift_date: string; start_time: string; end_time: string }>(`
         select v.capacity, sh.shift_date::text, sh.start_time::text, sh.end_time::text
         from driver_shifts sh
         join vehicles v on v.id = sh.vehicle_id
+        join drivers d on d.id = sh.driver_id
         where sh.id = $1::uuid and sh.status <> 'CANCELED'
-        for update
+          and v.active and d.active and v.status <> 'MAINTENANCE' and d.status <> 'OFF_DUTY'
+        for update of sh,v,d
       `, [shiftId]);
       if (!shift.rowCount) throw new Error("The selected shift is no longer available.");
       const selectedShift = shift.rows[0];
@@ -203,9 +248,10 @@ export async function createTrip(_: FormState, formData: FormData): Promise<Form
           and c.school_id = $2::uuid
           and st.program_id = $3::uuid
           and st.active = true
-      `, [studentIds, schoolId, programId]);
+          and not exists (select 1 from student_day_plans dp where dp.student_id = st.id and dp.service_date = $4::date and dp.absent)
+      `, [studentIds, schoolId, programId, scheduledDate]);
       if (eligible.rowCount !== studentIds.length) {
-        throw new Error("Every student must belong to the selected school and after-school program.");
+        throw new Error("Every student must belong to the selected school and after-school program and must not be absent that day.");
       }
 
       const duplicate = await client.query(`
@@ -237,53 +283,40 @@ export async function createTrip(_: FormState, formData: FormData): Promise<Form
         `, [rider.rows[0].id]);
       }
     });
-  }, ["/", "/schedule"], "Trip published.");
+  }, ["/", "/schedule"], { zh: "行程已发布。", en: "Trip published." });
 }
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus) {
+  const user = await requireUser(["ADMIN", "DRIVER"]);
   const allowed: Record<RiderStatus, RiderStatus[]> = {
     SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
     PICKED_UP: ["DROPPED_OFF", "EXCEPTION"],
-    DROPPED_OFF: [],
-    ABSENT: [],
-    EXCEPTION: ["PICKED_UP", "ABSENT"],
+    DROPPED_OFF: [], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
-
   await transaction(async (client) => {
-    const current = await client.query<{ status: RiderStatus; trip_id: string }>(`
-      select status, trip_id from trip_students where id = $1::uuid for update
-    `, [tripStudentId]);
-    if (!current.rowCount) throw new Error("Student trip assignment not found.");
+    const target = await client.query<{ student_id: string; trip_id: string }>(`
+      select ts.student_id, ts.trip_id from trip_students ts
+      join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
+      where ts.id = $1::uuid and ($2::uuid is null or sh.driver_id = $2)
+    `, [tripStudentId, user.role === "DRIVER" ? user.driverId : null]);
+    if (!target.rowCount) throw new Error("Assignment unavailable.");
+    // Same lock order as parent plans: student, trip, assignment.
+    await client.query("select id from students where id = $1 for update", [target.rows[0].student_id]);
+    const trip = await client.query<{ status: string }>("select status from trips where id = $1 for update", [target.rows[0].trip_id]);
+    if (["DRAFT", "CANCELED", "COMPLETED"].includes(trip.rows[0].status)) throw new Error("Trip is not active.");
+    const current = await client.query<{ status: RiderStatus; parent_absence: boolean }>(
+      "select status, parent_absence from trip_students where id = $1 for update", [tripStudentId],
+    );
     const rider = current.rows[0];
-    if (!allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
-
+    if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
     await client.query(`
-      update trip_students
-      set status = $2,
-          picked_up_at = case when $2 = 'PICKED_UP' then now() else picked_up_at end,
-          dropped_off_at = case when $2 = 'DROPPED_OFF' then now() else dropped_off_at end,
-          updated_at = now()
-      where id = $1::uuid
+      update trip_students set status = $2,
+        picked_up_at = case when $2 = 'PICKED_UP' then now() else picked_up_at end,
+        dropped_off_at = case when $2 = 'DROPPED_OFF' then now() else dropped_off_at end,
+        updated_at = now() where id = $1
     `, [tripStudentId, nextStatus]);
-    await client.query(`
-      insert into status_history (trip_student_id, from_status, to_status)
-      values ($1::uuid, $2, $3)
-    `, [tripStudentId, rider.status, nextStatus]);
-    await client.query(`
-      update trips
-      set status = (
-        select case
-          when bool_or(ts.status = 'EXCEPTION') then 'NEEDS_ATTENTION'
-          when bool_and(ts.status in ('DROPPED_OFF', 'ABSENT')) then 'COMPLETED'
-          when bool_or(ts.status in ('PICKED_UP', 'DROPPED_OFF')) then 'IN_PROGRESS'
-          else 'PUBLISHED'
-        end
-        from trip_students ts where ts.trip_id = $1::uuid
-      ), updated_at = now()
-      where id = $1::uuid
-    `, [rider.trip_id]);
+    await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id) values ($1, $2, $3, $4)", [tripStudentId, rider.status, nextStatus, user.id]);
+    await recomputeTrip(client, target.rows[0].trip_id);
   });
-
-  revalidatePath("/");
-  revalidatePath("/schedule");
+  for (const path of ["/", "/schedule", "/driver", "/parent"]) revalidatePath(path);
 }
