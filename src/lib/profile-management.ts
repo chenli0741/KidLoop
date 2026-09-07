@@ -53,5 +53,5 @@ export async function saveOwnChild(client: PoolClient, user: AuthUser, form: For
   // Association changes are an administrator operation, never trusted from a parent's request.
   allowed.set("classroomId", result.rows[0].classroom_id);
   allowed.set("programId", result.rows[0].program_id);
-  await saveStudent(client, allowed);
+  await saveStudent(client, allowed, user.id);
 }

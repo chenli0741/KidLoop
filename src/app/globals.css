@@ -413,3 +413,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
   .pickup-record-actions { align-self: flex-end; }
   .pickup-preview th,.pickup-preview td { padding: 8px 4px; font-size: 12px; vertical-align: top; }
 }
+.photo-upload { position: relative; display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.photo-upload > img { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; }
+.photo-upload input[type=file] { width: 100%; min-width: 0; padding: 10px; font-size: 14px; }
+.photo-upload .photo-validation { position: absolute; bottom: 0; left: 0; width: 1px; height: 1px; min-height: 1px; opacity: 0; padding: 0; border: 0; }
+.photo-source-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.photo-drop-zone { display: flex; gap: 10px; align-items: center; border: 1px dashed var(--line); padding: 16px; border-radius: 12px; color: var(--muted); font-size: 13px; }
+.photo-drop-zone.dragging, .photo-drop-zone:focus-visible { background: var(--green-soft); border-color: var(--green); outline: 2px solid var(--green); }
+@media (pointer: coarse) { .photo-drop-zone { display: none; } }

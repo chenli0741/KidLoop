@@ -1,4 +1,5 @@
 "use server";
+import { attachPhoto, photoPath } from "@/lib/student-photos";
 
 import { requireUser } from "@/lib/auth";
 import { recomputeTrip } from "@/lib/day-plans";
@@ -144,6 +145,9 @@ export async function createClassroom(_: FormState, formData: FormData): Promise
 }
 
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser(["ADMIN"]);
+  const photo = optional(formData, "photoUrl");
+  if (!photoPath.test(photo)) return {ok:false,message:"请选择并上传学生照片。 / Please upload a student photo."};
   return runMutation(async () => {
     const age = positiveInteger(formData, "age");
     if (age < 3 || age > 20) throw new Error("age must be between 3 and 20");
@@ -161,10 +165,10 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
         optional(formData, "email"),
       ]);
 
-      await client.query(`
+      const student = await client.query<{id:string}>(`
         insert into students
           (classroom_id, parent_id, program_id, name, photo_url, grade, age, notes)
-        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
+        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8) returning id
       `, [
         required(formData, "classroomId"),
         parent.rows[0].id,
@@ -175,6 +179,7 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
         age,
         optional(formData, "notes"),
       ]);
+      await attachPhoto(client,photo,student.rows[0].id,user.id);
     });
   }, ["/", "/students", "/schedule"], { zh: "学生已添加。", en: "Student added." });
 }

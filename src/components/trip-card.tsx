@@ -63,7 +63,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
         {trip.riders.map((rider) => (
           <div className="rider-row" key={rider.id}>
             <div className="student-photo">
-              {rider.photoUrl ? <Image src={rider.photoUrl} alt="" fill sizes="48px" /> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
+              {rider.photoUrl ? <Image unoptimized={rider.photoUrl.startsWith("/api/photos/")} src={rider.photoUrl} alt="" fill sizes="48px" /> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
             </div>
             <div className="rider-primary">
               <strong>{rider.name}</strong>

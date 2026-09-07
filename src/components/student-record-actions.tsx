@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { PhotoUpload } from "@/components/photo-upload";
 import { RecordActions } from "@/components/record-actions";
 import { deleteStudent, updateStudent } from "@/app/students/actions";
 import { editableNote } from "@/lib/student-management";
@@ -20,8 +20,7 @@ export function StudentRecordActions({ student, classrooms, programs, locale }: 
       <label><span>{text(locale, "家长电话", "Parent phone")}</span><input name="parentPhone" type="tel" defaultValue={student.parentPhone} maxLength={80} /></label>
       <label><span>{text(locale, "备用电话", "Backup phone")}</span><input name="backupPhone" type="tel" defaultValue={student.backupPhone} maxLength={80} /></label>
       <label><span>{text(locale, "家长邮箱", "Parent email")}</span><input name="email" type="email" defaultValue={student.email} maxLength={254} /></label>
-      {student.photoUrl ? <div className="full record-photo-preview"><Image src={student.photoUrl} alt={student.name} width={64} height={80} /><label className="record-checkbox"><input type="checkbox" name="removePhoto" /><span>{text(locale, "移除现有照片", "Remove current photo")}</span></label></div> : null}
-      <label className="full"><span>{text(locale, "替换照片链接（留空保留原图）", "Replacement photo URL (leave empty to keep)")}</span><input name="photoUrl" type="url" placeholder="https://..." maxLength={2048} /></label>
+      <PhotoUpload current={student.photoUrl} />
       <label className="full"><span>{text(locale, "接送备注", "Pickup notes")}</span><textarea name="notes" rows={3} defaultValue={editableNote(student.notes)} maxLength={4000} /></label>
     </RecordActions>
   );

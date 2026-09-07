@@ -1,3 +1,4 @@
+import { attachPhoto, photoPath } from "@/lib/student-photos";
 import type { PoolClient } from "pg";
 
 export class StudentEditError extends Error {}
@@ -40,7 +41,7 @@ async function lockStudent(client: PoolClient, form: FormData) {
   return result.rows[0];
 }
 
-export async function saveStudent(client: PoolClient, form: FormData) {
+export async function saveStudent(client: PoolClient, form: FormData, actorId?: string) {
   const name = field(form, "name", 200);
   const classroomId = field(form, "classroomId");
   const programId = field(form, "programId");
@@ -52,7 +53,7 @@ export async function saveStudent(client: PoolClient, form: FormData) {
   const removePhoto = form.get("removePhoto") === "on";
   if (!name || !uuid.test(classroomId) || !uuid.test(programId)) throw new StudentEditError("invalid");
   if (age !== null && (!/^\d+$/.test(ageText) || !Number.isInteger(age) || age < 3 || age > 20)) throw new StudentEditError("age");
-  if (replacement) {
+  if (replacement && !photoPath.test(replacement)) {
     try {
       const url = new URL(replacement);
       if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new Error();
@@ -88,6 +89,9 @@ export async function saveStudent(client: PoolClient, form: FormData) {
   if (!parentId && Object.values(parent).some(Boolean)) {
     const inserted = await client.query<{ id: string }>("insert into parents (name,relationship,phone,backup_phone,email) values ($1,$2,$3,$4,$5) returning id", values);
     parentId = inserted.rows[0].id;
+  }
+  if (replacement) {
+    try { await attachPhoto(client,replacement,current.id,actorId); } catch { throw new StudentEditError("photo"); }
   }
   await client.query(`update students set name=$2,classroom_id=$3,program_id=$4,grade=$5,age=$6,
     photo_url=$7,parent_id=$8,notes=$9,updated_at=clock_timestamp() where id=$1`,

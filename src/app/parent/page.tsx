@@ -29,7 +29,7 @@ export default async function ParentPage({ searchParams }: { searchParams: Promi
       const rides = schedule.rides.filter((ride) => ride.studentId === child.id);
       const plan = schedule.plans.find((p) => p.studentId === child.id);
       return <article className="family-card" key={child.id}>
-        <header className="family-child"><div className="family-photo">{child.photoUrl ? <Image src={child.photoUrl} alt={child.name} fill sizes="72px" /> : <UsersRound size={30} />}</div><div><h2>{child.name}</h2><p>{child.schoolName} · {child.classroomName}</p><small>{text(locale, "年级", "Grade")} {child.grade || "—"} · {child.age === null ? text(locale, "年龄待补充", "Age pending") : text(locale, `${child.age} 岁`, `Age ${child.age}`)}</small></div></header>
+        <header className="family-child"><div className="family-photo">{child.photoUrl ? <Image unoptimized={child.photoUrl.startsWith("/api/photos/")} src={child.photoUrl} alt={child.name} fill sizes="72px" /> : <UsersRound size={30} />}</div><div><h2>{child.name}</h2><p>{child.schoolName} · {child.classroomName}</p><small>{text(locale, "年级", "Grade")} {child.grade || "—"} · {child.age === null ? text(locale, "年龄待补充", "Age pending") : text(locale, `${child.age} 岁`, `Age ${child.age}`)}</small></div></header>
         <p className="family-destination"><MapPin size={16} />{child.programName}</p>
         {child.notes && <p className="family-note">{child.notes}</p>}
         <Link className="text-link" href={`/parent/children#child-${child.id}`}>{text(locale, "编辑孩子资料", "Edit child information")}</Link>

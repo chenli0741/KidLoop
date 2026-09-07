@@ -1,3 +1,4 @@
+import { PhotoUpload } from "@/components/photo-upload";
 import { requireUser } from "@/lib/auth";
 import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { StudentRecordActions } from "@/components/student-record-actions";
@@ -45,7 +46,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             {canAddStudent ? (
               <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
                 <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
-                <label><span>{text(locale, "照片 URL", "Photo URL")}</span><input name="photoUrl" type="url" placeholder="https://..." required /></label>
+                <PhotoUpload required />
                 <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue={schoolClassrooms.length === 1 ? schoolClassrooms[0].id : ""}><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{schoolClassrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
                 <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
                 <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
@@ -68,7 +69,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             <div className="student-grid">
               {visibleStudents.map((student) => (
                 <article className="student-card" key={student.id}>
-                  <div className="student-card-photo">{student.photoUrl ? <Image src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
+                  <div className="student-card-photo">{student.photoUrl ? <Image unoptimized={student.photoUrl.startsWith("/api/photos/")} src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
                   <div className="student-card-body">
                     <h3>{student.name}</h3>
                     <p>{student.schoolName}</p>

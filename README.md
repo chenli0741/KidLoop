@@ -105,3 +105,5 @@ Run local profile and ownership checks with `KIDLOOP_TEST_DATABASE_URL=postgresq
 管理员从「接送设置」选择学校，维护学期、假期与特殊日期、班级每周接送时间，再添加学校到课外班的线路。多条线路共享学校日历和时间规则；日程预览按学期计算，无需司机或车辆。实际任务仍由「当天调度」处理。
 
 新增数据库迁移 `006_pickup_settings.sql`，启动前运行 `npm run db:migrate`。`npm run test:pickup` 验证共享日历、星期规则、日期覆盖和并发版本检查，需要显式设置本机 `KIDLOOP_TEST_DATABASE_URL`。
+
+学生照片支持上传：配置私有 Vercel Blob 的 `BLOB_READ_WRITE_TOKEN`，运行迁移 `007_student_photos.sql`。照片经压缩和服务端重编码后存储，读取需要登录并具备对应学生权限。

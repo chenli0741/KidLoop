@@ -446,3 +446,15 @@ MVP 至少需要通过以下端到端场景：
 - 设置支持新增、编辑、确认删除，所有写入仅限管理员；按学校串行检查冲突并校验版本。被线路引用的规则不能直接删除或移除线路使用的星期。
 - 学校基础资料不再要求填写单一放学时间，改为链接到学校日历与接送规则；原 dismissal_time 历史字段保留。
 - 数据迁移：`006_pickup_settings.sql`。规则集成测试：`KIDLOOP_TEST_DATABASE_URL=postgresql://<user>@localhost/postgres npm run test:pickup`，仅接受本机数据库，使用独立临时 schema。
+
+### 学生照片上传
+
+- 管理员添加／编辑学生、家长编辑已绑定孩子均支持文件选择和照片预览；iPhone 使用系统图片选择入口。选择后上传，保存资料后关联到学生。
+- 浏览器将可解码照片（原图最多 15 MB）压缩为 JPEG 再上传；服务端限制为 1 MB，重新解码、纠正方向、缩至最长边 1024 并移除元数据。无法解码的 HEIC 提示转为 JPEG。
+- 上传内容保存到 Vercel 私有 Blob；`student_photos` 只保存对象地址、上传人和学生关联。环境变量为 `BLOB_READ_WRITE_TOKEN`，迁移为 `007_student_photos.sql`。
+- `/api/photos` 仅接受管理员／家长的同源上传。`/api/photos/[id]` 按角色和学生关系鉴权，返回私有不缓存图片；图片直接请求鉴权接口，不经 Next 图片优化公共缓存。
+- 用户仅能将自己上传的照片关联到当前有权编辑的学生。取消选择不改变原照片；尚未关联的对象保留为上传草稿，当前没有自动清理任务。原有照片链接仍可显示。
+- iPhone 原生配置已加入相机和相册用途说明；拍照权限配置需随下一次 App 构建发布。
+
+- 上传交互参考 RedHotWeb 的 `packages/ui/src/components/image-upload.tsx` 和 `support-chat-widget.tsx`：照片预览、独立相册／拍照按钮、原生 Camera 插件、逐步压缩到 1 MB 以下，以及问题反馈页的拖拽／粘贴入口。KidLoop 按自身会话和孩子绑定关系鉴权，不复用 RedHotWeb 的公开图片地址或业务接口。
+- Web 使用文件选择并支持拖拽／粘贴截图；iPhone App 安装 Camera 插件后使用系统相册／相机，取消选择保留原照片且不显示失败。原生插件不可用时保留文件选择兼容入口。原生配置变更需重新构建安装包。
