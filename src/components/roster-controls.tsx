@@ -4,8 +4,9 @@ import { useId, useRef, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 
-export function SchoolFilter({ schools, selected, label }: {
+export function SchoolFilter({ schools, selected, label, page = "/students", tab }: {
   schools: { id: string; name: string }[]; selected: string; label: string;
+  page?: "/students" | "/schedule"; tab?: "school" | "preview";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -13,7 +14,9 @@ export function SchoolFilter({ schools, selected, label }: {
     <span>{label}</span>
     <select aria-label={label} value={selected} disabled={pending || !schools.length} onChange={(event) => {
       const schoolId = event.target.value;
-      startTransition(() => router.push(`/students?school=${encodeURIComponent(schoolId)}`, { scroll: false }));
+      const params = new URLSearchParams({ school: schoolId });
+      if (tab) params.set("tab", tab);
+      startTransition(() => router.push(`${page}?${params}`, { scroll: false }));
     }}>
       {!schools.length && <option value="">—</option>}
       {schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}

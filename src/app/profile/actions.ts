@@ -60,7 +60,7 @@ export async function updateChild(_: FormState, form: FormData): Promise<FormSta
   const user = await requireUser(["PARENT"]); const locale = await getLocale();
   try {
     await transaction((client) => saveOwnChild(client, user, form));
-    for (const path of ["/parent", "/parent/children", "/students", "/driver", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);
+    for (const path of ["/parent", "/parent/children", "/students", "/driver", "/routes", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);
     return { ok: true, message: text(locale, "孩子资料已保存。", "Child information saved.") };
   } catch (error) { return failure(error, locale); }
 }

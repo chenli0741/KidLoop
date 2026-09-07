@@ -208,6 +208,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .student-card-photo { position: relative; min-height: 156px; background: #e7ebe8; }
 .student-card-body { min-width: 0; padding: 14px; }
 .student-card h3 { margin: 0; font-size: 15px; }
+.student-card-heading { display: grid; grid-template-columns: minmax(0, 1fr) 74px; align-items: start; gap: 8px; margin-bottom: 10px; }
+.student-card-identity { min-width: 0; overflow-wrap: anywhere; }
+.student-card-heading > .record-actions { margin-top: 0; }
 .record-actions { margin-top: 10px; min-width: 0; }
 .record-card > .record-actions { grid-column: 2 / -1; margin-top: 0; }
 .record-action-buttons { display: flex; justify-content: flex-end; gap: 6px; }
@@ -231,7 +234,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .record-photo-preview img { object-fit: contain; border-radius: 5px; }
 .record-dialog .record-checkbox { display: flex; align-items: center; gap: 8px; }
 .record-checkbox input { width: 18px; height: 18px; min-height: 18px; }
-.student-card-body > p { margin: 3px 0 11px; color: var(--muted); font-size: 11px; }
+.student-card-identity > p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
 .student-facts { display: grid; gap: 6px; }
 .student-facts span { display: flex; align-items: center; gap: 6px; color: #4f5d56; font-size: 11px; }
 .destination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #edf0ee; }
@@ -353,6 +356,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .resource-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px; margin-bottom: 24px; background: #e8eee9; border-radius: 15px; max-width: 650px; }
 .resource-tabs a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 8px; color: var(--muted); border-radius: 10px; font-size: 14px; font-weight: 700; }
 .resource-tabs a[aria-current] { color: var(--green); background: white; box-shadow: 0 2px 6px #17211d08; }
+.resource-tabs.school-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .admin-entry { margin-top: 18px; }
 .admin-entry[aria-current] { background: #2b3d35; color: white; }
 .account-trigger { display: flex; align-items: center; gap: 10px; margin-top: auto; min-height: 48px; padding: 12px; border: 0; background: transparent; color: #d9e5dd; cursor: pointer; text-align: left; font-size: 14px; }

@@ -71,15 +71,16 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                 <article className="student-card" key={student.id}>
                   <div className="student-card-photo">{student.photoUrl ? <Image unoptimized={student.photoUrl.startsWith("/api/photos/")} src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
                   <div className="student-card-body">
-                    <h3>{student.name}</h3>
-                    <p>{student.schoolName}</p>
+                    <div className="student-card-heading">
+                      <div className="student-card-identity"><h3>{student.name}</h3><p>{student.schoolName}</p></div>
+                      <StudentRecordActions student={student} classrooms={classrooms} programs={programs} locale={locale} />
+                    </div>
                     <div className="student-facts">
                       <span><GraduationCap size={14} /> {student.classroomName} · {text(locale, "年级", "Grade")} {student.grade || text(locale, "待定", "pending")}</span>
                       <span><UsersRound size={14} /> {text(locale, "年龄", "Age")} {student.age ?? text(locale, "待定", "pending")}</span>
                       <span><Phone size={14} /> {student.parentName ? `${student.parentName} · ${student.parentPhone}` : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
                     </div>
                     <div className="destination"><span>{text(locale, "送达", "Dropoff")}</span><strong>{student.programName}</strong></div>
-                    <StudentRecordActions student={student} classrooms={classrooms} programs={programs} locale={locale} />
                   </div>
                 </article>
               ))}

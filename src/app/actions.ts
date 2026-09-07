@@ -77,6 +77,7 @@ async function runMutation(work: () => Promise<void>, paths: string[], success: 
   try {
     await work();
     for (const path of paths) revalidatePath(path);
+    revalidatePath("/routes");
     revalidatePath("/schedule/dispatch");
     return { ok: true, message: success[locale] };
   } catch (error) {

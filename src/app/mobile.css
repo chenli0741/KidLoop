@@ -111,7 +111,8 @@
   .student-card-photo { overflow: hidden; min-height: 64px; height: 64px; border-radius: 16px; }
   .student-card-body { padding: 0; }
   .student-card h3 { font-size: 17px; }
-  .student-card-body > p { margin-top: 5px; font-size: 12px; line-height: 1.5; }
+  .student-card-heading { grid-template-columns: minmax(0, 1fr) 98px; }
+  .student-card-identity > p { margin-top: 5px; font-size: 12px; line-height: 1.5; }
   .student-facts span { align-items: flex-start; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
   .student-facts svg { flex-shrink: 0; margin-top: 2px; }
   .destination { align-items: flex-start; }
@@ -161,7 +162,7 @@
 @media (max-width: 920px) {
   .desktop-only, .sidebar .desktop-only { display: none; }
   .mobile-only { display: block; }
-  .sidebar nav[data-role="ADMIN"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sidebar nav[data-role="ADMIN"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .account-trigger { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); display: grid; place-items: center; margin: 0; padding: 0; width: 44px; height: 44px; min-height: 44px; background: white; border: 1px solid var(--line); border-radius: 14px; color: var(--green); }
   .account-trigger > span { display: none; }
   .account-menu { margin: calc(72px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) auto auto; max-height: calc(100dvh - 100px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
