@@ -2,7 +2,6 @@
 
 import {useId,useRef,useState,useTransition,type ReactNode} from "react";
 import {ArrowRight,Check,CarFront} from "lucide-react";
-import {useRouter} from "next/navigation";
 import {LocationMap} from "./location-map";
 import {finishSegment} from "@/app/driver/actions";
 import {text,type Locale} from "@/lib/i18n";
@@ -12,7 +11,7 @@ type Option={id:string;stops:RouteStop[];done:boolean;pendingPickups:number};
 export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
   options:Option[];tripId:string;locale:Locale;interactive:boolean;children:ReactNode[];
 }) {
-  const id=useId(),router=useRouter();
+  const id=useId();
   const confirmation=useRef<HTMLDialogElement>(null);
   const current=options.findIndex(option=>!option.done);
   const [selected,setSelected]=useState<string|null>(null);
@@ -29,7 +28,7 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
       try{
         await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id);
         confirmation.current?.close();
-        setSelected(null);router.refresh();
+        setSelected(null);
       }catch{setError(text(locale,'无法完成，请刷新后重试。','Could not finish. Refresh and retry.'));}
     });
   }

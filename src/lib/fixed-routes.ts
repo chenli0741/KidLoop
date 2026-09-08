@@ -90,10 +90,13 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string) {
   const schoolTimes = new Map<string,string>();
   let stops=r.stops.map(s=>({...s}));
   if(r.enabled&&r.driverId&&r.vehicleId&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday)) {
+   const matches=(await c.query<{student_id:string;school_id:string;time:string}>(`select s.id as student_id,cl.school_id,coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=any($1::uuid[]) and s.active and (e.id is null or e.pickup_time is not null)`,[r.students.map(a=>a.studentId),date,weekday])).rows;
+   const byStudent=new Map<string,typeof matches[number]>();
+   for(const match of matches) if(!byStudent.has(match.student_id))byStudent.set(match.student_id,match);
    for(const a of r.students) {
     const stop=stops.find(s=>s.id===a.pickupStopId)!;
-    const match=(await c.query(`select coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=$1 and s.active and cl.school_id=$4 and (e.id is null or e.pickup_time is not null)`,[a.studentId,date,weekday,stop.schoolId])).rows[0];
-    if(match) {
+    const match=byStudent.get(a.studentId);
+    if(match && match.school_id===stop.schoolId) {
       eligible.push(a);
       const time=match.time.slice(0,5);
       if(time>(schoolTimes.get(stop.id)??"")) schoolTimes.set(stop.id,time);
@@ -125,11 +128,15 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string) {
   const tripId=existing?.id||(await c.query("insert into trips(shift_id,scheduled_date,departure_time,fixed_route_id,route_name,route_stops) values($1,$2,$3,$4,$5,$6) returning id",[shiftId,date,stops[0].time,r.id,r.name,JSON.stringify(stops)])).rows[0].id;
   await c.query("update trips set route_name=$2,route_stops=$3,departure_time=$4,status='PUBLISHED' where id=$1",[tripId,r.name,JSON.stringify(stops),stops[0].time]);
   await c.query("delete from trip_students where trip_id=$1 and not student_id=any($2::uuid[])",[tripId,eligible.map(a=>a.studentId)]);
-  for(const a of eligible) {
-   // Respect existing manually created trips, so upgrading cannot put a child on two buses.
-   if((await c.query("select 1 from trip_students ts join trips t on t.id=ts.trip_id where ts.student_id=$1 and t.scheduled_date=$2 and t.id<>$3 and t.status<>'CANCELED'",[a.studentId,date,tripId])).rowCount) {await issue("学生已在其他行程中，本线路未重复安排 / A rider already has another trip");continue;}
-   await c.query(`insert into trip_students(trip_id,student_id,status,parent_absence,pickup_stop_id,dropoff_stop_id) values($1,$2,case when coalesce((select absent from student_day_plans where student_id=$2 and service_date=$3),false) then 'ABSENT' else 'SCHEDULED' end,coalesce((select absent from student_day_plans where student_id=$2 and service_date=$3),false),$4,$5) on conflict(trip_id,student_id) do update set pickup_stop_id=$4,dropoff_stop_id=$5`,[tripId,a.studentId,date,a.pickupStopId,a.dropoffStopId]);
-  }
+  // Check the whole roster together, still under the same student/route locks.
+  const conflicts=new Set((await c.query<{student_id:string}>("select distinct ts.student_id from trip_students ts join trips t on t.id=ts.trip_id where ts.student_id=any($1::uuid[]) and t.scheduled_date=$2 and t.id<>$3 and t.status<>'CANCELED'",[eligible.map(a=>a.studentId),date,tripId])).rows.map(a=>a.student_id));
+  if(conflicts.size)await issue("学生已在其他行程中，本线路未重复安排 / A rider already has another trip");
+  const assignments=eligible.filter(a=>!conflicts.has(a.studentId));
+  await c.query(`insert into trip_students(trip_id,student_id,status,parent_absence,pickup_stop_id,dropoff_stop_id)
+    select $1,a."studentId",case when coalesce(dp.absent,false) then 'ABSENT' else 'SCHEDULED' end,coalesce(dp.absent,false),a."pickupStopId",a."dropoffStopId"
+    from jsonb_to_recordset($2::jsonb) as a("studentId" uuid,"pickupStopId" uuid,"dropoffStopId" uuid)
+    left join student_day_plans dp on dp.student_id=a."studentId" and dp.service_date=$3::date
+    on conflict(trip_id,student_id) do update set pickup_stop_id=excluded.pickup_stop_id,dropoff_stop_id=excluded.dropoff_stop_id`,[tripId,JSON.stringify(assignments),date]);
   if((await c.query("select 1 from trip_students where trip_id=$1",[tripId])).rowCount) await recomputeTrip(c,tripId);
   else {await c.query("update trips set status='CANCELED' where id=$1",[tripId]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[shiftId]);}
  }

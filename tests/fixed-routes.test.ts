@@ -120,5 +120,14 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   assert.equal(missed.status,'EXCEPTION');assert.equal(missed.picked_up_at,null);assert.equal(missed.dropped_off_at,null);
   assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'COMPLETED');
   assert.match((await c.query("select note from status_history where trip_student_id=$1 and to_status='EXCEPTION'",[delivered.id])).rows[0].note,/Child at school but did not come out/);
+  // Batched roster writes must still exclude another trip and preserve parent absence.
+  const manualShift=await id("insert into driver_shifts(driver_id,vehicle_id,shift_date,start_time,end_time) values($1,$2,'2026-09-11','09:00','10:00')",[backup,vehicle]);
+  const manualTrip=await id("insert into trips(shift_id,school_id,program_id,scheduled_date,departure_time) values($1,$2,$3,'2026-09-11','09:00')",[manualShift,school,program]);
+  await c.query('insert into trip_students(trip_id,student_id) values($1,$2)',[manualTrip,ids[0]]);
+  await c.query("insert into student_day_plans(student_id,service_date,absent,updated_by) values($1,'2026-09-11',true,$2)",[ids[1],adminId]);
+  await tx(()=>materializeRoutes(c,'2026-09-11','2026-09-07'));
+  const batched=(await c.query("select ts.student_id,ts.status,ts.parent_absence from trip_students ts join trips t on t.id=ts.trip_id where t.fixed_route_id=$1 and t.scheduled_date='2026-09-11'",[route.id])).rows;
+  assert.deepEqual(batched,[{student_id:ids[1],status:'ABSENT',parent_absence:true}]);
+  assert.equal((await c.query("select count(*)::int n from route_task_issues where route_id=$1 and service_date='2026-09-11'",[route.id])).rows[0].n,1);
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });
