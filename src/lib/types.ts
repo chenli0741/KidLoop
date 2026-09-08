@@ -98,6 +98,7 @@ export type Rider = {
   parentPhone: string;
   status: RiderStatus;
   parentNote: string;
+  missedPickupNote?: string;
   parentAbsent: boolean;
 };
 

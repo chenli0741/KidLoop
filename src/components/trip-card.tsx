@@ -10,7 +10,7 @@ import { tripSegments } from "@/lib/trip-segments";
 import { TripSegmentPicker } from "@/components/trip-segment-picker";
 
 export function TripCard({ trip, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
-  const completed = trip.riders.filter((rider) => rider.status === "DROPPED_OFF" || rider.status === "ABSENT").length;
+  const completed = trip.riders.filter((rider) => ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
   const segments = tripSegments(trip);
   const paired = segments.every(s=>s.routeStops?.length===2 && s.riders.length>0 && s.riders.every(r=>r.pickupStopId===s.routeStops![0].id && r.dropoffStopId===s.routeStops![1].id));
 
@@ -36,7 +36,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
 
       {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
-        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!['PICKED_UP','DROPPED_OFF','ABSENT'].includes(r.status)).length};
+        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
       })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
         <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false}/>
@@ -102,6 +102,7 @@ function TripSegmentContent({trip,locale,interactive,showStops=true}:{trip:Trip;
             </div>
             <StatusBadge status={rider.status} />
             {interactive && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} /> : null}
+            {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>
         ))}

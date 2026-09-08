@@ -17,7 +17,7 @@ const labels: Record<string, { zh: string; en: string }> = {
   PICKED_UP: { zh: "已接到", en: "Picked up" },
   DROPPED_OFF: { zh: "已送达", en: "Dropped off" },
   ABSENT: { zh: "缺席", en: "Absent" },
-  EXCEPTION: { zh: "异常", en: "Issue" },
+  EXCEPTION: { zh: "未接到", en: "Not picked up" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

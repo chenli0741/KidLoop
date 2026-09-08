@@ -193,11 +193,12 @@ export async function getTrips(date: string) {
       order by t.departure_time, d.name
     `, [date, driverId]),
     query<{
-      trip_id: string; id: string; student_id: string; name: string; photo_url: string;
+      missed_pickup_note: string | null; trip_id: string; id: string; student_id: string; name: string; photo_url: string;
       classroom_name: string; grade: string; age: number | null; parent_name: string;
       parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean; pickup_stop_id: string|null; dropoff_stop_id:string|null; school_name:string;
     }>(`
-      select ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=c.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
+      select (select note from status_history where trip_student_id=ts.id and to_status='EXCEPTION' order by created_at desc limit 1) as missed_pickup_note,
+             ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=c.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
              c.name as classroom_name, st.grade, st.age,
              coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
              coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent
@@ -229,6 +230,7 @@ export async function getTrips(date: string) {
       parentPhone: row.parent_phone,
       status: row.status,
       parentNote: row.parent_note,
+      missedPickupNote: row.missed_pickup_note ?? undefined,
       parentAbsent: row.parent_absent,
       pickupStopId: row.pickup_stop_id, dropoffStopId:row.dropoff_stop_id, schoolName:row.school_name,
     });

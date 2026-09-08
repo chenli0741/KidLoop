@@ -60,7 +60,7 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
     <dialog ref={confirmation} className="record-dialog" aria-labelledby={`${id}-confirm`} onCancel={event=>{if(pending)event.preventDefault()}}>
       <h2 id={`${id}-confirm`}>{text(locale,'确认全部送达','Confirm all dropped off')}</h2>
       <p>{option.stops[0].name} → {option.stops.at(-1)!.name}</p>
-      <p>{text(locale,'确认本线路所有乘车学生均已送达？未完成的学生将统一标记为已送达，缺席记录保持不变。','Confirm that every rider on this route has arrived? Unfinished riders will be marked Dropped off; absent riders remain absent.')}</p>
+      <p>{text(locale,'确认本线路所有乘车学生均已送达？已接到的学生将统一标记为已送达，缺席和未接到记录保持不变。','Confirm that every onboard rider has arrived? Picked-up riders will be marked Dropped off; absent and not-picked-up records stay unchanged.')}</p>
       {error&&<p role="alert" className="form-message error">{error}</p>}
       <div className="segment-finish">
         <button type="button" className="button secondary" disabled={pending} onClick={()=>confirmation.current?.close()}>{text(locale,'取消','Cancel')}</button>

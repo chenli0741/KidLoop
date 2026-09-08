@@ -12,8 +12,7 @@ export function validServiceDate(date: string) {
 export async function recomputeTrip(client: PoolClient, tripId: string) {
   await client.query(`
     update trips set status = (
-      select case when bool_or(status = 'EXCEPTION') then 'NEEDS_ATTENTION'
-        when bool_and(status in ('DROPPED_OFF', 'ABSENT')) then 'COMPLETED'
+      select case when bool_and(status in ('DROPPED_OFF', 'ABSENT', 'EXCEPTION')) then 'COMPLETED'
         when bool_or(status in ('PICKED_UP', 'DROPPED_OFF')) then 'IN_PROGRESS'
         else 'PUBLISHED' end from trip_students where trip_id = $1
     ), updated_at = now() where id = $1 and status not in ('CANCELED', 'DRAFT')
@@ -58,7 +57,7 @@ export async function saveDayPlan(client: PoolClient, user: AuthUser, input: {
   for (const rider of assignments.rows) {
     if (rider.finished) continue;
     // A parent's cancellation must never reverse an absence recorded by a driver.
-    const next = input.absent && ["SCHEDULED", "EXCEPTION"].includes(rider.status) ? "ABSENT"
+    const next = input.absent && rider.status === "SCHEDULED" ? "ABSENT"
       : !input.absent && rider.parent_absence && rider.status === "ABSENT" ? "SCHEDULED" : null;
     if (!next) continue;
     await client.query("update trip_students set status = $2, parent_absence = $3, updated_at = now() where id = $1", [rider.id, next, input.absent]);

@@ -3,8 +3,9 @@ import type { PoolClient } from "pg";
 import type { AuthUser, RiderStatus } from "./types";
 import { requireTerm } from "./operating-terms";
 import { recomputeTrip } from "./day-plans";
+import { missedPickupReasons, type MissedPickupDetails } from "./missed-pickup";
 
-export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus) {
+export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails) {
   if (!["ADMIN", "DRIVER"].includes(user.role) || (user.role === "DRIVER" && !user.driverId)) throw new Error("Assignment unavailable.");
   await requireTerm(client);
   const target = await client.query<{ student_id: string; trip_id: string }>(`
@@ -26,10 +27,12 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   if (["DRAFT", "CANCELED"].includes(trip.rows[0].status) || (trip.rows[0].status === "COMPLETED" && !undo)) throw new Error("Trip is not active.");
   const allowed: Record<RiderStatus, RiderStatus[]> = {
     SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
-    PICKED_UP: ["SCHEDULED", "ABSENT", "EXCEPTION"],
+    PICKED_UP: ["SCHEDULED", "ABSENT"],
     DROPPED_OFF: ["PICKED_UP"], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
   if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
+  const reason = missedPickupReasons.find(item => item.id === details?.reason);
+  if (nextStatus === "EXCEPTION" && (!reason || details?.parentNotified !== true)) throw new Error("Select a reason and confirm parent notified.");
   await client.query(`
     update trip_students set status = $2,
       picked_up_at = case when $2 = 'SCHEDULED' then null when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
@@ -39,6 +42,6 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   if (undo) {
     await client.query("delete from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id]);
   }
-  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id) values ($1, $2, $3, $4)", [assignmentId, rider.status, nextStatus, user.id]);
+  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, note) values ($1, $2, $3, $4, $5)", [assignmentId, rider.status, nextStatus, user.id, nextStatus === "EXCEPTION" ? `${reason!.zh} / ${reason!.en}; 已通知家长自行安排接送 / Parent notified to arrange pickup` : ""]);
   await recomputeTrip(client, tripId);
 }

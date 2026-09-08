@@ -70,8 +70,6 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[1].id]);
   await assert.rejects(finish(0),/Resolve all pickups/);
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,0);
-  await c.query("update trip_students set status='EXCEPTION' where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[0].id]);
-  await assert.rejects(finish(0),/Resolve all pickups/);
   await c.query("update trip_students set status='PICKED_UP' where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[0].id]);
   await finish(0);await finish(0);
   const delivered=(await c.query('select id,status,picked_up_at,dropped_off_at from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
@@ -111,5 +109,16 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await assert.rejects(finish(0),/Resolve all pickups/);
   await tx(()=>changeRiderStatus(c,actor,delivered.id,'PICKED_UP'));
   assert.ok((await c.query('select picked_up_at from trip_students where id=$1',[delivered.id])).rows[0].picked_up_at);
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'EXCEPTION',{reason:'NOT_COME_OUT',parentNotified:true})),/not allowed/);
+  await undoPickup();
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'EXCEPTION')),/Select a reason/);
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'EXCEPTION',{reason:'NOT_COME_OUT',parentNotified:false})),/Select a reason/);
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'EXCEPTION',{reason:'invalid',parentNotified:true})),/Select a reason/);
+  await tx(()=>changeRiderStatus(c,actor,delivered.id,'EXCEPTION',{reason:'NOT_COME_OUT',parentNotified:true}));
+  await finish(0);
+  const missed=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
+  assert.equal(missed.status,'EXCEPTION');assert.equal(missed.picked_up_at,null);assert.equal(missed.dropped_off_at,null);
+  assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'COMPLETED');
+  assert.match((await c.query("select note from status_history where trip_student_id=$1 and to_status='EXCEPTION'",[delivered.id])).rows[0].note,/Child at school but did not come out/);
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });
