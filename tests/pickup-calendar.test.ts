@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 import { calendarDays } from "../src/lib/pickup-calendar";
 import type { PickupSetting } from "../src/lib/pickup-types";
 const setting = (v: Partial<PickupSetting>): PickupSetting => ({id:"id",name:"Test",updatedAt:"",...v});
+test('special date splits concrete grades by time and leaves other days and grades unchanged',()=>{
+ const terms=[setting({startsOn:'2026-09-01',endsOn:'2026-09-30'})];
+ const rules=[setting({weekdays:[1,2,3,4,5],grades:['1','2','3','4'],pickupTime:'14:00'})];
+ const exception=setting({startsOn:'2026-09-09',endsOn:'2026-09-09',gradeTimes:[{grades:['1','2'],time:'12:00'},{grades:['3'],time:'12:30'}]});
+ const days=calendarDays('2026-09',terms,[exception],rules);
+ assert.equal(days[8].closed,false);assert.equal(days[8].status,'adjusted');
+ assert.deepEqual(days[8].schoolTimes.map(({grades,time})=>({grades,time})),[{grades:['1','2'],time:'12:00'},{grades:['3'],time:'12:30'},{grades:['4'],time:'14:00'}]);
+ assert.equal(days[9].schoolTimes[0].time,'14:00');
+ const unified=calendarDays('2026-09',terms,[{...exception,gradeTimes:[],pickupTime:'13:30'}],rules);
+ assert.equal(unified[8].schoolTimes.length,1);assert.equal(unified[8].schoolTimes[0].time,'13:30');
+});
 test("month calendar shows closures without routes, overrides pickup times and respects term bounds", () => {
   const terms=[setting({startsOn:"2026-09-07",endsOn:"2026-09-11"})];
   const exceptions=[setting({startsOn:"2026-09-07",endsOn:"2026-09-07",pickupTime:null}),setting({startsOn:"2026-09-08",endsOn:"2026-09-08",pickupTime:"12:00"})];

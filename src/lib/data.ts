@@ -4,7 +4,7 @@ import "server-only";
 
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import type { Classroom, Driver, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
+import type { Driver, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
 
 export async function getVehicles() {
   await requireUser(["ADMIN"]);
@@ -67,34 +67,16 @@ export async function getPrograms() {
   }));
 }
 
-export async function getClassrooms() {
-  await requireUser(["ADMIN"]);
-  const result = await query<{
-    id: string; school_id: string; school_name: string; name: string;
-  }>(`
-    select c.id, c.school_id, s.name as school_name, c.name
-    from classrooms c
-    join schools s on s.id = c.school_id
-    order by s.name, c.name
-  `);
-  return result.rows.map((row): Classroom => ({
-    id: row.id,
-    schoolId: row.school_id,
-    schoolName: row.school_name,
-    name: row.name,
-  }));
-}
-
 export async function getStudents() {
   await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; name: string; photo_url: string; grade: string; age: number | null;
-    classroom_name: string; classroom_id: string; school_id: string; school_name: string;
+    no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
     backup_phone: string; email: string; notes: string; updated_at: string;
   }>(`
-    select st.id, st.name, st.photo_url, st.grade, st.age,
-           c.name as classroom_name, c.id as classroom_id,
+    select st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
+           st.classroom_name, st.classroom_id,
            sc.id as school_id, sc.name as school_name,
            p.id as program_id, p.name as program_name,
            coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone,
@@ -102,12 +84,11 @@ export async function getStudents() {
            coalesce(pa.backup_phone, '') as backup_phone, coalesce(pa.email, '') as email,
            st.notes, st.updated_at::text
     from students st
-    join classrooms c on c.id = st.classroom_id
-    join schools sc on sc.id = c.school_id
+    join schools sc on sc.id = st.school_id
     join after_school_programs p on p.id = st.program_id
     left join parents pa on pa.id = st.parent_id
     where st.active = true and exists(select 1 from term_students ts where ts.student_id=st.id and ts.operating_term_id=current_operating_term())
-    order by sc.name, c.name, st.name
+    order by sc.name, st.classroom_name, st.name
   `);
   return result.rows.map((row): Student => ({
     id: row.id,
@@ -116,7 +97,7 @@ export async function getStudents() {
     grade: row.grade,
     age: row.age,
     classroomName: row.classroom_name,
-    classroomId: row.classroom_id,
+    noPickupWeekdays: row.no_pickup_weekdays,
     schoolId: row.school_id,
     schoolName: row.school_name,
     programId: row.program_id,
@@ -200,8 +181,8 @@ export async function getTrips(date: string) {
       parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean; pickup_stop_id: string|null; dropoff_stop_id:string|null; school_name:string;
     }>(`
       select (select note from status_history where trip_student_id=ts.id and to_status='EXCEPTION' order by created_at desc limit 1) as missed_pickup_note,
-             ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=c.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
-             c.name as classroom_name, st.grade, st.age,
+             ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
+             st.classroom_name, st.grade, st.age,
              coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
              coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent
       from trip_students ts
@@ -209,11 +190,10 @@ export async function getTrips(date: string) {
       join driver_shifts sh on sh.id = t.shift_id
       left join student_day_plans dp on dp.student_id = ts.student_id and dp.service_date = t.scheduled_date
       join students st on st.id = ts.student_id
-      join classrooms c on c.id = st.classroom_id
       left join parents pa on pa.id = st.parent_id
       where t.operating_term_id=current_operating_term() and t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
-      order by c.name, st.name
+      order by st.classroom_name, st.name
     `, [date, driverId]),
   ]);
 

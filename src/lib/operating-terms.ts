@@ -99,8 +99,8 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
       [source, id, PICKUP_GRADES],
     );
     await c.query(
-      `insert into term_students(operating_term_id,student_id,reviewed,previous_grade,previous_classroom_id)
-   select $2,s.id,false,h->>'grade',(h->>'classroom_id')::uuid
+      `insert into term_students(operating_term_id,student_id,reviewed,previous_grade,previous_classroom_id,previous_classroom_name)
+   select $2,s.id,false,h->>'grade',(h->>'classroom_id')::uuid,h->>'classroom_name'
    from operating_terms ot cross join lateral jsonb_array_elements(ot.snapshot->'students') h
    join students s on s.id=(h->>'id')::uuid where ot.id=$1 and s.active`,
       [source, id],
@@ -190,7 +190,7 @@ export async function archiveOperatingTerm(
   ).rows;
   snapshot.students = (
     await c.query(
-      "select s.*,c.name as classroom_name,sc.name as school_name,p.name as program_name,ts.reviewed from term_students ts join students s on s.id=ts.student_id join classrooms c on c.id=s.classroom_id join schools sc on sc.id=c.school_id join after_school_programs p on p.id=s.program_id where ts.operating_term_id=$1",
+      "select s.*,sc.name as school_name,p.name as program_name,ts.reviewed from term_students ts join students s on s.id=ts.student_id join schools sc on sc.id=s.school_id join after_school_programs p on p.id=s.program_id where ts.operating_term_id=$1",
       [id],
     )
   ).rows;
@@ -258,9 +258,10 @@ export async function reviewTermStudent(c: PoolClient, f: FormData) {
   const t = await requireTerm(c, String(f.get("operatingTermId"))),
     id = String(f.get("studentId")),
     grade = String(f.get("grade") ?? "").trim(),
-    classroom = String(f.get("classroomId") ?? ""),
+    school = String(f.get("schoolId") ?? ""),
+    classroom = String(f.get("classroomName") ?? "").trim(),
     program = String(f.get("programId") ?? "");
-  if (!grade || grade.length > 30)
+  if (!grade || grade.length > 30 || classroom.length > 100)
     throw new TermError("请核对年级 / Confirm grade");
   const st = (
     await c.query("select id from students where id=$1 and active for update", [
@@ -278,7 +279,7 @@ export async function reviewTermStudent(c: PoolClient, f: FormData) {
   )
     throw new TermError("学生有未完成行程 / Student has unfinished trips");
   if (
-    !(await c.query("select id from classrooms where id=$1", [classroom]))
+    !(await c.query("select id from schools where id=$1", [school]))
       .rowCount ||
     !(
       await c.query("select id from after_school_programs where id=$1", [
@@ -286,10 +287,10 @@ export async function reviewTermStudent(c: PoolClient, f: FormData) {
       ])
     ).rowCount
   )
-    throw new TermError("请选择班级和课外班 / Select class and program");
+    throw new TermError("请选择学校和课外班 / Select school and program");
   await c.query(
-    "update students set grade=$2,classroom_id=$3,program_id=$4,updated_at=clock_timestamp() where id=$1",
-    [id, grade, classroom, program],
+    "update students set grade=$2,classroom_name=$3,program_id=$4,school_id=$5,classroom_id=null,updated_at=clock_timestamp() where id=$1",
+    [id, grade, classroom, program, school],
   );
   await c.query(
     "insert into term_students(operating_term_id,student_id,reviewed) values($1,$2,true) on conflict(operating_term_id,student_id) do update set reviewed=true",

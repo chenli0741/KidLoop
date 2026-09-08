@@ -1,5 +1,6 @@
 import { attachPhoto, photoPath } from "@/lib/student-photos";
 import type { PoolClient } from "pg";
+import { noPickupWeekdays } from './student-schedule';
 
 export class StudentEditError extends Error {}
 
@@ -33,8 +34,8 @@ async function lockStudent(client: PoolClient, form: FormData) {
   const result = await client.query<{
     id: string; parent_id: string | null; school_id: string; program_id: string;
     notes: string; photo_url: string; fresh: boolean;
-  }>(`select st.id, st.parent_id, st.program_id, st.notes, st.photo_url, c.school_id,
-      st.updated_at=$2::timestamptz as fresh from students st join classrooms c on c.id=st.classroom_id
+  }>(`select st.id, st.parent_id, st.program_id, st.notes, st.photo_url, st.school_id,
+      st.updated_at=$2::timestamptz as fresh from students st
       where st.id=$1 and st.active for update of st`, [id, version]);
   if (!result.rowCount) throw new StudentEditError("missing");
   if (!result.rows[0].fresh) throw new StudentEditError("stale");
@@ -43,7 +44,9 @@ async function lockStudent(client: PoolClient, form: FormData) {
 
 export async function saveStudent(client: PoolClient, form: FormData, actorId?: string) {
   const name = field(form, "name", 200);
-  const classroomId = field(form, "classroomId");
+  const schoolId = field(form, "schoolId");
+  const classroomName = field(form, "classroomName", 100);
+  const excludedDays = noPickupWeekdays(form);
   const programId = field(form, "programId");
   const grade = field(form, "grade", 30);
   const ageText = field(form, "age", 3);
@@ -51,7 +54,7 @@ export async function saveStudent(client: PoolClient, form: FormData, actorId?: 
   const note = field(form, "notes", 4000);
   const replacement = field(form, "photoUrl", 2048);
   const removePhoto = form.get("removePhoto") === "on";
-  if (!name || !uuid.test(classroomId) || !uuid.test(programId)) throw new StudentEditError("invalid");
+  if (!name || !uuid.test(schoolId) || !uuid.test(programId)) throw new StudentEditError("invalid");
   if (age !== null && (!/^\d+$/.test(ageText) || !Number.isInteger(age) || age < 3 || age > 20)) throw new StudentEditError("age");
   if (replacement && !photoPath.test(replacement)) {
     try {
@@ -66,10 +69,10 @@ export async function saveStudent(client: PoolClient, form: FormData, actorId?: 
   };
   if (parent.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent.email)) throw new StudentEditError("email");
   const current = await lockStudent(client, form);
-  const classroom = await client.query<{ school_id: string }>("select school_id from classrooms where id=$1", [classroomId]);
+  const school = await client.query("select id from schools where id=$1", [schoolId]);
   const program = await client.query("select id from after_school_programs where id=$1", [programId]);
-  if (!classroom.rowCount || !program.rowCount) throw new StudentEditError("invalid");
-  if (classroom.rows[0].school_id !== current.school_id || programId !== current.program_id) {
+  if (!school.rowCount || !program.rowCount) throw new StudentEditError("invalid");
+  if (schoolId !== current.school_id || programId !== current.program_id) {
     const trips = await client.query(`select 1 from trip_students ts join trips t on t.id=ts.trip_id
       where ts.student_id=$1 and t.operating_term_id=current_operating_term() and t.status not in ('COMPLETED','CANCELED') limit 1`, [current.id]);
     if (trips.rowCount) throw new StudentEditError("assigned");
@@ -93,9 +96,9 @@ export async function saveStudent(client: PoolClient, form: FormData, actorId?: 
   if (replacement) {
     try { await attachPhoto(client,replacement,current.id,actorId); } catch { throw new StudentEditError("photo"); }
   }
-  await client.query(`update students set name=$2,classroom_id=$3,program_id=$4,grade=$5,age=$6,
-    photo_url=$7,parent_id=$8,notes=$9,updated_at=clock_timestamp() where id=$1`,
-    [current.id, name, classroomId, programId, grade, age, removePhoto ? "" : replacement || current.photo_url, parentId, mergeNote(current.notes, note)]);
+  await client.query(`update students set name=$2,school_id=$3,classroom_id=null,program_id=$4,grade=$5,age=$6,
+    photo_url=$7,parent_id=$8,notes=$9,classroom_name=$10,no_pickup_weekdays=$11,updated_at=clock_timestamp() where id=$1`,
+    [current.id, name, schoolId, programId, grade, age, removePhoto ? "" : replacement || current.photo_url, parentId, mergeNote(current.notes, note),classroomName,excludedDays]);
 }
 
 export async function archiveStudent(client: PoolClient, form: FormData) {

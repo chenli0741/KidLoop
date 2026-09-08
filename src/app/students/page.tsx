@@ -6,13 +6,13 @@ import { requireUser } from "@/lib/auth";
 import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { StudentRecordActions } from "@/components/student-record-actions";
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowRight, GraduationCap, Phone, UsersRound } from "lucide-react";
-import { createClassroom, createStudent } from "@/app/actions";
+import { GraduationCap, Phone, UsersRound } from "lucide-react";
+import { createStudent } from "@/app/actions";
+import { StudentWeekdays } from '@/components/student-weekdays';
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { getClassrooms, getPrograms, getSchools, getStudents } from "@/lib/data";
+import { getPrograms, getSchools, getStudents } from "@/lib/data";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 
@@ -23,14 +23,13 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
   const locale = await getLocale();
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
-  const [students, classrooms, schools, programs] = await Promise.all([
-    getStudents(), getClassrooms(), getSchools(), getPrograms(),
+  const [students, schools, programs] = await Promise.all([
+    getStudents(), getSchools(), getPrograms(),
   ]);
   const requestedSchool = (await searchParams).school;
   const selectedSchool = schools.find((school) => school.id === requestedSchool) ?? schools[0];
-  const schoolClassrooms = classrooms.filter((classroom) => classroom.schoolId === selectedSchool?.id);
   const visibleStudents = students.filter((student) => student.schoolId === selectedSchool?.id);
-  const canAddStudent = schoolClassrooms.length > 0 && programs.length > 0;
+  const canAddStudent = Boolean(selectedSchool) && programs.length > 0;
 
   return (
     <div className="page-container">
@@ -39,21 +38,14 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
 
       <div className="roster-toolbar"><SchoolFilter schools={schools} selected={selectedSchool?.id ?? ""} label={text(locale, "学校", "School")} />
         <div className="roster-create-actions" key={selectedSchool?.id ?? "empty"}>
-          <RosterCreateDialog title={text(locale, "添加班级", "Add class")} closeLabel={text(locale, "关闭", "Close")}>
-            {schools.length ? (
-              <ActionForm action={createClassroom} submitLabel={text(locale, "添加班级", "Add class")}>
-                <label className="full"><span>{text(locale, "学校", "School")}</span><select name="schoolId" required defaultValue={selectedSchool?.id ?? ""}><option value="" disabled>{text(locale, "选择学校", "Select school")}</option>{schools.map((school) => <option value={school.id} key={school.id}>{school.name}</option>)}</select></label>
-                <label className="full"><span>{text(locale, "班级名称", "Class name")}</span><input name="name" placeholder={text(locale, "三年级 2 班", "Room 12")} required /></label>
-              </ActionForm>
-            ) : <p className="setup-callout">{text(locale, "请先添加学校。", "Add a school first.")} <Link href="/resources?tab=schools">{text(locale, "打开地点", "Open locations")} <ArrowRight size={14} /></Link></p>}
-          </RosterCreateDialog>
-
           <RosterCreateDialog title={text(locale, "添加学生", "Add student")} closeLabel={text(locale, "关闭", "Close")}>
             {canAddStudent ? (
               <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
                 <input type="hidden" name="operatingTermId" value={operation.id}/><label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
                 <PhotoUpload required />
-                <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue={schoolClassrooms.length === 1 ? schoolClassrooms[0].id : ""}><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{schoolClassrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
+                <input type="hidden" name="schoolId" value={selectedSchool?.id}/>
+                <label><span>{text(locale, "班级", "Class")}</span><input name="classroomName" maxLength={100}/></label>
+                <StudentWeekdays locale={locale}/>
                 <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
                 <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
                 <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min="3" max="20" required /></label>
@@ -64,7 +56,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                 <label className="full"><span>{text(locale, "家长邮箱", "Parent email")}</span><input name="email" type="email" /></label>
                 <label className="full"><span>{text(locale, "接送备注", "Pickup notes")}</span><textarea name="notes" rows={2} /></label>
               </ActionForm>
-            ) : <p className="setup-callout">{text(locale, "请先为当前学校添加班级，并在资料中设置培训学校。", "Add a class for this school and configure an after-school program in Resources first.")}</p>}
+            ) : <p className="setup-callout">{text(locale, "请先在资料中设置学校和课外班。", "Configure a school and an after-school program in Resources first.")}</p>}
           </RosterCreateDialog>
         </div>
       </div>
@@ -79,11 +71,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                   <div className="student-card-body">
                     <div className="student-card-heading">
                       <div className="student-card-identity"><h3>{student.name}</h3><p>{student.schoolName}</p></div>
-                      <StudentRecordActions operatingTermId={operation.id} student={student} classrooms={classrooms} programs={programs} locale={locale} />
+                      <StudentRecordActions operatingTermId={operation.id} student={student} schools={schools} programs={programs} locale={locale} />
                     </div>
                     <div className="student-facts">
                       <span><GraduationCap size={14} /> {student.classroomName} · {text(locale, "年级", "Grade")} {student.grade || text(locale, "待定", "pending")}</span>
                       <span><UsersRound size={14} /> {text(locale, "年龄", "Age")} {student.age ?? text(locale, "待定", "pending")}</span>
+                      {Boolean(student.noPickupWeekdays?.length) && <span>{text(locale,'每周不接送：','No pickup: ')}{student.noPickupWeekdays!.map(day=>(locale==='zh'?['周一','周二','周三','周四','周五','周六','周日']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])[day-1]).join(' / ')}</span>}
                       <span><Phone size={14} /> {student.parentName ? `${student.parentName} · ${student.parentPhone}` : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
                     </div>
                     <div className="destination"><span>{text(locale, "送达", "Dropoff")}</span><strong>{student.programName}</strong></div>

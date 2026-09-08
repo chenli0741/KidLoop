@@ -7,6 +7,7 @@ import {saveFixedRoute,readFixedRoutes,materializeRoutes} from '../src/lib/fixed
 import {finishTripSegment} from '../src/lib/finish-trip-segment';
 import {changeRiderStatus} from '../src/lib/rider-status';
 import {readTripExecution} from '../src/lib/read-trip-execution';
+import {savePickupSetting,parseGradeTimes} from '../src/lib/pickup-settings';
 import type {AuthUser} from '../src/lib/types';
 
 test('fixed multi-school route creates tasks once, skips holidays, changes driver and preserves started trips',async()=>{
@@ -137,5 +138,26 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   const batched=(await c.query("select ts.student_id,ts.status,ts.parent_absence from trip_students ts join trips t on t.id=ts.trip_id where t.fixed_route_id=$1 and t.scheduled_date='2026-09-11'",[route.id])).rows;
   assert.deepEqual(batched,[{student_id:ids[1],status:'ABSENT',parent_absence:true}]);
   assert.equal((await c.query("select count(*)::int n from route_task_issues where route_id=$1 and service_date='2026-09-11'",[route.id])).rows[0].n,1);
+  await c.query("update students set no_pickup_weekdays=array[2,4],classroom_id=null,classroom_name='Room 12' where id=$1",[ids[0]]);
+  for(const [date,count] of [['2026-09-14',2],['2026-09-15',1],['2026-09-17',1]] as const) {
+   await tx(()=>materializeRoutes(c,date,'2026-09-07'));
+   assert.equal((await c.query('select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id where t.scheduled_date=$1 and t.fixed_route_id=$2',[date,route.id])).rows[0].n,count);
+  }
+  await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-07'));
+  assert.equal((await c.query('select count(*)::int n from trip_students where trip_id=$1',[tripId])).rows[0].n,2);
+  await c.query("update students set no_pickup_weekdays='{}' where id=$1",[ids[0]]);
+  await tx(()=>materializeRoutes(c,'2026-09-15','2026-09-07'));
+  assert.equal((await c.query("select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id where t.scheduled_date='2026-09-15' and t.fixed_route_id=$1",[route.id])).rows[0].n,2);
+  assert.throws(()=>parseGradeTimes(JSON.stringify([{grades:['1'],time:'12:00'},{grades:['1'],time:'12:30'}])),/only one time/);
+  assert.throws(()=>parseGradeTimes(JSON.stringify([{grades:['99'],time:'12:00'}])),/valid grade/);
+  const special=new FormData();for(const [key,value] of Object.entries({kind:'exception',schoolId:school,name:'Special dismissal',startsOn:'2026-09-16',endsOn:'2026-09-16',exceptionType:'grades',gradeTimes:JSON.stringify([{grades:['1'],time:'12:00'},{grades:['2'],time:'12:30'}])}))special.set(key,value);
+  await tx(()=>savePickupSetting(c,special));
+  await c.query("update school_pickup_rules set grades=array['1','2','3'] where school_id=$1",[school]);
+  for(const [grade,time] of [['1','12:00'],['2','12:30'],['3','14:00']]){
+   await c.query('update students set grade=$2 where id=$1',[ids[0],grade]);
+   await tx(()=>materializeRoutes(c,'2026-09-16','2026-09-07'));
+   const generated=(await c.query("select route_stops from trips where fixed_route_id=$1 and scheduled_date='2026-09-16'",[route.id])).rows[0];
+   assert.equal(generated.route_stops[0].time,time);
+  }
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });

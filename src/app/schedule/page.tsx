@@ -31,7 +31,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
   const cutoff = schoolId ? (await query<{cutoff:string|null}>('select calendar_archived_through::text as cutoff from schools where id=$1',[schoolId])).rows[0]?.cutoff ?? null : null;
   const [termsResult,exceptionsResult,rulesResult]=await Promise.all([
     query<PickupSetting>('select id,name,starts_on::text as "startsOn",ends_on::text as "endsOn",updated_at::text as "updatedAt" from school_terms where operating_term_id=current_operating_term() and school_id=$1 and ($2::date is null or ends_on > $2::date) order by starts_on desc',[schoolId,cutoff]),
-    query<PickupSetting>('select id,name,starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,\'HH24:MI\') as "pickupTime",updated_at::text as "updatedAt" from school_calendar_exceptions where operating_term_id=current_operating_term() and school_id=$1 and ($2::date is null or ends_on > $2::date) order by starts_on',[schoolId,cutoff]),
+    query<PickupSetting>('select grade_times as "gradeTimes",id,name,starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,\'HH24:MI\') as "pickupTime",updated_at::text as "updatedAt" from school_calendar_exceptions where operating_term_id=current_operating_term() and school_id=$1 and ($2::date is null or ends_on > $2::date) order by starts_on',[schoolId,cutoff]),
     query<PickupSetting>(`select p.id,p.name,p.weekdays,to_char(p.pickup_time,'HH24:MI') as "pickupTime",p.updated_at::text as "updatedAt", p.grades from school_pickup_rules p where p.operating_term_id=current_operating_term() and p.school_id=$1 order by p.pickup_time,p.name`,[schoolId]),
 
   ]);
@@ -44,7 +44,8 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
     <div className="section-heading"><div><h2>{title}</h2><p className="form-hint">{description}</p></div>{ready && kind!=="term" && <RosterCreateDialog title={text(locale,"添加","Add")} closeLabel={text(locale,"关闭","Close")}>{form(kind)}</RosterCreateDialog>}</div>
     {!ready && <p className="setup-callout">{text(locale,"请先设置年级接送时间，并在资料中添加课外班目的地。","Set grade pickup times and add an after-school destination in Resources first.")}</p>}
     {!items.length ? <p className="form-hint">{text(locale,"尚未设置","Not configured yet")}</p> : <div className="pickup-records">{items.map(item=><article className="pickup-record school-setting-record" key={item.id}><div><h3>{item.name}</h3>
-      {(kind==="term" || kind==="exception") && <p>{item.startsOn} — {item.endsOn}{kind==="exception" && ` · ${item.pickupTime ?? text(locale,"不接送","No pickup")}`}</p>}
+      {(kind==="term" || kind==="exception") && <p>{item.startsOn} — {item.endsOn}{kind==="exception" && ` · ${item.gradeTimes?.length ? text(locale,'按年级临时改时','Grade-specific time change') : item.pickupTime ?? text(locale,"不接送","No pickup")}`}</p>}
+      {kind==='exception' && item.gradeTimes?.map((group,index)=><p key={index}>{text(locale,'年级','Grades')} {group.grades.join('、')} · <strong>{group.time}</strong></p>)}
       {kind==="rule" && <><p>{item.grades?.join("、") || text(locale,"请选择适用年级","Select applicable grades")}</p><p>{weekdays(item.weekdays)} · <strong>{item.pickupTime}</strong></p></>}
       {kind==="route" && <><p>{school?.name} → {item.destination}</p><p>{item.ruleName} · {weekdays(item.weekdays)} · {item.pickupTime}</p></>}
     </div><div className="pickup-record-actions"><RosterCreateDialog iconOnly icon="edit" title={text(locale,"编辑","Edit")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item)}</RosterCreateDialog>{kind!=="term" && <RosterCreateDialog iconOnly icon="remove" title={text(locale,"删除","Remove")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item,true)}</RosterCreateDialog>}
@@ -56,7 +57,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
       <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"学校","School")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
       {tab==="school" && <>
         {section("term",text(locale,"学期日历","School terms"),text(locale,"默认使用运营学期日期；仅在本校不同的情况下编辑。","Dates default to the operating term. Edit only school-specific differences."),terms)}
-        {section("exception",text(locale,"假期与特殊日期","Holidays & exceptions"),text(locale,"日期范围包含首尾两天；可设置停课或全校临时接送时间。特殊时间只覆盖原本有接送的日期。","Date ranges are inclusive. Set closures or school-wide time changes on regular pickup days."),exceptions)}
+        {section("exception",text(locale,"特殊日期与假期","Special dates & holidays"),text(locale,"可按具体年级临时改时，或设置全校统一时间、放假。未选择的年级保持每周规则。","Change times for selected grades, set one school-wide time, or mark a closure. Other grades keep their weekly times."),exceptions)}
         {section("rule",text(locale,"年级接送时间","Grade pickup times"),text(locale,"相同时间的年级可合并设置；周三等不同时间另建一条规则。","Group grades sharing a time. Add a separate rule for weekdays with different times."),rules)}
       </>}
       {tab==="preview" && school && <PickupCalendar key={`${school.id}:${cutoff}`} archivedThrough={cutoff} today={today} schoolName={school.name} terms={terms} exceptions={exceptions} rules={rules} locale={locale} />}

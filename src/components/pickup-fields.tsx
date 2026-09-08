@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { text, type Locale } from "@/lib/i18n";
 import type { PickupSetting } from "@/lib/pickup-types";
+import {PICKUP_GRADES} from '@/lib/pickup-grades';
+import {Plus,Trash2} from 'lucide-react';
 
 export function Weekdays({ allowed = [1,2,3,4,5,6,7], selected = [1,2,3,4,5], locale }: { allowed?: number[]; selected?: number[]; locale: Locale }) {
   const labels = locale === "zh" ? ["周一","周二","周三","周四","周五","周六","周日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -17,9 +19,19 @@ export function RouteFields({ rules, initial, locale }: { rules: PickupSetting[]
   </>;
 }
 export function ExceptionFields({ initial, locale }: { initial?: PickupSetting; locale: Locale }) {
-  const [type,setType] = useState(initial?.pickupTime ? "time" : "closed");
+  const [type,setType] = useState(initial?.gradeTimes?.length ? 'grades' : initial?.pickupTime || !initial ? "time" : "closed");
+  const [groups,setGroups]=useState(initial?.gradeTimes?.length?initial.gradeTimes:[{grades:[] as string[],time:''}]);
   return <>
-    <label className="full"><span>{text(locale,"日期安排","Date arrangement")}</span><select name="exceptionType" value={type} onChange={e=>setType(e.target.value)}><option value="closed">{text(locale,"停课／不接送","Closed / no pickup")}</option><option value="time">{text(locale,"全校调整接送时间","School-wide pickup time change")}</option></select></label>
+    <label className="full"><span>{text(locale,"日期安排","Date arrangement")}</span><select name="exceptionType" value={type} onChange={e=>setType(e.target.value)}><option value="time">{text(locale,"临时改时：全校同一时间","Time change: all grades")}</option><option value="grades">{text(locale,"临时改时：按年级设置","Time change: by grade")}</option><option value="closed">{text(locale,"放假／不接送","Closed / no pickup")}</option></select></label>
     {type==="time" && <label className="full"><span>{text(locale,"当天接送时间","Pickup time on these dates")}</span><input type="time" name="pickupTime" defaultValue={initial?.pickupTime ?? ""} required /></label>}
+    {type==='grades' && <>
+      <input type="hidden" name="gradeTimes" value={JSON.stringify(groups)}/>
+      {groups.map((group,index)=><div className="special-time-group full" key={index}>
+        <fieldset className="pickup-checks"><legend>{text(locale,`第 ${index+1} 组年级`,`Grade group ${index+1}`)}</legend>{PICKUP_GRADES.map(grade=><label key={grade}><input type="checkbox" checked={group.grades.includes(grade)} disabled={!group.grades.includes(grade)&&groups.some(g=>g.grades.includes(grade))} onChange={e=>setGroups(prev=>prev.map((g,i)=>i===index?{...g,grades:e.target.checked?[...g.grades,grade]:g.grades.filter(v=>v!==grade)}:g))}/><span>{grade}</span></label>)}</fieldset>
+        <label><span>{text(locale,'当天接送时间','Pickup time')}</span><input type="time" required value={group.time} onChange={e=>setGroups(prev=>prev.map((g,i)=>i===index?{...g,time:e.target.value}:g))}/></label>
+        <button type="button" className="icon-button danger" disabled={groups.length===1} title={text(locale,'删除时间组','Remove time group')} aria-label={text(locale,'删除时间组','Remove time group')} onClick={()=>setGroups(prev=>prev.filter((_,i)=>i!==index))}><Trash2 size={16}/></button>
+      </div>)}
+      <button type="button" className="button secondary" disabled={groups.length>=PICKUP_GRADES.length} onClick={()=>setGroups(prev=>[...prev,{grades:[],time:''}])}><Plus size={16}/>{text(locale,'添加时间组','Add time group')}</button>
+    </>}
   </>;
 }

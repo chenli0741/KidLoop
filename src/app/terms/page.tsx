@@ -165,20 +165,21 @@ export default async function TermsPage({
           id: string;
           name: string;
           grade: string;
-          classroom_id: string;
+          classroom_name: string;
+          school_id: string;
           program_id: string;
           reviewed: boolean | null;
           previous_grade: string | null;
           previous_classroom_name: string | null;
         }>(
-          `select s.id,s.name,s.grade,s.classroom_id,s.program_id,ts.reviewed,ts.previous_grade,prev.name as previous_classroom_name from students s left join term_students ts on ts.student_id=s.id and ts.operating_term_id=$1 left join classrooms prev on prev.id=ts.previous_classroom_id where s.active order by ts.reviewed nulls last,s.name`,
+          `select s.id,s.name,s.grade,s.school_id,s.classroom_name,s.program_id,ts.reviewed,ts.previous_grade,coalesce(ts.previous_classroom_name,prev.name) as previous_classroom_name from students s left join term_students ts on ts.student_id=s.id and ts.operating_term_id=$1 left join classrooms prev on prev.id=ts.previous_classroom_id where s.active order by ts.reviewed nulls last,s.name`,
           [t.id],
         )
       ).rows
     : [];
-  const classrooms = (
+  const schools = (
     await query<{ id: string; name: string }>(
-      "select c.id,s.name || ' · ' || c.name as name from classrooms c join schools s on s.id=c.school_id order by s.name,c.name",
+      "select id,name from schools order by name",
     )
   ).rows;
   const programs = (
@@ -253,15 +254,16 @@ export default async function TermsPage({
                       />
                     </label>
                     <label>
-                      <span>{text(locale, "本期班级", "Current class")}</span>
-                      <select name="classroomId" defaultValue={s.classroom_id}>
-                        {classrooms.map((c) => (
+                      <span>{text(locale, "学校", "School")}</span>
+                      <select name="schoolId" defaultValue={s.school_id}>
+                        {schools.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
                           </option>
                         ))}
                       </select>
                     </label>
+                    <label><span>{text(locale, "本期班级", "Current class")}</span><input name="classroomName" defaultValue={s.classroom_name} maxLength={100}/></label>
                     <label className="full">
                       <span>{text(locale, "课外班", "Destination")}</span>
                       <select name="programId" defaultValue={s.program_id}>

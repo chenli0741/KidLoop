@@ -38,7 +38,7 @@ test("self-service profiles enforce ownership, preserve associations and revoke 
     await assert.rejects(tx(() => saveOwnChild(client, { ...user, role: "DRIVER" }, form(values))), /forbidden/);
     await tx(() => saveOwnChild(client, user, form(values)));
     const changed = (await client.query("select * from students where id=$1", [child])).rows[0];
-    assert.equal(changed.name, "Edited child"); assert.equal(changed.active, true); assert.equal(changed.classroom_id, classroom); assert.equal(changed.program_id, program);
+    assert.equal(changed.name, "Edited child"); assert.equal(changed.active, true); assert.equal(changed.classroom_id, null); assert.equal(changed.school_id, school); assert.equal(changed.classroom_name, 'Class'); assert.equal(changed.program_id, program);
     assert.equal(changed.photo_url, "data:image/png;base64,original"); assert.equal(JSON.parse(changed.notes).source, "preserve"); assert.equal(JSON.parse(changed.notes).note, "New note");
     await assert.rejects(tx(() => saveOwnChild(client, user, form(values))), /stale/);
     const version = async (userId = parent) => (await client.query("select updated_at::text from app_users where id=$1", [userId])).rows[0].updated_at;

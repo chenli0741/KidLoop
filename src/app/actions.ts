@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { changeRiderStatus } from "@/lib/rider-status";
 import { readTripExecution } from "@/lib/read-trip-execution";
 import type { MissedPickupDetails } from "@/lib/missed-pickup";
+import { noPickupWeekdays } from '@/lib/student-schedule';
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { query, transaction } from "@/lib/db";
@@ -144,15 +145,6 @@ export async function createProgram(_: FormState, formData: FormData): Promise<F
   }, ["/resources", "/students", "/schedule"], { zh: "课外班已添加。", en: "After-school program added." });
 }
 
-export async function createClassroom(_: FormState, formData: FormData): Promise<FormState> {
-  return runMutation(async () => {
-    await query(
-      "insert into classrooms (school_id, name) values ($1::uuid, $2)",
-      [required(formData, "schoolId"), required(formData, "name")],
-    );
-  }, ["/students", "/schedule"], { zh: "班级已添加。", en: "Class added." });
-}
-
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser(["ADMIN"]);
   const photo = optional(formData, "photoUrl");
@@ -177,10 +169,10 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
 
       const student = await client.query<{id:string}>(`
         insert into students
-          (classroom_id, parent_id, program_id, name, photo_url, grade, age, notes)
-        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8) returning id
+          (school_id, parent_id, program_id, name, photo_url, grade, age, notes, classroom_name, no_pickup_weekdays)
+        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10) returning id
       `, [
-        required(formData, "classroomId"),
+        required(formData, "schoolId"),
         parent.rows[0].id,
         required(formData, "programId"),
         required(formData, "name"),
@@ -188,6 +180,8 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
         required(formData, "grade"),
         age,
         optional(formData, "notes"),
+        optional(formData, "classroomName").slice(0,100),
+        noPickupWeekdays(formData),
       ]);
       await attachPhoto(client,photo,student.rows[0].id,user.id);
       await client.query("insert into term_students(operating_term_id,student_id,reviewed) values($1,$2,true)",[operation.id,student.rows[0].id]);

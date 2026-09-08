@@ -58,7 +58,7 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, lo
       <h3>{schoolName}</h3>
       <p className="calendar-school-status">{labels[day.status]}</p>
       {day.term && <p>{day.term.name} · {day.term.startsOn} — {day.term.endsOn}</p>}
-      {day.exception && <p className={day.closed ? "calendar-holiday" : day.status === "adjusted" ? "calendar-special" : ""}>{day.exception.name}{day.status === "adjusted" && ` · ${text(locale,"接送时间调整为","Pickup time changed to")} ${day.exception.pickupTime}`}</p>}
+      {day.exception && <p className={day.closed ? "calendar-holiday" : day.status === "adjusted" ? "calendar-special" : ""}>{day.exception.name}{day.status === "adjusted" && (day.exception.gradeTimes?.length ? ` · ${text(locale,'按年级临时改时','Grade-specific time change')}` : ` · ${text(locale,"接送时间调整为","Pickup time changed to")} ${day.exception.pickupTime}`)}</p>}
       {day.schoolTimes.length>0 && <><h4>{text(locale,"学校接送时间","School pickup times")}</h4>{day.schoolTimes.map(t=><div className="calendar-pickup-detail" key={t.id}><strong>{t.time}</strong><span>{text(locale,"年级","Grades")} {t.grades.join("、")}</span></div>)}</>}
     </div>
     </dialog>

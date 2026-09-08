@@ -39,8 +39,8 @@ export async function changeOwnPassword(client: PoolClient, userId: string, form
 
 export async function saveOwnChild(client: PoolClient, user: AuthUser, form: FormData) {
   if (user.role !== "PARENT") throw new ProfileError("forbidden");
-  const result = await client.query<{ classroom_id: string; program_id: string }>(`
-    select st.classroom_id,st.program_id from students st
+  const result = await client.query<{ school_id: string; classroom_name: string; no_pickup_weekdays: number[]; program_id: string }>(`
+    select st.school_id,st.classroom_name,st.no_pickup_weekdays,st.program_id from students st
     where st.id=$1::uuid and st.active and exists (select 1 from user_students us where us.student_id=st.id and us.user_id=$2)
     for update of st
   `, [form.get("id"), user.id]);
@@ -51,7 +51,9 @@ export async function saveOwnChild(client: PoolClient, user: AuthUser, form: For
     if (typeof field === "string") allowed.set(key, field);
   }
   // Association changes are an administrator operation, never trusted from a parent's request.
-  allowed.set("classroomId", result.rows[0].classroom_id);
+  allowed.set("schoolId", result.rows[0].school_id);
+  allowed.set("classroomName", result.rows[0].classroom_name);
+  for (const day of result.rows[0].no_pickup_weekdays) allowed.append('noPickupWeekdays',String(day));
   allowed.set("programId", result.rows[0].program_id);
   await saveStudent(client, allowed, user.id);
 }

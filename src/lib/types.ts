@@ -43,13 +43,6 @@ export type Program = {
   requirements: string;
 };
 
-export type Classroom = {
-  id: string;
-  schoolId: string;
-  schoolName: string;
-  name: string;
-};
-
 export type Student = {
   id: string;
   name: string;
@@ -57,7 +50,7 @@ export type Student = {
   grade: string;
   age: number | null;
   classroomName: string;
-  classroomId: string;
+  noPickupWeekdays?: number[];
   schoolId: string;
   schoolName: string;
   programId: string;

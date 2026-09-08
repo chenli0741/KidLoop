@@ -46,14 +46,14 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  let name=baseName, suffix=2;
  while((await c.query("select 1 from fixed_routes where operating_term_id=current_operating_term() and lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
  if(!Array.isArray(students)||students.length>200||new Set(students.map(s=>s.studentId)).size!==students.length) error("学生清单无效。","Invalid student list.");
- const studentRows=(await c.query("select s.id,s.program_id,c.school_id from students s join classrooms c on c.id=s.classroom_id where s.active and s.id=any($1::uuid[])",[students.map(s=>s.studentId)])).rows;
+ const studentRows=(await c.query("select s.id,s.program_id,s.school_id from students s where s.active and s.id=any($1::uuid[])",[students.map(s=>s.studentId)])).rows;
  for(const a of students) {
   const st=studentRows.find(s=>s.id===a.studentId), from=stops.findIndex(s=>s.id===a.pickupStopId), to=stops.findIndex(s=>s.id===a.dropoffStopId);
   if(!st||from<0||to<=from||stops[from].schoolId!==st.school_id) error("请选择学生所属学校的上车站和后续下车站。","Select the student's school pickup and a later dropoff stop.");
  }
  for(const a of students) if(!(await c.query("select 1 from term_students where operating_term_id=$1 and student_id=$2 and (reviewed or not $3)",[operation.id,a.studentId,enabled])).rowCount) error("请先核对本学期学生年级、班级和课外班。", "Review this term's student details before enabling.");
  if(enabled) for(const a of students) {
-  if(!(await c.query(`select 1 from students s join classrooms cl on cl.id=s.classroom_id join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and p.weekdays && $2::integer[] join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and t.starts_on<=$4::date and t.ends_on>=$3::date where s.id=$1`,[a.studentId,weekdays,starts,ends])).rowCount) error("启用前请先设置学生所属学校的学期和年级接送规则。","Configure school terms and grade pickup rules before enabling.");
+  if(!(await c.query(`select 1 from students s join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=s.school_id and trim(s.grade)=any(p.grades) and p.weekdays && $2::integer[] join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=s.school_id and t.starts_on<=$4::date and t.ends_on>=$3::date where s.id=$1`,[a.studentId,weekdays,starts,ends])).rowCount) error("启用前请先设置学生所属学校的学期和年级接送规则。","Configure school terms and grade pickup rules before enabling.");
  }
  if(driver&&!(await c.query("select id from drivers where id=$1 and active and status='AVAILABLE'",[driver])).rowCount) error("司机不可用。","Driver unavailable.");
  const v=vehicle?(await c.query("select capacity from vehicles where id=$1 and active and status<>'MAINTENANCE'",[vehicle])).rows[0]:null;
@@ -92,7 +92,7 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   const schoolTimes = new Map<string,string>();
   let stops=r.stops.map(s=>({...s}));
   if(r.enabled&&r.driverId&&r.vehicleId&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday)) {
-   const matches=(await c.query<{student_id:string;school_id:string;time:string}>(`select s.id as student_id,cl.school_id,coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=any($1::uuid[]) and s.active and (e.id is null or e.pickup_time is not null)`,[r.students.map(a=>a.studentId),date,weekday])).rows;
+   const matches=(await c.query<{student_id:string;school_id:string;time:string}>(`select s.id as student_id,s.school_id,school_special_pickup_time(e.grade_times,s.grade,e.pickup_time,p.pickup_time)::text as time from students s join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=s.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=s.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=s.school_id and $2::date between e.starts_on and e.ends_on where s.id=any($1::uuid[]) and s.active and not ($3=any(s.no_pickup_weekdays)) and (e.id is null or e.pickup_time is not null or jsonb_array_length(e.grade_times)>0)`,[r.students.map(a=>a.studentId),date,weekday])).rows;
    const byStudent=new Map<string,typeof matches[number]>();
    for(const match of matches) if(!byStudent.has(match.student_id))byStudent.set(match.student_id,match);
    for(const a of r.students) {

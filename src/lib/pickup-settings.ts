@@ -2,6 +2,22 @@ import { requireTerm } from "./operating-terms";
 import "server-only";
 import type { PoolClient } from "pg";
 import { PICKUP_GRADES } from "./pickup-grades";
+import type {GradeTime} from './pickup-types';
+
+export function parseGradeTimes(raw: string): GradeTime[] {
+  let groups: unknown;
+  try { groups=JSON.parse(raw); } catch { fail('请填写年级和时间。','Enter grades and times.'); }
+  if(!Array.isArray(groups)||!groups.length||groups.length>PICKUP_GRADES.length)fail('请至少添加一组年级和时间。','Add at least one grade/time group.');
+  const seen=new Set<string>();
+  return groups.map(group=>{
+    if(!group||!Array.isArray(group.grades)||!group.grades.length||typeof group.time!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(group.time))fail('请检查年级和时间。','Check grades and times.');
+    for(const grade of group.grades) {
+      if(typeof grade!=='string'||!PICKUP_GRADES.includes(grade)||seen.has(grade))fail('同一天每个年级只能设置一个时间。','Each valid grade can have only one time per date.');
+      seen.add(grade);
+    }
+    return {grades:group.grades,time:group.time};
+  });
+}
 
 export class PickupError extends Error {
   constructor(public zh: string, public en: string) { super(en); }
@@ -61,8 +77,10 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
     if (cutoff && a <= cutoff) fail("日期必须晚于已存档日期。", "Dates must be after the archive cutoff.");
     if ((await c.query(`select 1 from ${table} where operating_term_id=current_operating_term() and school_id=$1 and id<>coalesce($2::uuid,gen_random_uuid()) and starts_on<=$4::date and ends_on>=$3::date`,[school,id||null,a,b])).rowCount) fail("日期与该学校已有设置重叠，请编辑已有记录。", "Dates overlap an existing entry. Edit that entry instead.");
     const t = kind === "exception" && field(f,"exceptionType") === "time" ? time(f) : null;
-    if (id) await c.query(`update ${table} set name=$2,starts_on=$3,ends_on=$4,updated_at=clock_timestamp()${kind === "exception" ? ",pickup_time=$5" : ""} where id=$1`,kind === "exception" ? [id,n,a,b,t] : [id,n,a,b]);
-    else await c.query(`insert into ${table}(school_id,name,starts_on,ends_on${kind === "exception" ? ",pickup_time" : ""}) values($1,$2,$3,$4${kind === "exception" ? ",$5" : ""})`,kind === "exception" ? [school,n,a,b,t] : [school,n,a,b]);
+    const gradeTimes=kind==='exception' && field(f,'exceptionType')==='grades'?parseGradeTimes(field(f,'gradeTimes')):[];
+    if(kind==='exception' && !['closed','time','grades'].includes(field(f,'exceptionType')))fail('请选择日期安排。','Select a date arrangement.');
+    if (id) await c.query(`update ${table} set name=$2,starts_on=$3,ends_on=$4,updated_at=clock_timestamp()${kind === "exception" ? ",pickup_time=$5,grade_times=$6" : ""} where id=$1`,kind === "exception" ? [id,n,a,b,t,JSON.stringify(gradeTimes)] : [id,n,a,b]);
+    else await c.query(`insert into ${table}(school_id,name,starts_on,ends_on${kind === "exception" ? ",pickup_time,grade_times" : ""}) values($1,$2,$3,$4${kind === "exception" ? ",$5,$6" : ""})`,kind === "exception" ? [school,n,a,b,t,JSON.stringify(gradeTimes)] : [school,n,a,b]);
     return;
   }
   const weekdays = days(f);
@@ -86,8 +104,8 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
 
 export const pickupPreviewSql = `
  select d::date::text as date,r.name as route,p.name as rule,a.name as destination,
-        to_char(coalesce(e.pickup_time,p.pickup_time),'HH24:MI') as time,
-        p.grades as grades
+        to_char(adjusted.pickup_time,'HH24:MI') as time,
+        adjusted.grades as grades
  from school_terms t
  join schools s on s.id=t.school_id
  cross join lateral generate_series(t.starts_on::timestamp,t.ends_on::timestamp,interval '1 day') d
@@ -95,9 +113,12 @@ export const pickupPreviewSql = `
  join pickup_routes r on r.rule_id=p.id and extract(isodow from d)::integer=any(r.weekdays)
  join after_school_programs a on a.id=r.program_id
  left join school_calendar_exceptions e on e.school_id=t.school_id and d::date between e.starts_on and e.ends_on
- where t.id=$1 and t.school_id=$2 and (e.id is null or e.pickup_time is not null)
+ cross join lateral (select school_special_pickup_time(e.grade_times,g.grade,e.pickup_time,p.pickup_time) as pickup_time,
+   array_agg(g.grade order by g.position) as grades from unnest(p.grades) with ordinality as g(grade,position)
+   group by school_special_pickup_time(e.grade_times,g.grade,e.pickup_time,p.pickup_time)) adjusted
+ where t.id=$1 and t.school_id=$2 and (e.id is null or e.pickup_time is not null or jsonb_array_length(e.grade_times)>0)
  and (s.calendar_archived_through is null or d::date > s.calendar_archived_through)
- order by d,coalesce(e.pickup_time,p.pickup_time),r.name`;
+ order by d,adjusted.pickup_time,r.name`;
 
 export async function archiveSchoolCalendar(c: PoolClient, f: FormData, today: string) {
   const school = field(f, "schoolId");
@@ -109,8 +130,8 @@ export async function archiveSchoolCalendar(c: PoolClient, f: FormData, today: s
   if (term.end >= today) fail("只能存档已经结束的学期。", "Only ended terms can be archived.");
   if (locked.rows[0].cutoff && term.end <= locked.rows[0].cutoff) fail("该学期已存档。", "Term is already archived.");
   // Keep the historical segment and a separately editable future segment.
-  await c.query(`insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time)
-    select school_id,name,$2::date+1,ends_on,pickup_time from school_calendar_exceptions
+  await c.query(`insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time,grade_times)
+    select school_id,name,$2::date+1,ends_on,pickup_time,grade_times from school_calendar_exceptions
     where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
   await c.query(`update school_calendar_exceptions set ends_on=$2,updated_at=clock_timestamp()
     where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
