@@ -1,5 +1,6 @@
 import "server-only";
 import type { PoolClient } from "pg";
+import { photoPath } from "@/lib/student-photos";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { saveStudent } from "@/lib/student-management";
 import type { AuthUser } from "@/lib/types";
@@ -24,6 +25,16 @@ export async function saveOwnProfile(client: PoolClient, userId: string, form: F
   await client.query("update app_users set name=$2,email=$3,phone=$4,updated_at=clock_timestamp() where id=$1", [userId, current.role === "DRIVER" ? null : name, email, current.role === "DRIVER" ? null : phone]);
   if (current.role === "DRIVER" && current.driver_id) {
     await client.query("update drivers set name=$2,phone=$3,updated_at=clock_timestamp() where id=$1", [current.driver_id, name, phone]);
+  }
+  const photo = String(form.get("photoUrl") ?? "").trim();
+  const remove = form.get("removePhoto") === "on";
+  if (photo && !remove) {
+    const match = photoPath.exec(photo);
+    if (!match || !(await client.query("select id from student_photos where id=$1 and uploaded_by=$2 and purpose='avatar' and student_id is null", [match[1],userId])).rowCount) throw new ProfileError("photo");
+  }
+  if (photo || remove) {
+    if (current.role === "DRIVER") await client.query("update drivers set photo_url=$2,updated_at=clock_timestamp() where id=$1", [current.driver_id,remove ? "" : photo]);
+    else await client.query("update app_users set photo_url=$2 where id=$1", [userId,remove ? "" : photo]);
   }
   return { email, emailChanged };
 }

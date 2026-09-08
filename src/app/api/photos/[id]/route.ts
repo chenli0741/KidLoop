@@ -9,9 +9,9 @@ export const runtime="nodejs";
 export async function GET(_:Request,{params}:{params:Promise<{id:string}>}) {
   const user=await getUser();if(!user)return new Response(null,{status:401});
   const {id}=await params;if(!photoPath.test(`/api/photos/${id}`))return new Response(null,{status:404});
-  const result=await query<{blob_url:string}>(photoAccessSql,[id,user.id,user.role,user.driverId]);
+  const result=await query<{blob_url:string;purpose:string}>(photoAccessSql,[id,user.id,user.role,user.driverId]);
   if(!result.rowCount)return new Response(null,{status:404});
-  if (usesDemoPhotos(user)) {
+  if (result.rows[0].purpose === "student" && usesDemoPhotos(user)) {
     const avatar = await readFile(path.join(process.cwd(), 'public/demo-avatars/student-teal.png'));
     return new Response(new Uint8Array(avatar), {headers:{"Content-Type":"image/png","Cache-Control":"private, no-store","Vary":"Cookie","X-Content-Type-Options":"nosniff"}});
   }

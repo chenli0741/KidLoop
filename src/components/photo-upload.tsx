@@ -6,7 +6,7 @@ import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 import { compressPhoto, pickNativePhoto, pickerCanceled } from "@/lib/photo-client";
 
-export function PhotoUpload({current="",required=false}:{current?:string;required?:boolean}) {
+export function PhotoUpload({current="",required=false,purpose="student"}:{current?:string;required?:boolean;purpose?:"student"|"avatar"}) {
   const locale=useLocale(), fileRef=useRef<HTMLInputElement>(null), cameraRef=useRef<HTMLInputElement>(null), guard=useRef<HTMLInputElement>(null);
   const operation=useRef<AbortController|null>(null),locked=useRef(false);
   const [url,setUrl]=useState(""),[stage,setStage]=useState<""|"pick"|"upload">(""),[error,setError]=useState(""),[remove,setRemove]=useState(false),[dragging,setDragging]=useState(false);
@@ -34,14 +34,14 @@ export function PhotoUpload({current="",required=false}:{current?:string;require
       if(!file){(source==='camera'?cameraRef:fileRef).current?.click();return;}
       setStage('upload');const blob=await compressPhoto(file);if(task.signal.aborted)return;
       const data=new FormData();data.set('photo',blob,'photo.jpg');
-      const response=await fetch('/api/photos',{method:'POST',body:data,signal:task.signal});if(!response.ok)throw new Error(String(response.status));
+      const response=await fetch(`/api/photos?purpose=${purpose}`,{method:'POST',body:data,signal:task.signal});if(!response.ok)throw new Error(String(response.status));
       const result=await response.json();if(!task.signal.aborted){setUrl(result.url);setRemove(false);}
     }catch(e){if(!task.signal.aborted&&!pickerCanceled(e))setError(message(e));}
     finally{if(operation.current===task){locked.current=false;setStage('');}}
   }
   const preview=remove?'':url||current;
   return <div className="photo-upload full" aria-busy={busy}>
-    <span>{text(locale,"学生照片","Student photo")}</span>
+    <span>{purpose === "avatar" ? text(locale,"账号照片","Profile photo") : text(locale,"学生照片","Student photo")}</span>
     {preview && <Image src={preview} alt={text(locale,"照片预览","Photo preview")} width={96} height={96} unoptimized />}
     <div className="photo-source-actions">
       <button type="button" className="button secondary compact" disabled={busy} onClick={()=>void start('photos')}><ImagePlus size={17}/>{text(locale,"选择照片","Choose photo")}</button>

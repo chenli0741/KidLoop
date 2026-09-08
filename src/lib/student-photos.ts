@@ -13,11 +13,11 @@ export async function normalizePhoto(bytes: Buffer) {
 export async function attachPhoto(c: PoolClient, url: string, studentId: string, actorId?: string) {
   const match = photoPath.exec(url);
   if (!match) return;
-  const result = await c.query(`update student_photos set student_id=$2 where id=$1 and uploaded_by=$3
+  const result = await c.query(`update student_photos set student_id=$2 where id=$1 and uploaded_by=$3 and purpose='student'
     and (student_id is null or student_id=$2) returning id`, [match[1],studentId,actorId ?? null]);
   if (!result.rowCount) throw new Error("photo");
 }
-export const photoAccessSql = `select p.blob_url from student_photos p
+export const photoAccessSql = `select p.blob_url,p.purpose from student_photos p
  left join students s on s.id=p.student_id
  where p.id=$1 and (
    $3='ADMIN' or (p.student_id is null and p.uploaded_by=$2) or

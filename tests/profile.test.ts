@@ -61,6 +61,17 @@ test("self-service profiles enforce ownership, preserve associations and revoke 
     await tx(async () => saveOwnProfile(client, driverUser, form({ name: "Driver updated", email: "driver@test.local", phone: "98765", updatedAt: await version(driverUser) })));
     assert.deepEqual((await client.query("select name,phone from drivers where id=$1", [driver])).rows[0], { name: "Driver updated", phone: "98765" });
     assert.deepEqual((await client.query("select name,phone from app_users where id=$1", [driverUser])).rows[0], { name: null, phone: null });
+    const avatar = randomUUID(), foreignAvatar = randomUUID();
+    await client.query("insert into student_photos(id,uploaded_by,blob_url,purpose) values($1,$2,'avatar-private','avatar'),($3,$4,'foreign-private','avatar')", [avatar,driverUser,foreignAvatar,parent]);
+    const avatarForm = async (photoUrl: string, removePhoto = "") => form({name:"Driver updated",email:"driver@test.local",phone:"98765",updatedAt:await version(driverUser),photoUrl,removePhoto});
+    await assert.rejects(tx(async () => saveOwnProfile(client,driverUser,await avatarForm(`/api/photos/${foreignAvatar}`))), /photo/);
+    await tx(async () => saveOwnProfile(client,driverUser,await avatarForm(`/api/photos/${avatar}`)));
+    assert.equal((await client.query("select photo_url from drivers where id=$1",[driver])).rows[0].photo_url, `/api/photos/${avatar}`);
+    assert.equal((await client.query("select photo_url from app_users where id=$1",[driverUser])).rows[0].photo_url, "");
+    await tx(async () => saveOwnProfile(client,driverUser,await avatarForm("")));
+    assert.equal((await client.query("select photo_url from drivers where id=$1",[driver])).rows[0].photo_url, `/api/photos/${avatar}`);
+    await tx(async () => saveOwnProfile(client,driverUser,await avatarForm("", "on")));
+    assert.equal((await client.query("select photo_url from drivers where id=$1",[driver])).rows[0].photo_url, "");
     const beforeDriverEdit = await version(driverUser);
     await client.query("update drivers set name='Driver renamed',phone='456' where id=$1", [driver]);
     assert.notEqual(await version(driverUser), beforeDriverEdit);

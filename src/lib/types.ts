@@ -126,5 +126,5 @@ export type Trip = {
 };
 
 export type UserRole = "ADMIN" | "DRIVER" | "PARENT";
-export type AuthUser = { id: string; email: string; name: string; role: UserRole; driverId: string | null };
+export type AuthUser = { photoUrl?: string; id: string; email: string; name: string; role: UserRole; driverId: string | null };
 export type DayPlan = { studentId: string; serviceDate: string; absent: boolean; note: string; updatedAt: string };

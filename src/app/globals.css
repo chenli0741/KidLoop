@@ -605,3 +605,5 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .adjust-success { padding:24px; background:#e5f2eb; border-radius:12px; }
 .adjust-success small { overflow-wrap:anywhere; }
 .adjust-usage { margin-top:24px; color:#64726a; font-size:12px; }
+
+.account-trigger .account-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
