@@ -8,7 +8,7 @@ const schools = [
   { name: "McAuliffe", tuesday: "14:00", other: "14:35" },
   { name: "Stratford School", tuesday: "12:45", other: "13:45" },
 ];
-const grades = ["TK", "K", ...Array.from({ length: 12 }, (_, i) => String(i + 1))];
+const grades = ["TK", "K", ...Array.from({ length: 7 }, (_, i) => String(i + 1))];
 // OPM 2026/2027 schedules, checked 2026-09-07. Include weekend dates and observed days.
 // https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/
 const holidays = [

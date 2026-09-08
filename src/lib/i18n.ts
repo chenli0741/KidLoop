@@ -1,6 +1,7 @@
 export type Locale = "zh" | "en";
 
-export const DEFAULT_LOCALE: Locale = "zh";
+export const DEFAULT_LOCALE: Locale = "en";
+export const LANGUAGE_SWITCH_ENABLED = false;
 export const LOCALE_COOKIE = "kidloop_locale";
 
 export function isLocale(value: string | undefined): value is Locale {

@@ -35,8 +35,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
 
   ]);
   const terms=termsResult.rows, exceptions=exceptionsResult.rows, rules=rulesResult.rows;
-  const studentGrades = schoolId ? (await query<{grade:string}>("select distinct trim(s.grade) as grade from students s join classrooms c on c.id=s.classroom_id where c.school_id=$1 and trim(s.grade)<>''", [schoolId])).rows.map(r=>r.grade) : [];
-  const grades = [...new Set(["TK", "K", ...Array.from({length:12},(_,i)=>String(i+1)), ...studentGrades, ...rules.flatMap(r=>r.grades ?? [])])];
+  const grades = ["TK", "K", ...Array.from({length:7},(_,i)=>String(i+1))];
   const today=todayInOperationsTimeZone();
   const weekdays=(days?:number[])=>days?.map(d=>(locale==="zh" ? ["周一","周二","周三","周四","周五","周六","周日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])[d-1]).join("、");
   const form=(kind:SettingKind, initial?:PickupSetting, remove=false)=><PickupSettingForm operatingTermId={operation.id} kind={kind} schoolId={school!.id} locale={locale} initial={initial} remove={remove} rules={rules} programs={programs} grades={grades} />;
@@ -51,10 +50,9 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
 
     </div></article>)}</div>}
   </section>;
-  return <div className="page-container"><TermWorkspace term={operation} locale={locale}/><PageHeader eyebrow={text(locale,"学期安排","Term planning")} title={text(locale,"学校","Schools")} description={text(locale,"学校学期、假期与接送时间。","School terms, holidays and pickup times.")} />
+  return <div className="page-container"><TermWorkspace term={operation} locale={locale}/><div className="school-page-header"><PageHeader eyebrow={text(locale,"学期安排","Term planning")} title={text(locale,"学校","Schools")} description={text(locale,"学校学期、假期与接送时间。","School terms, holidays and pickup times.")} actions={school ? <div className="school-header-picker"><SchoolFilter schools={schools} selected={school.id} label={text(locale,"学校","School")} page="/schedule" tab={tab} /></div> : undefined} /></div>
     {!school ? <EmptyState title={text(locale,"请先添加学校","Add a school first")} body={text(locale,"学校日历和接送规则将保存在学校下面。","Calendars and pickup rules belong to each school.")} href="/resources?tab=schools" action={text(locale,"添加学校","Add school")} /> : <>
       <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"学校","School")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
-      <div className="pickup-school-picker"><SchoolFilter schools={schools} selected={school.id} label={text(locale,"学校","School")} page="/schedule" tab={tab} /></div>
       {tab==="school" && <>
         {section("term",text(locale,"学期日历","School terms"),text(locale,"默认使用运营学期日期；仅在本校不同的情况下编辑。","Dates default to the operating term. Edit only school-specific differences."),terms)}
         {section("exception",text(locale,"假期与特殊日期","Holidays & exceptions"),text(locale,"日期范围包含首尾两天；可设置停课或全校临时接送时间。特殊时间只覆盖原本有接送的日期。","Date ranges are inclusive. Set closures or school-wide time changes on regular pickup days."),exceptions)}

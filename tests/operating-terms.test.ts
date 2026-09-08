@@ -116,6 +116,17 @@ test("operating term initializes once, archives frozen data and copies only revi
     const schoolTerm = (
       await c.query("select id from school_terms where school_id=$1", [school])
     ).rows[0].id;
+    const independentDates = {
+      kind: 'term', schoolId: school, id: schoolTerm, name: 'Fall',
+      updatedAt: await version('school_terms', schoolTerm),
+      startsOn: '2026-08-01', endsOn: '2027-01-15',
+    };
+    await tx(() => savePickupSetting(c, form(independentDates)));
+    assert.deepEqual((await c.query('select starts_on::text,ends_on::text from school_terms where id=$1',[schoolTerm])).rows[0],
+      {starts_on:'2026-08-01',ends_on:'2027-01-15'});
+    for(const dates of [{startsOn:'2026-02-30',endsOn:'2026-12-20'},{startsOn:'2027-01-15',endsOn:'2026-08-01'}]) {
+      await assert.rejects(tx(async () => savePickupSetting(c,form({...independentDates,...dates,updatedAt:await version('school_terms',schoolTerm)}))),/valid dates/);
+    }
     const change = {
       kind: "term",
       schoolId: school,

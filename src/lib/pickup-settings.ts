@@ -56,7 +56,7 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   const n = name(f);
   if (kind === "term" || kind === "exception") {
     const [a,b] = dates(f);
-    if (a<operation.startsOn || b>operation.endsOn) fail("日期须在当前运营学期范围内。", "Dates must be within the operating term.");
+    if (kind === "exception" && (a<operation.startsOn || b>operation.endsOn)) fail("日期须在当前运营学期范围内。", "Dates must be within the operating term.");
     if (cutoff && a <= cutoff) fail("日期必须晚于已存档日期。", "Dates must be after the archive cutoff.");
     if ((await c.query(`select 1 from ${table} where operating_term_id=current_operating_term() and school_id=$1 and id<>coalesce($2::uuid,gen_random_uuid()) and starts_on<=$4::date and ends_on>=$3::date`,[school,id||null,a,b])).rowCount) fail("日期与该学校已有设置重叠，请编辑已有记录。", "Dates overlap an existing entry. Edit that entry instead.");
     const t = kind === "exception" && field(f,"exceptionType") === "time" ? time(f) : null;
