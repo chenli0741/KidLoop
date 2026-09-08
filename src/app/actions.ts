@@ -16,9 +16,12 @@ import type { FormState, RiderStatus } from "@/lib/types";
 import { assignNewStudentRoute } from "@/lib/student-route-assignment";
 import { todayInOperationsTimeZone } from "@/lib/date";
 import { schoolNames, updateSchoolNames } from "@/lib/school-management";
+import { isTestAccount } from '@/lib/test-account';
 import { pickupMapUrl } from "@/lib/map-url";
 
 export async function setLocale(formData: FormData) {
+  const user = await requireUser();
+  if (isTestAccount(user)) return;
   const locale = formData.get("locale");
   if (typeof locale !== "string" || !isLocale(locale)) return;
   (await cookies()).set(LOCALE_COOKIE, locale, {

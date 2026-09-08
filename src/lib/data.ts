@@ -1,3 +1,4 @@
+import { displayedStudentPhoto } from './photo-display';
 import { todayInOperationsTimeZone } from "./date";
 import { ensureRouteTasks } from "./ensure-route-tasks";
 import type { RouteStop } from "./fixed-route-types";
@@ -72,7 +73,7 @@ export async function getPrograms() {
 }
 
 export async function getStudents() {
-  await requireUser(["ADMIN"]);
+  const user = await requireUser(["ADMIN"]);
   const result = await query<{
     id: string; name: string; photo_url: string; grade: string; age: number | null; route_assigned: boolean;
     no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
@@ -100,7 +101,7 @@ export async function getStudents() {
   return result.rows.map((row): Student => ({
     id: row.id,
     name: row.name,
-    photoUrl: row.photo_url,
+    photoUrl: displayedStudentPhoto(user, row.photo_url),
     grade: row.grade,
     age: row.age,
     classroomName: row.classroom_name,
@@ -212,7 +213,7 @@ export async function getTrips(date: string) {
       id: row.id,
       studentId: row.student_id,
       name: row.name,
-      photoUrl: row.photo_url,
+      photoUrl: displayedStudentPhoto(user, row.photo_url),
       classroomName: row.classroom_name,
       grade: row.grade,
       age: row.age,

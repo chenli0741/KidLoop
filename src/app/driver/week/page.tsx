@@ -1,6 +1,11 @@
+import { Suspense } from 'react';
+import { calendarMonth, workweek } from '@/lib/workweek';
+import { todayInOperationsTimeZone } from '@/lib/date';
+import { requireUser } from '@/lib/auth';
+import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import { BusFront, UsersRound } from 'lucide-react';
-import { getDriverWeek } from '@/lib/driver-week';
+import { driverScheduleDate, getDriverWeek } from '@/lib/driver-week';
 import { getLocale } from '@/lib/i18n-server';
 import { text } from '@/lib/i18n';
 import { formatDate, formatTime } from '@/lib/date';
@@ -11,13 +16,34 @@ import { StatusBadge } from '@/components/status-badge';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DriverWeekPage({ searchParams }: { searchParams: Promise<{ week?: string | string[]; day?: string; view?: string }> }) {
+type ScheduleParams = { week?: string | string[]; day?: string; view?: string };
+
+export default async function DriverWeekPage({ searchParams }: { searchParams: Promise<ScheduleParams> }) {
+  await requireUser(['DRIVER']);
   const params = await searchParams;
+  const locale = await getLocale();
   const monthly = params.view === 'month';
-  const [week, locale] = await Promise.all([getDriverWeek(params.week, monthly), getLocale()]);
+  const today = todayInOperationsTimeZone();
+  const date = driverScheduleDate(params.week, today);
+  const month = calendarMonth(date);
+  const dates = monthly ? month.days : workweek(date).days;
   return <div className="page-container driver-week-page">
     <PageHeader eyebrow={text(locale, '我的安排', 'My schedule')} title={text(locale, '日程', 'Schedule')}
-      description={text(locale, '选择星期，查看当天接送计划。', 'Choose a weekday to view your plans.')} />
+      description={text(locale, '选择日期，查看当天接送计划。', 'Choose a date to view your plans.')} />
+    <Suspense key={`${monthly}-${date}-${params.day}`} fallback={
+      <DriverWeekTabs loading monthly={monthly} month={month} hasTrips={dates.map(() => false)} dates={dates} locale={locale} initialDate={params.day || today}>
+        {dates.map(day => <p key={day} role="status" className="workweek-empty">{text(locale, '正在加载日程…', 'Loading schedule…')}</p>)}
+      </DriverWeekTabs>
+    }>
+      <ScheduleContent params={params} locale={locale} />
+    </Suspense>
+  </div>;
+}
+
+async function ScheduleContent({ params, locale }: { params: ScheduleParams; locale: Locale }) {
+  const monthly = params.view === 'month';
+  const week = await getDriverWeek(params.week, monthly);
+  return (
     <DriverWeekTabs key={`${monthly}-${week.days[0].date}`} monthly={monthly} month={week.month} hasTrips={week.days.map(day => day.trips.length > 0)} dates={week.days.map(day => day.date)} locale={locale}
       initialDate={params.day || week.today}>
       {week.days.map(day => <section className={`workweek-day${day.date === week.today ? ' is-today' : ''}`} key={day.date} aria-labelledby={`day-${day.date}`}>
@@ -47,5 +73,5 @@ export default async function DriverWeekPage({ searchParams }: { searchParams: P
         </div>}
       </section>)}
     </DriverWeekTabs>
-  </div>;
+  );
 }

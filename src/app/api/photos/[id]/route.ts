@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { usesDemoPhotos } from '@/lib/photo-display';
 import { get } from "@vercel/blob";
 import { getUser } from "@/lib/auth";
 import { query } from "@/lib/db";
@@ -8,9 +11,13 @@ export async function GET(_:Request,{params}:{params:Promise<{id:string}>}) {
   const {id}=await params;if(!photoPath.test(`/api/photos/${id}`))return new Response(null,{status:404});
   const result=await query<{blob_url:string}>(photoAccessSql,[id,user.id,user.role,user.driverId]);
   if(!result.rowCount)return new Response(null,{status:404});
+  if (usesDemoPhotos(user)) {
+    const avatar = await readFile(path.join(process.cwd(), 'public/demo-avatars/student-teal.png'));
+    return new Response(new Uint8Array(avatar), {headers:{"Content-Type":"image/png","Cache-Control":"private, no-store","Vary":"Cookie","X-Content-Type-Options":"nosniff"}});
+  }
   try {
     const blob=await get(result.rows[0].blob_url,{access:"private"});
     if(!blob || blob.statusCode!==200)return new Response(null,{status:404});
-    return new Response(blob.stream,{headers:{"Content-Type":"image/jpeg","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"}});
+    return new Response(blob.stream,{headers:{"Content-Type":"image/jpeg","Cache-Control":"private, no-store","Vary":"Cookie","X-Content-Type-Options":"nosniff"}});
   }catch{return new Response(null,{status:503});}
 }

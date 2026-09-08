@@ -1,3 +1,4 @@
+import { displayedStudentPhoto } from './photo-display';
 import { ensureRouteTasks } from "./ensure-route-tasks";
 import "server-only";
 import { editableNote } from "@/lib/student-management";
@@ -22,7 +23,7 @@ export async function getParentChildren() {
     left join parents pa on pa.id = st.parent_id
     where us.user_id = $1 and exists(select 1 from term_students et where et.student_id=st.id and et.operating_term_id=current_operating_term()) and st.active order by st.name
   `, [user.id]);
-  return result.rows.map((child) => ({ ...child, notes: editableNote(child.notes) }));
+  return result.rows.map((child) => ({ ...child, photoUrl: displayedStudentPhoto(user, child.photoUrl), notes: editableNote(child.notes) }));
 }
 
 export async function getParentSchedule(date: string) {

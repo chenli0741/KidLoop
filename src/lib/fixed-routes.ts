@@ -1,5 +1,6 @@
 import { requireTerm, openTerm } from "./operating-terms";
 import "server-only";
+import { readPickupMatches, planRoute, overCapacity as exceedsCapacity } from "./route-plan";
 import { routeName } from "./route-name";
 import type { PoolClient } from "pg";
 import type { FixedRoute, RouteStop, RouteStudent } from "./fixed-route-types";
@@ -77,7 +78,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
 }
 
 // One transaction serializes automatic creation and route edits; rider locks share the parent workflow's order.
-export async function materializeRoutes(c:PoolClient,date:string,today:string,driverId?:string) {
+export async function materializeRoutes(c:PoolClient,date:string,today:string,driverId?:string,replacementSources?:Map<string,string[]>) {
  if(!validServiceDate(date)||date<today) return;
  await lockRoutes(c);
  if(!await openTerm(c))return;
@@ -111,36 +112,15 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   // Preserve the actual journey once a driver has acted, including driver-marked absence.
   if(existing&&(await c.query("select 1 from trip_students where trip_id=$1 and (picked_up_at is not null or status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (status='ABSENT' and not parent_absence))",[existing.id])).rowCount) continue;
   const eligible:RouteStudent[]=[];
-  const schoolTimes = new Map<string,string>();
-  let stops=r.stops.map(s=>({...s}));
-  if(r.enabled&&r.driverId&&r.vehicleId&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday)) {
-   const matches=(await c.query<{student_id:string;school_id:string;time:string}>(`select s.id as student_id,s.school_id,school_special_pickup_time(e.grade_times,s.grade,e.pickup_time,p.pickup_time)::text as time from students s join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=s.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=s.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=s.school_id and $2::date between e.starts_on and e.ends_on where s.id=any($1::uuid[]) and s.active and not ($3=any(s.no_pickup_weekdays)) and (e.id is null or e.pickup_time is not null or jsonb_array_length(e.grade_times)>0)`,[r.students.map(a=>a.studentId),date,weekday])).rows;
-   const byStudent=new Map<string,typeof matches[number]>();
-   for(const match of matches) if(!byStudent.has(match.student_id))byStudent.set(match.student_id,match);
-   if(r.routeType==='RECURRING') {
-    const transferred=(await c.query<{student_id:string}>(`select ts.student_id from trip_students ts join trips t on t.id=ts.trip_id join fixed_routes fr on fr.id=t.fixed_route_id where t.scheduled_date=$1 and t.status<>'CANCELED' and fr.route_type='TEMPORARY' and ts.student_id=any($2::uuid[])`,[date,r.students.map(a=>a.studentId)])).rows;
-    for(const student of transferred)byStudent.delete(student.student_id);
-   }
-   for(const a of r.students) {
-    const stop=stops.find(s=>s.id===a.pickupStopId)!;
-    const match=byStudent.get(a.studentId);
-    if(match && match.school_id===stop.schoolId) {
-      eligible.push(a);
-      const time=match.time.slice(0,5);
-      if(time>(schoolTimes.get(stop.id)??"")) schoolTimes.set(stop.id,time);
-    }
-   }
+  let matches = r.enabled && r.driverId && r.vehicleId && r.startsOn<=date && r.endsOn>=date && r.weekdays.includes(weekday)
+   ? await readPickupMatches(c,r.students.map(a=>a.studentId),date) : [];
+  if(r.routeType==='RECURRING') {
+   const transferred = new Set((await c.query<{student_id:string}>(`select ts.student_id from trip_students ts join trips t on t.id=ts.trip_id join fixed_routes fr on fr.id=t.fixed_route_id where t.scheduled_date=$1 and t.status<>'CANCELED' and fr.route_type='TEMPORARY' and ts.student_id=any($2::uuid[])`,[date,r.students.map(a=>a.studentId)])).rows.map(s=>s.student_id));
+   matches=matches.filter(m=>!transferred.has(m.student_id));
   }
-  // Anchor to the first active school's daily dismissal, including early days.
-  // Later stops retain travel intervals and never precede their own dismissal.
-  const minutes=(s:string)=>Number(s.slice(0,2))*60+Number(s.slice(3,5));
-  const anchor=stops.find(s=>schoolTimes.has(s.id));
-  const delta=anchor ? minutes(schoolTimes.get(anchor.id)!)-minutes(anchor.time) : 0;
-  for(let i=0;i<stops.length;i++) {
-    const arrival=i===0 ? minutes(r.stops[0].time)+delta : minutes(stops[i-1].time)+minutes(r.stops[i].time)-minutes(r.stops[i-1].time);
-    const time=Math.max(arrival,schoolTimes.has(stops[i].id)?minutes(schoolTimes.get(stops[i].id)!):arrival);
-    stops[i].time=`${String(Math.floor(time/60)).padStart(2,'0')}:${String(time%60).padStart(2,'0')}`;
-  }
+  const planned=planRoute(r,matches);
+  eligible.push(...planned.students);
+  let stops=planned.stops;
   if(!eligible.length) {if(existing) {await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}
   stops=stops.filter(s=>!s.schoolId || eligible.some(a=>a.pickupStopId===s.id||a.dropoffStopId===s.id));
   if(stops.at(-1)!.time>"23:59") {await issue("站点时间超过当天，请调整线路 / Stop time exceeds this day");if(existing){await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}
@@ -148,7 +128,7 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   const driver=(await c.query("select id from drivers where id=$1 and active and status='AVAILABLE'",[r.driverId])).rowCount;
   const vehicle=(await c.query("select id,capacity from vehicles where id=$1 and active and status<>'MAINTENANCE'",[r.vehicleId])).rows[0];
   if(!driver||!vehicle) {await issue("固定司机或车辆不可用，请修改线路绑定 / Driver or vehicle unavailable");if(existing){await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}
-  const overCapacity=stops.some((_,i)=>eligible.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>vehicle.capacity);
+  const overCapacity=exceedsCapacity(stops,eligible,vehicle.capacity);
   const conflict=(await c.query(`select 1 from driver_shifts sh where shift_date=$1 and status<>'CANCELED' and id<>coalesce($2::uuid,gen_random_uuid()) and (driver_id=$3 or vehicle_id=$4) and start_time<$6::time and end_time>$5::time`,[date,existing?.shift_id??null,r.driverId,r.vehicleId,stops[0].time,stops.at(-1)!.time])).rowCount;
   if(overCapacity||conflict) {await issue(overCapacity?"车辆座位不足，请调整线路 / Vehicle capacity exceeded":"司机或车辆与其他行程时间冲突 / Driver or vehicle has a conflicting trip");if(existing){await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}
   const shiftId=existing?.shift_id||(await c.query("insert into driver_shifts(driver_id,vehicle_id,shift_date,start_time,end_time) values($1,$2,$3,$4,$5) returning id",[r.driverId,r.vehicleId,date,stops[0].time,stops.at(-1)!.time])).rows[0].id;
@@ -159,11 +139,11 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   if(r.routeType==='TEMPORARY') {
    // Move the assignment itself to retain parent absence and status history. Never alter a started source trip.
    const movable=(await c.query<{id:string;student_id:string;trip_id:string}>(`select ts.id,ts.student_id,ts.trip_id from trip_students ts join trips t on t.id=ts.trip_id join fixed_routes fr on fr.id=t.fixed_route_id
-    where ts.student_id=any($1::uuid[]) and t.scheduled_date=$2 and t.id<>$3 and t.status<>'CANCELED' and fr.route_type='RECURRING'
+    where ts.student_id=any($1::uuid[]) and t.scheduled_date=$2 and t.id<>$3 and ((t.status<>'CANCELED' and fr.route_type='RECURRING') or (fr.route_type='TEMPORARY' and not fr.enabled and fr.id=any($4::uuid[])))
     and not exists(select 1 from trip_segment_completions f where f.trip_id=t.id)
     and not exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))
     and not exists(select 1 from trip_students other join trips ot on ot.id=other.trip_id where other.student_id=ts.student_id and ot.scheduled_date=$2 and ot.status<>'CANCELED' and ot.id not in (t.id,$3))
-    for update of t,ts`,[eligible.map(a=>a.studentId),date,tripId])).rows;
+    for update of t,ts`,[eligible.map(a=>a.studentId),date,tripId,replacementSources?.get(r.id)??[]])).rows;
    for(const student of movable){
     const assignment=eligible.find(a=>a.studentId===student.student_id)!;
     const prior=(await c.query<{id:string}>('select id from trip_students where trip_id=$1 and student_id=$2',[tripId,student.student_id])).rows[0];

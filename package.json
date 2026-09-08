@@ -14,7 +14,8 @@
     "auth:create-admin": "node --env-file=.env.local --import tsx scripts/create-admin.ts",
     "test:roles": "node --conditions=react-server --import tsx --test tests/roles.test.ts",
     "test:profiles": "node --conditions=react-server --import tsx --test tests/profile.test.ts",
-    "test:pickup": "node --conditions=react-server --import tsx --test tests/pickup-settings.test.ts"
+    "test:pickup": "node --conditions=react-server --import tsx --test tests/pickup-settings.test.ts",
+    "reschedule:simulate": "node --conditions=react-server --import tsx scripts/simulate-rescheduling.ts"
   },
   "dependencies": {
     "@capacitor/camera": "^8.2.4",

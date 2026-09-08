@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
 import { FixedRouteForm } from "@/components/fixed-route-form";
@@ -30,6 +31,7 @@ export default async function RoutesPage() {
   return <div className="page-container">
       <TermWorkspace term={operation} locale={locale}/>
     <PageHeader eyebrow={text(locale, "线路管理", "Route management")} title={text(locale, "线路", "Routes")} description={text(locale, "固定线路、站点与司机车辆。", "Recurring routes, stops, drivers and vehicles.")} />
+    <Link className="button secondary" href="/routes/adjust">{text(locale,"智能调整接送安排","Adjust pickup schedules")}</Link>
     <section className="pickup-section">
       <div className="section-heading"><h2>{text(locale, "接送线路", "Routes")}</h2><RosterCreateDialog title={text(locale, "添加线路", "Add route")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>
       {!routes.length && <p>{text(locale, "暂无线路。", "No routes.")}</p>}
