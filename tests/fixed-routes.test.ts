@@ -6,6 +6,7 @@ import pg from 'pg';
 import {saveFixedRoute,readFixedRoutes,materializeRoutes} from '../src/lib/fixed-routes';
 import {finishTripSegment} from '../src/lib/finish-trip-segment';
 import {changeRiderStatus} from '../src/lib/rider-status';
+import {readTripExecution} from '../src/lib/read-trip-execution';
 import type {AuthUser} from '../src/lib/types';
 
 test('fixed multi-school route creates tasks once, skips holidays, changes driver and preserves started trips',async()=>{
@@ -34,6 +35,8 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await tx(()=>saveFixedRoute(c,make()));
   let route=(await readFixedRoutes(c))[0];assert.equal(route.name,'A → B → P');assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
   await assert.rejects(tx(()=>saveFixedRoute(c,make({name:'Overlap'}))),/overlapping/);
+  await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07',backup));
+  assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_students')).rows[0].n,2);
@@ -53,7 +56,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await tx(()=>materializeRoutes(c,'2026-09-12','2026-09-07'));
   assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-09-12'")).rows[0].n,0);
   await tx(()=>saveFixedRoute(c,make({id:route.id,updatedAt:route.updatedAt,driverId:backup})));
-  await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));
+  await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07',driver));
   assert.equal((await c.query("select driver_id from driver_shifts sh join trips t on t.shift_id=sh.id where scheduled_date='2026-09-07'")).rows[0].driver_id,backup);
   await c.query("update trip_students set status='PICKED_UP',picked_up_at=now() where trip_id=(select id from trips where scheduled_date='2026-09-07')");
   route=(await readFixedRoutes(c))[0];await tx(()=>saveFixedRoute(c,make({id:route.id,updatedAt:route.updatedAt,driverId:driver})));
@@ -89,6 +92,11 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   let restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
   assert.equal(restored.status,'PICKED_UP');assert.equal(restored.picked_up_at,null);assert.equal(restored.dropped_off_at,null);
   assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'IN_PROGRESS');
+  const snapshot=await readTripExecution(c,tripId);
+  assert.equal(snapshot.tripId,tripId);assert.equal(snapshot.status,'IN_PROGRESS');
+  assert.equal(snapshot.riders.find(r=>r.id===delivered.id)?.status,'PICKED_UP');
+  assert.deepEqual(snapshot.completedSegments,[`${stops[1].id}:${stops[2].id}`]);
+  assert.match(snapshot.version,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$/);
   assert.deepEqual((await c.query('select pickup_stop_id from trip_segment_completions where trip_id=$1',[tripId])).rows,[{pickup_stop_id:stops[1].id}]);
   assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT' and parent_absence",[tripId])).rows[0].n,1);
   assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='DROPPED_OFF' and to_status='PICKED_UP'",[delivered.id])).rows[0].n,1);

@@ -103,6 +103,7 @@ export type Rider = {
 };
 
 export type Trip = {
+  executionVersion?: string;
   completedSegments?: string[];
   routeName?:string|null; routeStops?:import("./fixed-route-types").RouteStop[]|null;
   id: string;

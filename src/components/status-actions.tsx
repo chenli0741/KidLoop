@@ -7,8 +7,9 @@ import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 import type { RiderStatus } from "@/lib/types";
 import { missedPickupReasons } from "@/lib/missed-pickup";
+import type { TripExecution } from "@/lib/trip-execution";
 
-export function StatusActions({ assignmentId, status }: { assignmentId: string; status: RiderStatus }) {
+export function StatusActions({ assignmentId, status, onUpdated }: { assignmentId: string; status: RiderStatus; onUpdated: (update: TripExecution) => void }) {
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
@@ -21,8 +22,9 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
     setError("");
     startTransition(async () => {
       try {
-        await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined);
+        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined);
         dialog.current?.close();
+        onUpdated(result);
       } catch {
         setError(text(locale, "无法更新状态。", "Could not update status."));
       }

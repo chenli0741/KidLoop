@@ -164,17 +164,19 @@ export async function getShifts(fromDate?: string) {
 
 export async function getTrips(date: string) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
-  await ensureRouteTasks(date);
+  if(user.role === 'DRIVER' && !user.driverId) return [];
+  await ensureRouteTasks(date,user.role === 'DRIVER' ? user.driverId! : undefined);
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
-      completed_segments: string[]; route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
+      execution_version: string; completed_segments: string[]; route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
       driver_name: string; driver_phone: string; vehicle_name: string; vehicle_plate: string; capacity: number;
       school_name: string; school_address: string; pickup_map_url: string | null;
       pickup_instructions: string; dismissal_time: string | null; program_name: string;
       program_address: string; dropoff_info: string; program_requirements: string;
     }>(`
-      select array(select pickup_stop_id::text||':'||dropoff_stop_id::text from trip_segment_completions where trip_id=t.id) as completed_segments,
+      select to_char(t.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US') as execution_version,
+             array(select pickup_stop_id::text||':'||dropoff_stop_id::text from trip_segment_completions where trip_id=t.id) as completed_segments,
              t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
              d.name as driver_name, d.phone as driver_phone,
              v.name as vehicle_name, v.plate as vehicle_plate, v.capacity,
@@ -239,6 +241,7 @@ export async function getTrips(date: string) {
 
   return tripResult.rows.map((row): Trip => ({
     id: row.id,
+    executionVersion: row.execution_version,
     routeName: row.route_name, routeStops:row.route_stops, completedSegments:row.completed_segments,
     scheduledDate: row.scheduled_date,
     departureTime: row.departure_time,

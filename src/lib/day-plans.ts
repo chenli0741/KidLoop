@@ -15,7 +15,7 @@ export async function recomputeTrip(client: PoolClient, tripId: string) {
       select case when bool_and(status in ('DROPPED_OFF', 'ABSENT', 'EXCEPTION')) then 'COMPLETED'
         when bool_or(status in ('PICKED_UP', 'DROPPED_OFF')) then 'IN_PROGRESS'
         else 'PUBLISHED' end from trip_students where trip_id = $1
-    ), updated_at = now() where id = $1 and status not in ('CANCELED', 'DRAFT')
+    ), updated_at = clock_timestamp() where id = $1 and status not in ('CANCELED', 'DRAFT')
   `, [tripId]);
 }
 

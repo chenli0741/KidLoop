@@ -44,4 +44,5 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   }
   await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, note) values ($1, $2, $3, $4, $5)", [assignmentId, rider.status, nextStatus, user.id, nextStatus === "EXCEPTION" ? `${reason!.zh} / ${reason!.en}; 已通知家长自行安排接送 / Parent notified to arrange pickup` : ""]);
   await recomputeTrip(client, tripId);
+  return tripId;
 }

@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import { BusFront, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
@@ -8,8 +11,18 @@ import { StatusBadge } from "@/components/status-badge";
 import { text, type Locale } from "@/lib/i18n";
 import { tripSegments } from "@/lib/trip-segments";
 import { TripSegmentPicker } from "@/components/trip-segment-picker";
+import { applyTripExecution, type TripExecution } from "@/lib/trip-execution";
 
-export function TripCard({ trip, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
+export function TripCard({ trip: source, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
+  const [state, setState] = useState({ source, trip: source });
+  let trip = state.trip;
+  if (state.source !== source) {
+    trip = (source.executionVersion ?? '') >= (state.trip.executionVersion ?? '') ? source : state.trip;
+    setState({ source, trip });
+  }
+  function onUpdated(update: TripExecution) {
+    setState(previous => ({ ...previous, trip: applyTripExecution(previous.trip, update) }));
+  }
   const completed = trip.riders.filter((rider) => ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
   const segments = tripSegments(trip);
   const paired = segments.every(s=>s.routeStops?.length===2 && s.riders.length>0 && s.riders.every(r=>r.pickupStopId===s.routeStops![0].id && r.dropoffStopId===s.routeStops![1].id));
@@ -34,19 +47,19 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
+      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
         return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
       })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
-        <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false}/>
+        <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false} onUpdated={onUpdated}/>
       </section>)}
-      </TripSegmentPicker> : <TripSegmentContent trip={trip} locale={locale} interactive={interactive}/>}
+      </TripSegmentPicker> : <TripSegmentContent trip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>}
     </article>
   );
 }
 
-function TripSegmentContent({trip,locale,interactive,showStops=true}:{trip:Trip;locale:Locale;interactive:boolean;showStops?:boolean}) {
+function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true}:{trip:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean}) {
   return <>
 
       {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
@@ -101,7 +114,7 @@ function TripSegmentContent({trip,locale,interactive,showStops=true}:{trip:Trip;
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>
             <StatusBadge status={rider.status} />
-            {interactive && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} /> : null}
+            {interactive && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>

@@ -8,11 +8,13 @@ import { validServiceDate, recomputeTrip } from "./day-plans";
 
 const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
 export async function lockRoutes(c:PoolClient) { await c.query("select pg_advisory_xact_lock(70919009)"); }
-export async function readFixedRoutes(c:Pick<PoolClient,"query">):Promise<FixedRoute[]> {
+export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string}):Promise<FixedRoute[]> {
  return (await c.query(`select r.id,r.name,r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
  coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',to_char(s.arrival_time,'HH24:MI')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  coalesce((select jsonb_agg(jsonb_build_object('studentId',a.student_id,'pickupStopId',a.pickup_stop_id,'dropoffStopId',a.dropoff_stop_id)) from fixed_route_students a where a.route_id=r.id),'[]') as students
- from fixed_routes r where r.operating_term_id=current_operating_term() order by r.name`)).rows;
+ from fixed_routes r where r.operating_term_id=current_operating_term()
+ and ($1::uuid is null or r.driver_id=$1 or exists(select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.fixed_route_id=r.id and t.scheduled_date=$2::date and sh.driver_id=$1))
+ order by r.name`,[scope?.driverId??null,scope?.date??null])).rows;
 }
 export async function readRouteTaskIssues(c:Pick<PoolClient,"query">,date:string) {
  return (await c.query<{name:string;message:string}>("select r.name,i.message from route_task_issues i join fixed_routes r on r.id=i.route_id where r.operating_term_id=current_operating_term() and i.service_date=$1 order by r.name",[date])).rows;
@@ -71,11 +73,11 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
 }
 
 // One transaction serializes automatic creation and route edits; rider locks share the parent workflow's order.
-export async function materializeRoutes(c:PoolClient,date:string,today:string) {
+export async function materializeRoutes(c:PoolClient,date:string,today:string,driverId?:string) {
  if(!validServiceDate(date)||date<today) return;
  await lockRoutes(c);
  if(!await openTerm(c))return;
- const routes=await readFixedRoutes(c);
+ const routes=await readFixedRoutes(c,driverId?{driverId,date}:undefined);
  const weekday=new Date(`${date}T12:00:00Z`).getUTCDay()||7;
  const allIds=[...new Set(routes.flatMap(r=>r.students.map(s=>s.studentId)))].sort();
  await c.query("select id from students where id=any($1::uuid[]) order by id for update",[allIds]);

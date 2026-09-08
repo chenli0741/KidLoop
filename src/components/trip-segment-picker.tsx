@@ -6,10 +6,11 @@ import {LocationMap} from "./location-map";
 import {finishSegment} from "@/app/driver/actions";
 import {text,type Locale} from "@/lib/i18n";
 import type {RouteStop} from "@/lib/fixed-route-types";
+import type {TripExecution} from "@/lib/trip-execution";
 
 type Option={id:string;stops:RouteStop[];done:boolean;pendingPickups:number};
-export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
-  options:Option[];tripId:string;locale:Locale;interactive:boolean;children:ReactNode[];
+export function TripSegmentPicker({options,tripId,locale,interactive,children,onUpdated}:{
+  options:Option[];tripId:string;locale:Locale;interactive:boolean;children:ReactNode[];onUpdated:(update:TripExecution)=>void;
 }) {
   const id=useId();
   const confirmation=useRef<HTMLDialogElement>(null);
@@ -26,9 +27,10 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
     setError('');
     startTransition(async()=>{
       try{
-        await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id);
+        const result=await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id);
         confirmation.current?.close();
         setSelected(null);
+        onUpdated(result);
       }catch{setError(text(locale,'无法完成，请刷新后重试。','Could not finish. Refresh and retry.'));}
     });
   }

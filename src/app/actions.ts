@@ -4,6 +4,7 @@ import { attachPhoto, photoPath } from "@/lib/student-photos";
 
 import { requireUser } from "@/lib/auth";
 import { changeRiderStatus } from "@/lib/rider-status";
+import { readTripExecution } from "@/lib/read-trip-execution";
 import type { MissedPickupDetails } from "@/lib/missed-pickup";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -196,6 +197,8 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
-  await transaction((client) => changeRiderStatus(client, user, tripStudentId, nextStatus, details));
-  for (const path of ["/", "/schedule/dispatch", "/driver", "/parent"]) revalidatePath(path);
+  return transaction(async (client) => {
+    const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details);
+    return readTripExecution(client, tripId);
+  });
 }
