@@ -190,7 +190,7 @@ export default async function TermsPage({
     <div className="page-container">
       <PageHeader
         title={text(locale, "运营学期", "Operating terms")}
-        eyebrow="KidLoop"
+        eyebrow="Kid Loop"
         description={text(
           locale,
           "一次初始化，按学期计划和归档。",

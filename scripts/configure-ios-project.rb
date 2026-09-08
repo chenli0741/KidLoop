@@ -34,7 +34,7 @@ project.recreate_user_schemes
 
 info_path = File.join(native_dir, "App", "Info.plist")
 info = Xcodeproj::Plist.read_from_path(info_path)
-info["CFBundleDisplayName"] = "KidLoop"
+info["CFBundleDisplayName"] = "Kid Loop"
 info.delete("UISupportedInterfaceOrientations~ipad")
 Xcodeproj::Plist.write_to_path(info, info_path)
 

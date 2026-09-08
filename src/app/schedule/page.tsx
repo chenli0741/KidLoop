@@ -42,11 +42,11 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
   const section=(kind:SettingKind,title:string,description:string,items:PickupSetting[],ready=true)=><section className="pickup-section">
     <div className="section-heading"><div><h2>{title}</h2><p className="form-hint">{description}</p></div>{ready && kind!=="term" && <RosterCreateDialog title={text(locale,"添加","Add")} closeLabel={text(locale,"关闭","Close")}>{form(kind)}</RosterCreateDialog>}</div>
     {!ready && <p className="setup-callout">{text(locale,"请先设置年级接送时间，并在资料中添加课外班目的地。","Set grade pickup times and add an after-school destination in Resources first.")}</p>}
-    {!items.length ? <p className="form-hint">{text(locale,"尚未设置","Not configured yet")}</p> : <div className="pickup-records">{items.map(item=><article className="pickup-record" key={item.id}><div><h3>{item.name}</h3>
+    {!items.length ? <p className="form-hint">{text(locale,"尚未设置","Not configured yet")}</p> : <div className="pickup-records">{items.map(item=><article className="pickup-record school-setting-record" key={item.id}><div><h3>{item.name}</h3>
       {(kind==="term" || kind==="exception") && <p>{item.startsOn} — {item.endsOn}{kind==="exception" && ` · ${item.pickupTime ?? text(locale,"不接送","No pickup")}`}</p>}
       {kind==="rule" && <><p>{item.grades?.join("、") || text(locale,"请选择适用年级","Select applicable grades")}</p><p>{weekdays(item.weekdays)} · <strong>{item.pickupTime}</strong></p></>}
       {kind==="route" && <><p>{school?.name} → {item.destination}</p><p>{item.ruleName} · {weekdays(item.weekdays)} · {item.pickupTime}</p></>}
-    </div><div className="pickup-record-actions"><RosterCreateDialog icon="edit" title={text(locale,"编辑","Edit")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item)}</RosterCreateDialog>{kind!=="term" && <RosterCreateDialog icon="remove" title={text(locale,"删除","Remove")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item,true)}</RosterCreateDialog>}
+    </div><div className="pickup-record-actions"><RosterCreateDialog iconOnly icon="edit" title={text(locale,"编辑","Edit")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item)}</RosterCreateDialog>{kind!=="term" && <RosterCreateDialog iconOnly icon="remove" title={text(locale,"删除","Remove")} closeLabel={text(locale,"关闭","Close")}>{form(kind,item,true)}</RosterCreateDialog>}
 
     </div></article>)}</div>}
   </section>;

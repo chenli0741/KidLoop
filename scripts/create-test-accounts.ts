@@ -10,7 +10,7 @@ async function main() {
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const driver = (await client.query<{ id: string; name: string }>("select id,name from drivers where name like 'Test Driver%' and active order by name limit 1")).rows[0];
+    const driver = (await client.query<{ id: string; name: string }>("select id,name from drivers where id='37dd4080-b702-4565-ae1c-bd71c51b6376' and active")).rows[0];
     if (!driver) throw new Error("Import the clearly labelled test drivers first.");
     const children = (await client.query<{ id: string; name: string }>(`
       select distinct st.id,st.name from students st join trip_students ts on ts.student_id=st.id

@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   return {
-    title: text(locale, "KidLoop 运营管理", "KidLoop Operations"),
+    title: text(locale, "Kid Loop 运营管理", "Kid Loop Operations"),
     description: text(locale, "课后接送与家庭出行管理", "After-school transportation and family ride management"),
   };
 }

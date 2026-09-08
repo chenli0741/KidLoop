@@ -28,7 +28,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
       <div className="brand">
         <div className="brand-mark"><BusFront size={21} aria-hidden="true" /></div>
         <div>
-          <strong>KidLoop</strong>
+          <strong>Kid Loop</strong>
           <span>{user.role === "PARENT" ? text(locale, "家长端", "Parent") : user.role === "DRIVER" ? text(locale, "司机端", "Driver") : text(locale, "运营管理", "Operations")}</span>
         </div>
       </div>

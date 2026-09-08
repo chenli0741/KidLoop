@@ -12,29 +12,29 @@ const grades = ["TK", "K", ...Array.from({ length: 7 }, (_, i) => String(i + 1))
 // OPM 2026/2027 schedules, checked 2026-09-07. Include weekend dates and observed days.
 // https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/
 const holidays = [
-  ["2026-01-01", "2026-01-01", "元旦 / New Year"],
-  ["2026-01-19", "2026-01-19", "马丁·路德·金纪念日 / MLK Day"],
-  ["2026-02-16", "2026-02-16", "华盛顿诞辰日 / Washington's Birthday"],
-  ["2026-05-25", "2026-05-25", "阵亡将士纪念日 / Memorial Day"],
-  ["2026-06-19", "2026-06-19", "六月节 / Juneteenth"],
-  ["2026-07-03", "2026-07-04", "独立日（含补休）/ Independence Day"],
-  ["2026-09-07", "2026-09-07", "劳动节 / Labor Day"],
-  ["2026-10-12", "2026-10-12", "哥伦布日 / Columbus Day"],
-  ["2026-11-11", "2026-11-11", "退伍军人节 / Veterans Day"],
-  ["2026-11-26", "2026-11-26", "感恩节 / Thanksgiving"],
-  ["2026-12-25", "2026-12-25", "圣诞节 / Christmas"],
-  ["2027-01-01", "2027-01-01", "元旦 / New Year"],
-  ["2027-01-18", "2027-01-18", "马丁·路德·金纪念日 / MLK Day"],
-  ["2027-02-15", "2027-02-15", "华盛顿诞辰日 / Washington's Birthday"],
-  ["2027-05-31", "2027-05-31", "阵亡将士纪念日 / Memorial Day"],
-  ["2027-06-18", "2027-06-19", "六月节（含补休）/ Juneteenth"],
-  ["2027-07-04", "2027-07-05", "独立日（含补休）/ Independence Day"],
-  ["2027-09-06", "2027-09-06", "劳动节 / Labor Day"],
-  ["2027-10-11", "2027-10-11", "哥伦布日 / Columbus Day"],
-  ["2027-11-11", "2027-11-11", "退伍军人节 / Veterans Day"],
-  ["2027-11-25", "2027-11-25", "感恩节 / Thanksgiving"],
-  ["2027-12-24", "2027-12-25", "圣诞节（含补休）/ Christmas"],
-  ["2027-12-31", "2027-12-31", "2028 元旦补休 / New Year observed"],
+  ["2026-01-01", "2026-01-01", "New Year"],
+  ["2026-01-19", "2026-01-19", "MLK Day"],
+  ["2026-02-16", "2026-02-16", "Washington's Birthday"],
+  ["2026-05-25", "2026-05-25", "Memorial Day"],
+  ["2026-06-19", "2026-06-19", "Juneteenth"],
+  ["2026-07-03", "2026-07-04", "Independence Day (including observed holiday)"],
+  ["2026-09-07", "2026-09-07", "Labor Day"],
+  ["2026-10-12", "2026-10-12", "Columbus Day"],
+  ["2026-11-11", "2026-11-11", "Veterans Day"],
+  ["2026-11-26", "2026-11-26", "Thanksgiving"],
+  ["2026-12-25", "2026-12-25", "Christmas"],
+  ["2027-01-01", "2027-01-01", "New Year"],
+  ["2027-01-18", "2027-01-18", "MLK Day"],
+  ["2027-02-15", "2027-02-15", "Washington's Birthday"],
+  ["2027-05-31", "2027-05-31", "Memorial Day"],
+  ["2027-06-18", "2027-06-19", "Juneteenth (including observed holiday)"],
+  ["2027-07-04", "2027-07-05", "Independence Day (including observed holiday)"],
+  ["2027-09-06", "2027-09-06", "Labor Day"],
+  ["2027-10-11", "2027-10-11", "Columbus Day"],
+  ["2027-11-11", "2027-11-11", "Veterans Day"],
+  ["2027-11-25", "2027-11-25", "Thanksgiving"],
+  ["2027-12-24", "2027-12-25", "Christmas (including observed holiday)"],
+  ["2027-12-31", "2027-12-31", "New Year 2028 (observed)"],
 ];
 const apply = process.argv.includes("--apply");
 const url = new URL(process.env.DATABASE_URL);
@@ -53,8 +53,8 @@ try {
     assert.equal(found.rowCount, 1, `Expected one school: ${school.name}`);
     const schoolId = found.rows[0].id;
     for (const [key, weekdays, time, name] of [
-      ["tuesday", [2], school.tuesday, "默认周二接送"],
-      ["other", [1, 3, 4, 5], school.other, "默认周一、三、四、五接送"],
+      ["tuesday", [2], school.tuesday, "Tuesday pickup"],
+      ["other", [1, 3, 4, 5], school.other, "Mon, Wed, Thu, Fri pickup"],
     ]) {
       const id = idFor(`${schoolId}:${key}`);
       // Never replace customized or overlapping rules on a subsequent run.

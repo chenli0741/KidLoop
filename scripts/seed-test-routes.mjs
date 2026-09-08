@@ -34,7 +34,7 @@ try {
     await client.query("insert into vehicles (id,name,plate,capacity) values ($1,$2,$3,$4) on conflict (id) do nothing",
       [vehicleId, vehicle.name, vehicle.plate, vehicle.capacity]);
     await client.query("insert into drivers (id,name,phone) values ($1,$2,'') on conflict (id) do nothing",
-      [driverId, `Test Driver ${vehicle.key}`]);
+      [driverId, vehicle.key === "01" ? "Driver Chen" : "Driver Lina"]);
     const available = await client.query(`select 1 from vehicles v, drivers d
       where v.id=$1 and d.id=$2 and v.status='AVAILABLE' and d.status='AVAILABLE' and v.capacity>=$3`,
       [vehicleId, driverId, vehicle.capacity]);
