@@ -13,6 +13,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
  try {
   await c.query(`create schema ${schema}`); await c.query(`set search_path to ${schema}`);
   for(const file of (await readdir('db/migrations')).filter(f=>f.endsWith('.sql')).sort())await c.query(await readFile(`db/migrations/${file}`,'utf8'));
+  await c.query("insert into operating_terms(name,starts_on,ends_on) values('Term','2026-09-01','2026-09-30')");
   const school=await id("insert into schools(name,address) values('A','A address')"),schoolB=await id("insert into schools(name,address) values('B','B address')");
   const program=await id("insert into after_school_programs(name,address) values('P','P address')");
   const driver=await id("insert into drivers(name,phone) values('D','1')"),backup=await id("insert into drivers(name,phone) values('Backup','2')");
@@ -24,6 +25,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
    await c.query("insert into school_terms(school_id,name,starts_on,ends_on) values($1,'Term','2026-09-01','2026-09-30')",[s]);
    await c.query("insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades) values($1,'Rule',array[1,2,3,4,5],'14:00',array['1'])",[s]);
   }
+  await c.query('insert into term_students(operating_term_id,student_id,reviewed) select current_operating_term(),id,true from students');
   const stops=[{id:randomUUID(),name:'',address:'',schoolId:school,programId:null,time:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:schoolB,programId:null,time:'14:20'},{id:randomUUID(),name:'',address:'',schoolId:null,programId:program,time:'15:00'}];
   const make=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({name:'Route',startsOn:'2026-09-01',endsOn:'2026-09-30',driverId:driver,vehicleId:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify(ids.map((studentId,i)=>({studentId,pickupStopId:stops[i].id,dropoffStopId:stops[2].id}))),...extra}))f.set(k,v);for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;};
   await tx(()=>saveFixedRoute(c,make()));

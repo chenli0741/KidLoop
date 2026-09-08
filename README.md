@@ -113,3 +113,11 @@ KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres node --conditions
 ```
 
 学生照片支持上传：配置私有 Vercel Blob 的 `BLOB_READ_WRITE_TOKEN`，运行迁移 `007_student_photos.sql`。照片经压缩和服务端重编码后存储，读取需要登录并具备对应学生权限。
+
+## Operating terms
+
+See [operating-term requirements](docs/operating-terms.md). Migration `011_operating_terms.sql` adopts existing school dates and plans without archiving the current term. `/terms` manages initialization, student review and whole-term archives.
+
+```sh
+KIDLOOP_TEST_DATABASE_URL=postgresql://USER@localhost/postgres node --conditions=react-server --import tsx --test tests/operating-terms.test.ts
+```

@@ -17,7 +17,7 @@ export default async function ChildrenPage() {
     <div className="profile-grid">{children.map((child) => <section className="profile-panel" key={child.id} id={`child-${child.id}`}><h2>{child.name}</h2><p className="form-hint">{child.schoolName} · {child.classroomName} → {child.programName}</p>
       {child.photoUrl && <div className="family-photo"><Image unoptimized={child.photoUrl.startsWith("/api/photos/")} src={child.photoUrl} alt={child.name} fill sizes="72px" /></div>}
       <SettingsForm action={updateChild} submitLabel={text(locale, "保存孩子资料", "Save child information")}>
-        <input type="hidden" name="id" value={child.id} /><input type="hidden" name="updatedAt" value={child.updatedAt} />
+        <input type="hidden" name="operatingTermId" value={child.operatingTermId}/><input type="hidden" name="id" value={child.id} /><input type="hidden" name="updatedAt" value={child.updatedAt} />
         <label className="full"><span>{text(locale, "孩子姓名", "Child name")}</span><input name="name" defaultValue={child.name} maxLength={200} required /></label>
         <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" defaultValue={child.grade} maxLength={30} /></label>
         <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min={3} max={20} step={1} defaultValue={child.age ?? ""} /></label>

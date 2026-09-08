@@ -5,9 +5,9 @@ import { editableNote } from "@/lib/student-management";
 import { text, type Locale } from "@/lib/i18n";
 import type { Classroom, Program, Student } from "@/lib/types";
 
-export function StudentRecordActions({ student, classrooms, programs, locale }: { student: Student; classrooms: Classroom[]; programs: Program[]; locale: Locale }) {
+export function StudentRecordActions({ student, classrooms, programs, locale, operatingTermId }: { operatingTermId:string; student: Student; classrooms: Classroom[]; programs: Program[]; locale: Locale }) {
   return (
-    <RecordActions id={student.id} name={student.name} updatedAt={student.updatedAt} update={updateStudent} remove={deleteStudent}
+    <RecordActions hiddenFields={{operatingTermId}} id={student.id} name={student.name} updatedAt={student.updatedAt} update={updateStudent} remove={deleteStudent}
       editTitle={text(locale, "编辑学生", "Edit student")}
       deleteDescription={text(locale, "删除后，该学生将从名册中移除，不能再安排新行程。已有接送行程和历史记录会保留，删除不会取消已有行程。", "The student will leave the roster and cannot be assigned new trips. Existing trips and history are retained; deletion does not cancel existing trips.")}>
       <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" defaultValue={student.name} maxLength={200} required /></label>

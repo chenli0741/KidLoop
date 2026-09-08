@@ -1,4 +1,5 @@
 "use server";
+import { requireTerm, openTerm, initializeSchools } from "@/lib/operating-terms";
 import { attachPhoto, photoPath } from "@/lib/student-photos";
 
 import { requireUser } from "@/lib/auth";
@@ -109,7 +110,9 @@ export async function createSchool(_: FormState, formData: FormData): Promise<Fo
     const rawMapUrl = optional(formData, "pickupMapUrl");
     const mapUrl = pickupMapUrl(rawMapUrl);
     if (rawMapUrl && !mapUrl) throw new Error("Pickup map must be an HTTPS URL without credentials");
-    await query(`
+    await transaction(async client => {
+      await client.query("select pg_advisory_xact_lock(70919009)");
+      await client.query(`
       insert into schools (name, address, pickup_map_url, pickup_instructions, dismissal_time)
       values ($1, $2, $3, $4, $5::time)
     `, [
@@ -119,6 +122,9 @@ export async function createSchool(_: FormState, formData: FormData): Promise<Fo
       required(formData, "pickupInstructions"),
       optional(formData, "dismissalTime") || null,
     ]);
+      const term=await openTerm(client);
+      if(term)await initializeSchools(client,term);
+    });
   }, ["/resources", "/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
 }
 
@@ -154,6 +160,7 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
     if (age < 3 || age > 20) throw new Error("age must be between 3 and 20");
 
     await transaction(async (client) => {
+      const operation=await requireTerm(client,String(formData.get("operatingTermId")));
       const parent = await client.query<{ id: string }>(`
         insert into parents (name, relationship, phone, backup_phone, email)
         values ($1, $2, $3, nullif($4, ''), nullif($5, ''))
@@ -181,6 +188,7 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
         optional(formData, "notes"),
       ]);
       await attachPhoto(client,photo,student.rows[0].id,user.id);
+      await client.query("insert into term_students(operating_term_id,student_id,reviewed) values($1,$2,true)",[operation.id,student.rows[0].id]);
     });
   }, ["/", "/students", "/schedule"], { zh: "学生已添加。", en: "Student added." });
 }
@@ -193,10 +201,11 @@ export async function updateRiderStatus(tripStudentId: string, nextStatus: Rider
     DROPPED_OFF: [], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
   await transaction(async (client) => {
+    await requireTerm(client);
     const target = await client.query<{ student_id: string; trip_id: string }>(`
       select ts.student_id, ts.trip_id from trip_students ts
       join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
-      where ts.id = $1::uuid and ($2::uuid is null or sh.driver_id = $2)
+      where ts.id = $1::uuid and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id = $2)
     `, [tripStudentId, user.role === "DRIVER" ? user.driverId : null]);
     if (!target.rowCount) throw new Error("Assignment unavailable.");
     // Same lock order as parent plans: student, trip, assignment.

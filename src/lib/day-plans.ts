@@ -26,6 +26,8 @@ export async function saveDayPlan(client: PoolClient, user: AuthUser, input: {
   if (user.role !== "PARENT") throw new Error("FORBIDDEN");
   if (!validServiceDate(input.date) || input.date < todayInOperationsTimeZone()) throw new Error("INVALID_DATE");
   if (input.note.length > 1000) throw new Error("NOTE_TOO_LONG");
+  await client.query('select pg_advisory_xact_lock(70919009)');
+  if(!(await client.query("select 1 from operating_terms o join term_students ts on ts.operating_term_id=o.id where o.status='OPEN' and ts.student_id=$1 and $2::date between o.starts_on and o.ends_on",[input.studentId,input.date])).rowCount)throw new Error("INVALID_DATE");
   const child = await client.query(`
     select st.id from students st where st.id = $1::uuid and st.active
       and exists (select 1 from user_students us where us.student_id = st.id and us.user_id = $2)

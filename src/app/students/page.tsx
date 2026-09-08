@@ -1,3 +1,6 @@
+import { db } from "@/lib/db";
+import { openTerm } from "@/lib/operating-terms";
+import { TermWorkspace } from "@/components/term-workspace";
 import { PhotoUpload } from "@/components/photo-upload";
 import { requireUser } from "@/lib/auth";
 import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
@@ -18,6 +21,8 @@ export const dynamic = "force-dynamic";
 export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ school?: string | string[] }> }) {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
+  const operation=await openTerm(db);
+  if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const [students, classrooms, schools, programs] = await Promise.all([
     getStudents(), getClassrooms(), getSchools(), getPrograms(),
   ]);
@@ -29,6 +34,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="page-container">
+      <TermWorkspace term={operation} locale={locale}/>
       <PageHeader eyebrow={text(locale, "学生名册", "Roster")} title={text(locale, "学生", "Students")} description={text(locale, "选择学校，查看和管理该校学生的接送资料。", "Select a school to view and manage its student roster.")} />
 
       <div className="roster-toolbar"><SchoolFilter schools={schools} selected={selectedSchool?.id ?? ""} label={text(locale, "学校", "School")} />
@@ -45,7 +51,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
           <RosterCreateDialog title={text(locale, "添加学生", "Add student")} closeLabel={text(locale, "关闭", "Close")}>
             {canAddStudent ? (
               <ActionForm action={createStudent} submitLabel={text(locale, "添加学生", "Add student")}>
-                <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
+                <input type="hidden" name="operatingTermId" value={operation.id}/><label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" required /></label>
                 <PhotoUpload required />
                 <label><span>{text(locale, "班级", "Class")}</span><select name="classroomId" required defaultValue={schoolClassrooms.length === 1 ? schoolClassrooms[0].id : ""}><option value="" disabled>{text(locale, "选择班级", "Select class")}</option>{schoolClassrooms.map((classroom) => <option value={classroom.id} key={classroom.id}>{classroom.schoolName} · {classroom.name}</option>)}</select></label>
                 <label><span>{text(locale, "课外班", "After-school program")}</span><select name="programId" required defaultValue=""><option value="" disabled>{text(locale, "选择课外班", "Select program")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</select></label>
@@ -73,7 +79,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                   <div className="student-card-body">
                     <div className="student-card-heading">
                       <div className="student-card-identity"><h3>{student.name}</h3><p>{student.schoolName}</p></div>
-                      <StudentRecordActions student={student} classrooms={classrooms} programs={programs} locale={locale} />
+                      <StudentRecordActions operatingTermId={operation.id} student={student} classrooms={classrooms} programs={programs} locale={locale} />
                     </div>
                     <div className="student-facts">
                       <span><GraduationCap size={14} /> {student.classroomName} · {text(locale, "年级", "Grade")} {student.grade || text(locale, "待定", "pending")}</span>

@@ -7,6 +7,7 @@ import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
 type Props = {
+  hiddenFields?: Record<string, string>;
   id: string;
   name: string;
   updatedAt: string;
@@ -57,6 +58,7 @@ function RecordDialog({ mode, close, done, ...props }: Props & { mode: "edit" | 
           } catch { setError(text(locale, "操作失败，请刷新后重试。", "Could not save. Refresh and try again.")); }
         });
       }}>
+        {Object.entries(props.hiddenFields ?? {}).map(([name,value]) => <input key={name} type="hidden" name={name} value={value} />)}
         <input type="hidden" name="id" value={props.id} />
         <input type="hidden" name="updatedAt" value={version} />
         <fieldset disabled={pending} className="record-dialog-fields form-grid">

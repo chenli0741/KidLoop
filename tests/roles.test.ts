@@ -46,6 +46,8 @@ test("parent plans enforce ownership, preserve execution facts and audit changes
     const actor: AuthUser = { id: user, name: "Parent", email: "parent@test.invalid", role: "PARENT", driverId: null };
     await client.query("insert into user_students(user_id,student_id) values($1,$2)", [user, child]);
     const date = todayInOperationsTimeZone();
+    await client.query("insert into operating_terms(name,starts_on,ends_on) values('Term',$1::date-1,$1::date+100)",[date]);
+    await client.query('insert into term_students(operating_term_id,student_id,reviewed) select current_operating_term(),id,true from students');
     const input = { studentId: child, date, absent: true, note: "Please contact grandma" };
     const mutate = async (args = input, identity = actor) => {
       await client.query("begin");

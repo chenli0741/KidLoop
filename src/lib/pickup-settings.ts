@@ -1,3 +1,4 @@
+import { requireTerm } from "./operating-terms";
 import "server-only";
 import type { PoolClient } from "pg";
 
@@ -29,6 +30,8 @@ function days(f: FormData) {
 }
 export async function savePickupSetting(c: PoolClient, f: FormData) {
   const school = field(f,"schoolId"), kind = field(f,"kind"), id = field(f,"id"), remove = field(f,"remove") === "1";
+  const operation=await requireTerm(c);
+  if(kind==='term' && (!id || remove)) fail("学校学期只能编辑日期。", "School term dates can only be edited.");
   // Serialize all changes for one school, including overlap checks and route edits.
   const locked = await c.query('select calendar_archived_through::text as cutoff from schools where id=$1 for update',[school]);
   if (!locked.rowCount) fail("学校不存在。", "School not found.");
@@ -38,8 +41,8 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   if (!table) fail("设置类型无效。", "Invalid setting type.");
   if (id) {
     const existing = kind === "route"
-      ? await c.query("select r.updated_at::text from pickup_routes r join school_pickup_rules p on p.id=r.rule_id where r.id=$1 and p.school_id=$2",[id,school])
-      : await c.query(`select updated_at::text${kind === "term" || kind === "exception" ? ', ends_on::text as end' : ''} from ${table} where id=$1 and school_id=$2`,[id,school]);
+      ? await c.query("select r.updated_at::text from pickup_routes r join school_pickup_rules p on p.id=r.rule_id where r.id=$1 and p.school_id=$2 and p.operating_term_id=current_operating_term()",[id,school])
+      : await c.query(`select updated_at::text${kind === "term" || kind === "exception" ? ', ends_on::text as end' : ''} from ${table} where id=$1 and school_id=$2 and operating_term_id=$3`,[id,school,operation.id]);
     if (!existing.rowCount) fail("该设置不属于当前学校。", "This setting does not belong to this school.");
     if (cutoff && existing.rows[0].end <= cutoff) fail("已存档日期不可修改或删除。", "Archived dates cannot be changed or deleted.");
     if (existing.rows[0].updated_at !== field(f,"updatedAt")) fail("设置已被更新，请刷新后再试。", "Settings changed. Refresh before saving.");
@@ -53,8 +56,9 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   const n = name(f);
   if (kind === "term" || kind === "exception") {
     const [a,b] = dates(f);
+    if (a<operation.startsOn || b>operation.endsOn) fail("日期须在当前运营学期范围内。", "Dates must be within the operating term.");
     if (cutoff && a <= cutoff) fail("日期必须晚于已存档日期。", "Dates must be after the archive cutoff.");
-    if ((await c.query(`select 1 from ${table} where school_id=$1 and id<>coalesce($2::uuid,gen_random_uuid()) and starts_on<=$4::date and ends_on>=$3::date`,[school,id||null,a,b])).rowCount) fail("日期与该学校已有设置重叠，请编辑已有记录。", "Dates overlap an existing entry. Edit that entry instead.");
+    if ((await c.query(`select 1 from ${table} where operating_term_id=current_operating_term() and school_id=$1 and id<>coalesce($2::uuid,gen_random_uuid()) and starts_on<=$4::date and ends_on>=$3::date`,[school,id||null,a,b])).rowCount) fail("日期与该学校已有设置重叠，请编辑已有记录。", "Dates overlap an existing entry. Edit that entry instead.");
     const t = kind === "exception" && field(f,"exceptionType") === "time" ? time(f) : null;
     if (id) await c.query(`update ${table} set name=$2,starts_on=$3,ends_on=$4,updated_at=clock_timestamp()${kind === "exception" ? ",pickup_time=$5" : ""} where id=$1`,kind === "exception" ? [id,n,a,b,t] : [id,n,a,b]);
     else await c.query(`insert into ${table}(school_id,name,starts_on,ends_on${kind === "exception" ? ",pickup_time" : ""}) values($1,$2,$3,$4${kind === "exception" ? ",$5" : ""})`,kind === "exception" ? [school,n,a,b,t] : [school,n,a,b]);
@@ -65,14 +69,14 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
     const pickupTime = time(f);
     const grades = [...new Set(f.getAll("grades").map(v => String(v).trim()))];
     if (!grades.length || grades.length > 30 || grades.some(g => !g || g.length > 30)) fail("请至少选择一个有效年级。", "Select at least one valid grade.");
-    if ((await c.query(`select 1 from school_pickup_rules p where p.school_id=$1 and p.id<>coalesce($2::uuid,gen_random_uuid()) and p.weekdays && $3::integer[] and p.grades && $4::text[]`,[school,id||null,weekdays,grades])).rowCount) fail("所选年级在这些星期已有接送时间，请修改已有规则。", "These grades already have pickup times on these weekdays.");
+    if ((await c.query(`select 1 from school_pickup_rules p where p.operating_term_id=current_operating_term() and p.school_id=$1 and p.id<>coalesce($2::uuid,gen_random_uuid()) and p.weekdays && $3::integer[] and p.grades && $4::text[]`,[school,id||null,weekdays,grades])).rowCount) fail("所选年级在这些星期已有接送时间，请修改已有规则。", "These grades already have pickup times on these weekdays.");
     if (id && (await c.query("select 1 from pickup_routes where rule_id=$1 and not weekdays <@ $2::integer[]",[id,weekdays])).rowCount) fail("已有线路使用了被移除的星期，请先调整线路。", "Update routes before removing weekdays they use.");
     if (id)
       await c.query("update school_pickup_rules set name=$2,weekdays=$3,pickup_time=$4,grades=$5,updated_at=clock_timestamp() where id=$1 returning id",[id,n,weekdays,pickupTime,grades]);
     else await c.query("insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades) values($1,$2,$3,$4,$5) returning id",[school,n,weekdays,pickupTime,grades]);
   } else {
     const rule = field(f,"ruleId"), program = field(f,"programId");
-    if (!(await c.query("select id from school_pickup_rules where id=$1 and school_id=$2 and $3::integer[] <@ weekdays",[rule,school,weekdays])).rowCount) fail("请选择本校规则，线路星期必须在规则范围内。", "Select this school's rule and a subset of its weekdays.");
+    if (!(await c.query("select id from school_pickup_rules where id=$1 and school_id=$2 and operating_term_id=current_operating_term() and $3::integer[] <@ weekdays",[rule,school,weekdays])).rowCount) fail("请选择本校规则，线路星期必须在规则范围内。", "Select this school's rule and a subset of its weekdays.");
     if (!(await c.query("select id from after_school_programs where id=$1",[program])).rowCount) fail("请选择有效目的地。", "Select a valid destination.");
     if (id) await c.query("update pickup_routes set name=$2,rule_id=$3,program_id=$4,weekdays=$5,updated_at=clock_timestamp() where id=$1",[id,n,rule,program,weekdays]);
     else await c.query("insert into pickup_routes(name,rule_id,program_id,weekdays) values($1,$2,$3,$4)",[n,rule,program,weekdays]);

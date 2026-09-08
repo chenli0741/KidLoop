@@ -1,3 +1,5 @@
+import { openTerm } from "@/lib/operating-terms";
+import { TermWorkspace } from "@/components/term-workspace";
 import { FixedRouteForm } from "@/components/fixed-route-form";
 import { PageHeader } from "@/components/page-header";
 import { RosterCreateDialog } from "@/components/roster-controls";
@@ -15,13 +17,16 @@ export const dynamic = "force-dynamic";
 export default async function RoutesPage() {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
+  const operation=await openTerm(db);
+  if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const [routes, schools, programs, drivers, vehicles, students, rules] = await Promise.all([
     readFixedRoutes(db), getSchools(), getPrograms(), getDrivers(), getVehicles(), getStudents(),
-    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules order by pickup_time`),
+    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules where operating_term_id=current_operating_term() order by pickup_time`),
   ]);
-  const formProps = { schools, programs, drivers, vehicles, students, rules: rules.rows, today: todayInOperationsTimeZone(), locale };
+  const formProps = { operatingTermId:operation.id, termStart:operation.startsOn, termEnd:operation.endsOn, schools, programs, drivers, vehicles, students, rules: rules.rows, today: todayInOperationsTimeZone(), locale };
   const weekdays = (days: number[]) => days.map(d => (locale === "zh" ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[d - 1]).join("、");
   return <div className="page-container">
+      <TermWorkspace term={operation} locale={locale}/>
     <PageHeader eyebrow={text(locale, "线路管理", "Route management")} title={text(locale, "线路", "Routes")} description={text(locale, "固定线路、站点与司机车辆。", "Recurring routes, stops, drivers and vehicles.")} />
     <section className="pickup-section">
       <div className="section-heading"><h2>{text(locale, "固定接送线路", "Recurring routes")}</h2><RosterCreateDialog title={text(locale, "添加线路", "Add route")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>

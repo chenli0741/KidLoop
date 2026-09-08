@@ -10,7 +10,7 @@ async function main() {
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const driver = (await client.query<{ id: string; name: string }>("select id,name from drivers where name like '测试司机%' and active order by name limit 1")).rows[0];
+    const driver = (await client.query<{ id: string; name: string }>("select id,name from drivers where name like 'Test Driver%' and active order by name limit 1")).rows[0];
     if (!driver) throw new Error("Import the clearly labelled test drivers first.");
     const children = (await client.query<{ id: string; name: string }>(`
       select distinct st.id,st.name from students st join trip_students ts on ts.student_id=st.id
@@ -20,9 +20,9 @@ async function main() {
     `, [driver.id])).rows;
     if (!children.length) throw new Error("No historical-test-data children assigned to the test driver.");
     const accounts = [
-      { role: "ADMIN", name: "测试管理员", email: "admin@test.kidloop.local", password: randomBytes(15).toString("base64url") },
-      { role: "DRIVER", name: "测试司机", email: "driver@test.kidloop.local", password: randomBytes(15).toString("base64url") },
-      { role: "PARENT", name: "测试家长", email: "parent@test.kidloop.local", password: randomBytes(15).toString("base64url") },
+      { role: "ADMIN", name: "Test Admin", email: "admin@test.kidloop.local", password: randomBytes(15).toString("base64url") },
+      { role: "DRIVER", name: "Test Driver", email: "driver@test.kidloop.local", password: randomBytes(15).toString("base64url") },
+      { role: "PARENT", name: "Test Parent", email: "parent@test.kidloop.local", password: randomBytes(15).toString("base64url") },
     ];
     for (const account of accounts) {
       const user = (await client.query<{ id: string }>("insert into app_users(name,email,role,password_hash,driver_id) values($1,$2,$3,$4,$5) returning id", [account.name, account.email, account.role, await hashPassword(account.password), account.role === "DRIVER" ? driver.id : null])).rows[0];

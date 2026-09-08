@@ -8,11 +8,11 @@ import type { DayPlan, RiderStatus } from "@/lib/types";
 export async function getParentChildren() {
   const user = await requireUser(["PARENT"]);
   const result = await query<{
-    id: string; name: string; photoUrl: string; grade: string; age: number | null;
+    operatingTermId: string; id: string; name: string; photoUrl: string; grade: string; age: number | null;
     schoolName: string; classroomName: string; programName: string; notes: string; updatedAt: string;
     parentName: string; relationship: string; parentPhone: string; backupPhone: string; email: string;
   }>(`
-    select st.id, st.name, st.photo_url as "photoUrl", st.grade, st.age, st.notes,
+    select current_operating_term() as "operatingTermId", st.id, st.name, st.photo_url as "photoUrl", st.grade, st.age, st.notes,
       sc.name as "schoolName", c.name as "classroomName", p.name as "programName", st.updated_at::text as "updatedAt",
       coalesce(pa.name, '') as "parentName", coalesce(pa.relationship, '') as relationship,
       coalesce(pa.phone, '') as "parentPhone", coalesce(pa.backup_phone, '') as "backupPhone", coalesce(pa.email, '') as email
@@ -20,7 +20,7 @@ export async function getParentChildren() {
     join classrooms c on c.id = st.classroom_id join schools sc on sc.id = c.school_id
     join after_school_programs p on p.id = st.program_id
     left join parents pa on pa.id = st.parent_id
-    where us.user_id = $1 and st.active order by st.name
+    where us.user_id = $1 and exists(select 1 from term_students et where et.student_id=st.id and et.operating_term_id=current_operating_term()) and st.active order by st.name
   `, [user.id]);
   return result.rows.map((child) => ({ ...child, notes: editableNote(child.notes) }));
 }
@@ -43,13 +43,13 @@ export async function getParentSchedule(date: string) {
       join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
       join drivers d on d.id = sh.driver_id join vehicles v on v.id = sh.vehicle_id
       left join schools sc on sc.id = t.school_id left join after_school_programs p on p.id = t.program_id
-      where us.user_id = $1 and t.scheduled_date = $2::date and t.status not in ('DRAFT', 'CANCELED')
+      where us.user_id = $1 and t.operating_term_id=current_operating_term() and t.scheduled_date = $2::date and t.status not in ('DRAFT', 'CANCELED')
       order by t.departure_time
     `, [user.id, date]),
     query<DayPlan>(`
       select dp.student_id as "studentId", dp.service_date::text as "serviceDate", dp.absent, dp.note, dp.updated_at::text as "updatedAt"
       from student_day_plans dp join user_students us on us.student_id = dp.student_id
-      where us.user_id = $1 and dp.service_date = $2::date
+      where us.user_id = $1 and dp.service_date = $2::date and exists(select 1 from operating_terms o where o.id=current_operating_term() and dp.service_date between o.starts_on and o.ends_on)
     `, [user.id, date]),
   ]);
   return { rides: rides.rows, plans: plans.rows };
@@ -61,7 +61,7 @@ export async function getParentRequests(date: string) {
     select dp.student_id as "studentId", dp.service_date::text as "serviceDate", dp.absent, dp.note,
       dp.updated_at::text as "updatedAt", st.name as "studentName", u.name as "parentName"
     from student_day_plans dp join students st on st.id = dp.student_id join app_users u on u.id = dp.updated_by
-    where dp.service_date = $1::date and (dp.absent or dp.note <> '')
+    where dp.service_date = $1::date and exists(select 1 from operating_terms o where o.id=current_operating_term() and dp.service_date between o.starts_on and o.ends_on) and (dp.absent or dp.note <> '')
       and ($2::uuid is null or exists (
         select 1 from trip_students ts join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
         where ts.student_id = dp.student_id and t.scheduled_date = dp.service_date

@@ -1,3 +1,6 @@
+import { db } from "@/lib/db";
+import { openTerm } from "@/lib/operating-terms";
+import { TermWorkspace } from "@/components/term-workspace";
 import { RouteTaskIssues } from "@/components/route-task-issues";
 import { ParentRequests } from "@/components/parent-requests";
 import { requireUser } from "@/lib/auth";
@@ -16,6 +19,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
+  const operation=await openTerm(db);
+  if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const today = todayInOperationsTimeZone();
   const [counts, trips] = await Promise.all([getDashboardCounts(today), getTrips(today)]);
   const stats = [
@@ -27,6 +32,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="page-container">
+      <TermWorkspace term={operation} locale={locale}/>
       <PageHeader
         eyebrow={formatDate(today, locale)}
         title={text(locale, "今日运营", "Today’s operations")}

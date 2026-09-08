@@ -6,13 +6,13 @@ const date = process.argv.find((arg) => /^\d{4}-\d{2}-\d{2}$/.test(arg))
 if (new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date) throw new Error("Invalid date");
 const apply = process.argv.includes("--apply");
 const vehicles = [
-  { key: "01", name: "测试车 01", plate: "TEST-01", capacity: 14 },
-  { key: "02", name: "测试车 02", plate: "TEST-02", capacity: 8 },
+  { key: "01", name: "Test Vehicle 01", plate: "TEST-01", capacity: 14 },
+  { key: "02", name: "Test Vehicle 02", plate: "TEST-02", capacity: 8 },
 ];
 const routes = [
   { key: "mcauliffe", vehicle: "01", school: "McAuliffe", program: "One Stop", departure: "14:35", count: 6 },
-  { key: "stratford", vehicle: "01", school: "Stratford School", program: "晨星中文学校（Saratoga 校区）", departure: "15:30", count: 8 },
-  { key: "ellis", vehicle: "02", school: "Ellis", program: "小树苗", departure: "14:30", count: 5 },
+  { key: "stratford", vehicle: "01", school: "Stratford School", program: "Morningstar San Jose", departure: "15:30", count: 8 },
+  { key: "ellis", vehicle: "02", school: "Ellis", program: "Little Tree Sunnyvale", departure: "14:30", count: 5 },
 ];
 function idFor(key) {
   const h = createHash("sha256").update(`kidloop-test-routes-v1:${key}`).digest("hex");
@@ -34,7 +34,7 @@ try {
     await client.query("insert into vehicles (id,name,plate,capacity) values ($1,$2,$3,$4) on conflict (id) do nothing",
       [vehicleId, vehicle.name, vehicle.plate, vehicle.capacity]);
     await client.query("insert into drivers (id,name,phone) values ($1,$2,'') on conflict (id) do nothing",
-      [driverId, `测试司机 ${vehicle.key}`]);
+      [driverId, `Test Driver ${vehicle.key}`]);
     const available = await client.query(`select 1 from vehicles v, drivers d
       where v.id=$1 and d.id=$2 and v.status='AVAILABLE' and d.status='AVAILABLE' and v.capacity>=$3`,
       [vehicleId, driverId, vehicle.capacity]);

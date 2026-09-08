@@ -71,7 +71,7 @@ export async function saveStudent(client: PoolClient, form: FormData, actorId?: 
   if (!classroom.rowCount || !program.rowCount) throw new StudentEditError("invalid");
   if (classroom.rows[0].school_id !== current.school_id || programId !== current.program_id) {
     const trips = await client.query(`select 1 from trip_students ts join trips t on t.id=ts.trip_id
-      where ts.student_id=$1 and t.status not in ('COMPLETED','CANCELED') limit 1`, [current.id]);
+      where ts.student_id=$1 and t.operating_term_id=current_operating_term() and t.status not in ('COMPLETED','CANCELED') limit 1`, [current.id]);
     if (trips.rowCount) throw new StudentEditError("assigned");
   }
   let parentId = current.parent_id;

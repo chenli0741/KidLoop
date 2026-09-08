@@ -1,4 +1,5 @@
 "use server";
+import { requireTerm, TermError } from "@/lib/operating-terms";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -12,6 +13,7 @@ import { text, type Locale } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
 function failure(error: unknown, locale: Locale): FormState {
+  if(error instanceof TermError)return {ok:false,message:error.message};
   const messages: Record<string, [string, string]> = {
     password: ["当前密码不正确。", "The current password is incorrect."],
     newPassword: ["新密码需 12–128 个字符，且两次输入一致。", "Use 12–128 characters and matching new passwords."],
@@ -59,7 +61,11 @@ export async function updatePassword(_: FormState, form: FormData): Promise<Form
 export async function updateChild(_: FormState, form: FormData): Promise<FormState> {
   const user = await requireUser(["PARENT"]); const locale = await getLocale();
   try {
-    await transaction((client) => saveOwnChild(client, user, form));
+    await transaction(async client => {
+      const term=await requireTerm(client,String(form.get('operatingTermId')));
+      if(!(await client.query('select 1 from term_students where operating_term_id=$1 and student_id=$2',[term.id,String(form.get('id'))])).rowCount)throw new Error('forbidden');
+      await saveOwnChild(client,user,form);
+    });
     for (const path of ["/parent", "/parent/children", "/students", "/driver", "/routes", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);
     return { ok: true, message: text(locale, "孩子资料已保存。", "Child information saved.") };
   } catch (error) { return failure(error, locale); }

@@ -4,15 +4,15 @@ import { ExceptionFields, RouteFields, Weekdays } from "@/components/pickup-fiel
 import type { PickupSetting, SettingKind } from "@/lib/pickup-types";
 import { text, type Locale } from "@/lib/i18n";
 
-export function PickupSettingForm({ kind, schoolId, locale, initial, rules=[], grades=[], programs=[], remove=false }: {
-  kind: SettingKind; schoolId: string; locale: Locale; initial?: PickupSetting; rules?: PickupSetting[];
+export function PickupSettingForm({ operatingTermId, kind, schoolId, locale, initial, rules=[], grades=[], programs=[], remove=false }: {
+  operatingTermId: string; kind: SettingKind; schoolId: string; locale: Locale; initial?: PickupSetting; rules?: PickupSetting[];
   grades?: string[]; programs?: {id:string;name:string}[]; remove?: boolean;
 }) {
   return <SettingsForm action={saveSetting} submitLabel={remove ? text(locale,"确认删除","Confirm removal") : text(locale,"保存设置","Save settings")}>
-    <input type="hidden" name="schoolId" value={schoolId} /><input type="hidden" name="kind" value={kind} />
+    <input type="hidden" name="operatingTermId" value={operatingTermId}/><input type="hidden" name="schoolId" value={schoolId} /><input type="hidden" name="kind" value={kind} />
     <input type="hidden" name="id" value={initial?.id ?? ""} /><input type="hidden" name="updatedAt" value={initial?.updatedAt ?? ""} />
     {remove ? <><input type="hidden" name="remove" value="1" /><p className="full">{text(locale,`删除“${initial?.name}”？对应规则的日程预览会重新计算。`,`Remove “${initial?.name}”? The schedule preview will be recalculated.`)}</p></> : <>
-      <label className="full"><span>{text(locale,"名称","Name")}</span><input name="name" defaultValue={initial?.name} maxLength={160} required /></label>
+      {kind==="term" ? <input type="hidden" name="name" value={initial?.name ?? ""}/> : <label className="full"><span>{text(locale,"名称","Name")}</span><input name="name" defaultValue={initial?.name} maxLength={160} required /></label>}
       {(kind==="term" || kind==="exception") && <>
         <label><span>{text(locale,"开始日期","Start date")}</span><input type="date" name="startsOn" defaultValue={initial?.startsOn} required /></label>
         <label><span>{text(locale,"结束日期","End date")}</span><input type="date" name="endsOn" defaultValue={initial?.endsOn} required /></label>

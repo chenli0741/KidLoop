@@ -1,3 +1,4 @@
+import { requireTerm, openTerm } from "./operating-terms";
 import "server-only";
 import { routeName } from "./route-name";
 import type { PoolClient } from "pg";
@@ -11,15 +12,21 @@ export async function readFixedRoutes(c:Pick<PoolClient,"query">):Promise<FixedR
  return (await c.query(`select r.id,r.name,r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
  coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',to_char(s.arrival_time,'HH24:MI')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  coalesce((select jsonb_agg(jsonb_build_object('studentId',a.student_id,'pickupStopId',a.pickup_stop_id,'dropoffStopId',a.dropoff_stop_id)) from fixed_route_students a where a.route_id=r.id),'[]') as students
- from fixed_routes r order by r.name`)).rows;
+ from fixed_routes r where r.operating_term_id=current_operating_term() order by r.name`)).rows;
+}
+export async function readRouteTaskIssues(c:Pick<PoolClient,"query">,date:string) {
+ return (await c.query<{name:string;message:string}>("select r.name,i.message from route_task_issues i join fixed_routes r on r.id=i.route_id where r.operating_term_id=current_operating_term() and i.service_date=$1 order by r.name",[date])).rows;
 }
 export async function saveFixedRoute(c:PoolClient,f:FormData) {
  await lockRoutes(c);
+ const operation=await requireTerm(c);
  const str=(key:string)=>String(f.get(key)??"").trim();
  const id=str("id"), starts=str("startsOn"), ends=str("endsOn"), driver=str("driverId")||null, vehicle=str("vehicleId")||null, enabled=str("enabled")==="on";
  const weekdays=[...new Set(f.getAll("weekdays").map(Number))];
  const stops:RouteStop[]=JSON.parse(str("stops")||"[]"), students:RouteStudent[]=JSON.parse(str("students")||"[]");
  if(!validServiceDate(starts)||!validServiceDate(ends)||starts>ends||Date.parse(ends)-Date.parse(starts)>550*86400000) error("请填写有效起止日期（不超过 550 天）。","Enter valid dates (up to 550 days).");
+ if(starts<operation.startsOn || ends>operation.endsOn) error("线路日期须在当前学期范围内。", "Route dates must be within the operating term.");
+ if(id && !(await c.query("select 1 from fixed_routes where id=$1 and operating_term_id=$2",[id,operation.id])).rowCount) error("线路不属于当前学期。", "Route is not in the current term.");
  if(!weekdays.length||weekdays.some(d=>!Number.isInteger(d)||d<1||d>7)) error("请选择接送星期。","Select valid weekdays.");
  if(!Array.isArray(stops)||stops.length<2||stops.length>30||new Set(stops.map(s=>s.id)).size!==stops.length) error("线路至少需要两个不同站点。","Add at least two distinct stops.");
  for(let i=0;i<stops.length;i++) {
@@ -35,22 +42,23 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  }
  const baseName=routeName(stops);
  let name=baseName, suffix=2;
- while((await c.query("select 1 from fixed_routes where lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
+ while((await c.query("select 1 from fixed_routes where operating_term_id=current_operating_term() and lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
  if(!Array.isArray(students)||students.length>200||new Set(students.map(s=>s.studentId)).size!==students.length) error("学生清单无效。","Invalid student list.");
  const studentRows=(await c.query("select s.id,s.program_id,c.school_id from students s join classrooms c on c.id=s.classroom_id where s.active and s.id=any($1::uuid[])",[students.map(s=>s.studentId)])).rows;
  for(const a of students) {
   const st=studentRows.find(s=>s.id===a.studentId), from=stops.findIndex(s=>s.id===a.pickupStopId), to=stops.findIndex(s=>s.id===a.dropoffStopId);
   if(!st||from<0||to<=from||stops[from].schoolId!==st.school_id) error("请选择学生所属学校的上车站和后续下车站。","Select the student's school pickup and a later dropoff stop.");
  }
+ for(const a of students) if(!(await c.query("select 1 from term_students where operating_term_id=$1 and student_id=$2 and (reviewed or not $3)",[operation.id,a.studentId,enabled])).rowCount) error("请先核对本学期学生年级、班级和课外班。", "Review this term's student details before enabling.");
  if(enabled) for(const a of students) {
-  if(!(await c.query(`select 1 from students s join classrooms cl on cl.id=s.classroom_id join school_pickup_rules p on p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and p.weekdays && $2::integer[] join school_terms t on t.school_id=cl.school_id and t.starts_on<=$4::date and t.ends_on>=$3::date where s.id=$1`,[a.studentId,weekdays,starts,ends])).rowCount) error("启用前请先设置学生所属学校的学期和年级接送规则。","Configure school terms and grade pickup rules before enabling.");
+  if(!(await c.query(`select 1 from students s join classrooms cl on cl.id=s.classroom_id join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and p.weekdays && $2::integer[] join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and t.starts_on<=$4::date and t.ends_on>=$3::date where s.id=$1`,[a.studentId,weekdays,starts,ends])).rowCount) error("启用前请先设置学生所属学校的学期和年级接送规则。","Configure school terms and grade pickup rules before enabling.");
  }
  if(driver&&!(await c.query("select id from drivers where id=$1 and active and status='AVAILABLE'",[driver])).rowCount) error("司机不可用。","Driver unavailable.");
  const v=vehicle?(await c.query("select capacity from vehicles where id=$1 and active and status<>'MAINTENANCE'",[vehicle])).rows[0]:null;
  if(vehicle&&!v) error("车辆不可用。","Vehicle unavailable.");
  if(v) for(let i=0;i<stops.length;i++) if(students.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>v.capacity) error("某段线路学生数超过车辆座位数。","Vehicle capacity exceeded on a route segment.");
  if(enabled&&(!driver||!vehicle||!students.length)) error("启用前请绑定司机、车辆并选择学生。","Assign driver, vehicle and students before enabling.");
- if(enabled&&(await c.query(`select 1 from fixed_routes r where enabled and id<>coalesce($1::uuid,gen_random_uuid()) and starts_on<=$3::date and ends_on>=$2::date and weekdays && $4::integer[] and (driver_id=$5 or vehicle_id=$6 or exists(select 1 from fixed_route_students where route_id=r.id and student_id=any($7::uuid[]))) and (select min(arrival_time) from fixed_route_stops where route_id=r.id)<$9::time and (select max(arrival_time) from fixed_route_stops where route_id=r.id)>$8::time`,[id||null,starts,ends,weekdays,driver,vehicle,students.map(a=>a.studentId),stops[0].time,stops.at(-1)!.time])).rowCount) error("同一时段的司机、车辆或学生已在线路中安排。","Driver, vehicle or student has an overlapping route.");
+ if(enabled&&(await c.query(`select 1 from fixed_routes r where r.operating_term_id=current_operating_term() and enabled and id<>coalesce($1::uuid,gen_random_uuid()) and starts_on<=$3::date and ends_on>=$2::date and weekdays && $4::integer[] and (driver_id=$5 or vehicle_id=$6 or exists(select 1 from fixed_route_students where route_id=r.id and student_id=any($7::uuid[]))) and (select min(arrival_time) from fixed_route_stops where route_id=r.id)<$9::time and (select max(arrival_time) from fixed_route_stops where route_id=r.id)>$8::time`,[id||null,starts,ends,weekdays,driver,vehicle,students.map(a=>a.studentId),stops[0].time,stops.at(-1)!.time])).rowCount) error("同一时段的司机、车辆或学生已在线路中安排。","Driver, vehicle or student has an overlapping route.");
  if(id) {
   if(!(await c.query("select id from fixed_routes where id=$1 and updated_at::text=$2",[id,str("updatedAt")])).rowCount) error("线路已更新，请刷新后再试。","Route changed. Refresh before saving.");
   await c.query("update fixed_routes set name=$2,starts_on=$3,ends_on=$4,weekdays=$5,driver_id=$6,vehicle_id=$7,enabled=$8,updated_at=clock_timestamp() where id=$1",[id,name,starts,ends,weekdays,driver,vehicle,enabled]);
@@ -66,6 +74,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
 export async function materializeRoutes(c:PoolClient,date:string,today:string) {
  if(!validServiceDate(date)||date<today) return;
  await lockRoutes(c);
+ if(!await openTerm(c))return;
  const routes=await readFixedRoutes(c);
  const weekday=new Date(`${date}T12:00:00Z`).getUTCDay()||7;
  const allIds=[...new Set(routes.flatMap(r=>r.students.map(s=>s.studentId)))].sort();
@@ -81,9 +90,9 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string) {
   if(r.enabled&&r.driverId&&r.vehicleId&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday)) {
    for(const a of r.students) {
     const stop=stops.find(s=>s.id===a.pickupStopId)!;
-    const match=(await c.query(`select coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=$1 and s.active and cl.school_id=$4 and (e.id is null or e.pickup_time is not null)`,[a.studentId,date,weekday,stop.schoolId])).rows[0];
+    const match=(await c.query(`select coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=$1 and s.active and cl.school_id=$4 and (e.id is null or e.pickup_time is not null)`,[a.studentId,date,weekday,stop.schoolId])).rows[0];
     if(match) {eligible.push(a); if(match.time.slice(0,5)!==stop.time) { /* Earliest valid pickup is the school's rule; planned later arrivals remain valid. */
-      const special=(await c.query("select to_char(pickup_time,'HH24:MI') as time from school_calendar_exceptions where school_id=$1 and $2::date between starts_on and ends_on and pickup_time is not null",[stop.schoolId,date])).rows[0];
+      const special=(await c.query("select to_char(pickup_time,'HH24:MI') as time from school_calendar_exceptions where operating_term_id=current_operating_term() and school_id=$1 and $2::date between starts_on and ends_on and pickup_time is not null",[stop.schoolId,date])).rows[0];
       if(special) stop.time=special.time; else if(stop.time<match.time.slice(0,5)) stop.time=match.time.slice(0,5);
     }}
    }

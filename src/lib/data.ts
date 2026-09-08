@@ -106,7 +106,7 @@ export async function getStudents() {
     join schools sc on sc.id = c.school_id
     join after_school_programs p on p.id = st.program_id
     left join parents pa on pa.id = st.parent_id
-    where st.active = true
+    where st.active = true and exists(select 1 from term_students ts where ts.student_id=st.id and ts.operating_term_id=current_operating_term())
     order by sc.name, c.name, st.name
   `);
   return result.rows.map((row): Student => ({
@@ -187,7 +187,7 @@ export async function getTrips(date: string) {
       join vehicles v on v.id = sh.vehicle_id
       left join schools sc on sc.id = t.school_id
       left join after_school_programs p on p.id = t.program_id
-      where t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
+      where t.operating_term_id=current_operating_term() and t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by t.departure_time, d.name
     `, [date, driverId]),
@@ -207,7 +207,7 @@ export async function getTrips(date: string) {
       join students st on st.id = ts.student_id
       join classrooms c on c.id = st.classroom_id
       left join parents pa on pa.id = st.parent_id
-      where t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
+      where t.operating_term_id=current_operating_term() and t.scheduled_date = $1::date and t.status not in ('DRAFT','CANCELED')
         and ($2::uuid is null or (sh.driver_id = $2 and t.status <> 'DRAFT'))
       order by c.name, st.name
     `, [date, driverId]),
@@ -266,7 +266,7 @@ export async function getDashboardCounts(date: string) {
   }>(`
     with daily_trips as (
       select t.id,t.shift_id,t.status from trips t
-      where t.scheduled_date=$1::date and t.status not in ('DRAFT','CANCELED')
+      where t.operating_term_id=current_operating_term() and t.scheduled_date=$1::date and t.status not in ('DRAFT','CANCELED')
     )
     select
       (select count(distinct sh.vehicle_id) from daily_trips t join driver_shifts sh on sh.id=t.shift_id) as vehicles,

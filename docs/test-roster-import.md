@@ -4,6 +4,14 @@ The selected batches contain 19 students from three schools, with 11 supplied ph
 
 The importer extracts the labelled photo rectangles without generating or altering faces. Small JPEGs are stored in `students.photo_url` as data URLs, so this test batch does not depend on temporary source files or a public asset upload after import.
 
+## Review Demo Avatars (2026-09-07)
+
+The 11 supplied test photos were replaced with two completely fictional AI-generated cartoon student avatars for review demonstrations. These are not likenesses derived from the children. The eight students without photos remain unchanged. Names, school assignments and other fields are unchanged, so this is photo replacement, not complete anonymization.
+
+Assets live in `public/demo-avatars/`. `scripts/replace-test-photos.mjs` only replaces existing photos on records marked `historical-test-data`; default execution is a rolled-back dry run, and `--apply` commits. The existing data-URL storage format is retained so the database change works without waiting for asset deployment. All roles using student photos see the replacement.
+
+Before applying, the script saves original and replacement URLs to a mode-0600 backup in `.local-data/photo-backups/` (excluded from Git). Repeated application is a no-op. Restore with `--restore <backup.json> --apply`; restoration aborts if any photo has since changed. Never commit or publish the private backup. Mobile browser verification covered all 11 avatars in Ellis and McAuliffe.
+
 Run migrations, preview, then apply a reviewed manifest:
 
 ```sh

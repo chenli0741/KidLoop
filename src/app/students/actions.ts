@@ -1,5 +1,6 @@
 "use server";
 
+import { requireTerm } from "@/lib/operating-terms";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { transaction } from "@/lib/db";
@@ -12,7 +13,11 @@ async function mutate(form: FormData, deleting: boolean): Promise<FormState> {
   const user = await requireUser(["ADMIN"]);
   const locale = await getLocale();
   try {
-    await transaction((client) => deleting ? archiveStudent(client, form) : saveStudent(client, form, user.id));
+    await transaction(async client => {
+      const term=await requireTerm(client,String(form.get("operatingTermId")));
+      if(!(await client.query('select 1 from term_students where operating_term_id=$1 and student_id=$2',[term.id,String(form.get("id"))])).rowCount)throw new StudentEditError('missing');
+      return deleting ? archiveStudent(client,form) : saveStudent(client,form,user.id);
+    });
     for (const path of ["/students", "/", "/routes", "/schedule", "/schedule/dispatch", "/parent", "/driver"]) revalidatePath(path);
     return { ok: true, message: deleting ? text(locale, "学生已移出名册。", "Student removed from roster.") : text(locale, "学生资料已保存。", "Student saved.") };
   } catch (error) {

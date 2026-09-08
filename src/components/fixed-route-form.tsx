@@ -8,7 +8,7 @@ import type { FixedRoute, RouteStop, RouteStudent } from "@/lib/fixed-route-type
 import type { Driver, Vehicle, School, Program, Student } from "@/lib/types";
 import type { PickupSetting } from "@/lib/pickup-types";
 import { text, type Locale } from "@/lib/i18n";
-export function FixedRouteForm({initial,schools,programs,drivers,vehicles,students,rules,today,locale}:{initial?:FixedRoute;schools:School[];programs:Program[];drivers:Driver[];vehicles:Vehicle[];students:Student[];rules:(PickupSetting&{schoolId:string})[];today:string;locale:Locale}) {
+export function FixedRouteForm({operatingTermId,termStart,termEnd,initial,schools,programs,drivers,vehicles,students,rules,locale}:{operatingTermId:string;termStart:string;termEnd:string;initial?:FixedRoute;schools:School[];programs:Program[];drivers:Driver[];vehicles:Vehicle[];students:Student[];rules:(PickupSetting&{schoolId:string})[];today:string;locale:Locale}) {
  const [stops,setStops]=useState<RouteStop[]>(initial?.stops??[]);
  const [riders,setRiders]=useState<RouteStudent[]>(initial?.students??[]);
  const change=(id:string,patch:Partial<RouteStop>)=>setStops(prev=>prev.map(s=>s.id===id?{...s,...patch}:s));
@@ -18,10 +18,10 @@ export function FixedRouteForm({initial,schools,programs,drivers,vehicles,studen
  }
  function reorder(i:number,d:number){setStops(prev=>{const next=[...prev];[next[i],next[i+d]]=[next[i+d],next[i]];return next;});}
  return <SettingsForm action={saveRoute} submitLabel={text(locale,"保存固定线路","Save recurring route")}>
-  <input type="hidden" name="id" value={initial?.id??""}/><input type="hidden" name="updatedAt" value={initial?.updatedAt??""}/><input type="hidden" name="stops" value={JSON.stringify(stops)}/><input type="hidden" name="students" value={JSON.stringify(riders)}/>
+  <input type="hidden" name="operatingTermId" value={operatingTermId}/><input type="hidden" name="id" value={initial?.id??""}/><input type="hidden" name="updatedAt" value={initial?.updatedAt??""}/><input type="hidden" name="stops" value={JSON.stringify(stops)}/><input type="hidden" name="students" value={JSON.stringify(riders)}/>
   <label className="full"><span>{text(locale,"线路名称","Route name")}</span><input name="name" value={routeName(stops)} readOnly placeholder={text(locale,"选择站点后自动生成","Generated from stops")}/><small className="form-hint">{text(locale,"根据站点顺序自动生成","Generated from stop order")}</small></label>
-  <label><span>{text(locale,"开始日期","Start date")}</span><input type="date" name="startsOn" defaultValue={initial?.startsOn??today} required/></label>
-  <label><span>{text(locale,"结束日期","End date")}</span><input type="date" name="endsOn" defaultValue={initial?.endsOn} required/></label>
+  <label><span>{text(locale,"开始日期","Start date")}</span><input type="date" name="startsOn" defaultValue={initial?.startsOn??termStart} required/></label>
+  <label><span>{text(locale,"结束日期","End date")}</span><input type="date" name="endsOn" defaultValue={initial?.endsOn??termEnd} required/></label>
   <Weekdays selected={initial?.weekdays} locale={locale}/>
   <div className="full fixed-stop-list"><h3>{text(locale,"按顺序设置站点","Stops in travel order")}</h3>
   {stops.map((s,i)=><div className="fixed-stop-editor" key={s.id}>
