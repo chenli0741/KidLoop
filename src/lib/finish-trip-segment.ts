@@ -3,6 +3,7 @@ import type {PoolClient} from "pg";
 import type {AuthUser, Trip} from "./types";
 import {tripSegments} from "./trip-segments";
 import {requireTerm} from "./operating-terms";
+import {recomputeTrip} from "./day-plans";
 
 export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string,pickupId:string,dropoffId:string) {
   if(!['ADMIN','DRIVER'].includes(user.role) || (user.role==='DRIVER'&&!user.driverId)) throw new Error('Unavailable');
@@ -21,6 +22,12 @@ export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string
   if(done.has(key))return;
   const current=groups.find(g=>!done.has(`${g.routeStops?.[0]?.id}:${g.routeStops?.at(-1)?.id}`));
   if(!current || current.routeStops?.length!==2 || current.routeStops[0].id!==pickupId || current.routeStops[1].id!==dropoffId || current.riders.some(r=>r.pickupStopId!==pickupId||r.dropoffStopId!==dropoffId)) throw new Error('Finish the current route first');
-  if(!current.riders.length || current.riders.some(r=>!['DROPPED_OFF','ABSENT'].includes(r.status))) throw new Error('Riders are not finished');
+  if(!current.riders.length) throw new Error('No riders');
+  for(const rider of current.riders) {
+    if(['DROPPED_OFF','ABSENT'].includes(rider.status)) continue;
+    await c.query("update trip_students set status='DROPPED_OFF',dropped_off_at=clock_timestamp(),updated_at=clock_timestamp() where id=$1",[rider.id]);
+    await c.query("insert into status_history(trip_student_id,from_status,to_status,actor_id,note) values($1,$2,'DROPPED_OFF',$3,'Driver confirmed all riders dropped off via Finish route')",[rider.id,rider.status,user.id]);
+  }
   await c.query('insert into trip_segment_completions(trip_id,pickup_stop_id,dropoff_stop_id,actor_id) values($1,$2,$3,$4)',[tripId,pickupId,dropoffId,user.id]);
+  await recomputeTrip(c,tripId);
 }

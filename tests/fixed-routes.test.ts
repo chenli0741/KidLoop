@@ -5,6 +5,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import pg from 'pg';
 import {saveFixedRoute,readFixedRoutes,materializeRoutes} from '../src/lib/fixed-routes';
 import {finishTripSegment} from '../src/lib/finish-trip-segment';
+import {changeRiderStatus} from '../src/lib/rider-status';
 import type {AuthUser} from '../src/lib/types';
 
 test('fixed multi-school route creates tasks once, skips holidays, changes driver and preserves started trips',async()=>{
@@ -65,14 +66,34 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   const finish=(index:number,user=actor)=>tx(()=>finishTripSegment(c,user,tripId,stops[index].id,stops[2].id));
   await assert.rejects(finish(0,{...actor,role:'PARENT'}),/Unavailable/);
   await assert.rejects(finish(0,{...actor,role:'DRIVER',driverId:backup}),/Unavailable/);
-  await assert.rejects(finish(0),/Riders are not finished/);
   await assert.rejects(finish(1),/current route/);
-  await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1",[tripId]);
+  await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[1].id]);
   await finish(0);await finish(0);
+  const delivered=(await c.query('select id,status,picked_up_at,dropped_off_at from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
+  assert.equal(delivered.status,'DROPPED_OFF');assert.ok(delivered.dropped_off_at);assert.equal(delivered.picked_up_at,null);
+  assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and to_status='DROPPED_OFF'",[delivered.id])).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,1);
   await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-07'));
-  assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT'",[tripId])).rows[0].n,2);
+  assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT'",[tripId])).rows[0].n,1);
   await finish(1);
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,2);
+  const undo=(user=actor)=>tx(()=>changeRiderStatus(c,user,delivered.id,'PICKED_UP'));
+  await assert.rejects(undo({...actor,role:'DRIVER',driverId:backup}),/unavailable/);
+  await assert.rejects(undo({...actor,role:'DRIVER',driverId:null}),/unavailable/);
+  await assert.rejects(undo({...actor,role:'PARENT'}),/unavailable/);
+  assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'COMPLETED');
+  await undo();
+  let restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
+  assert.equal(restored.status,'PICKED_UP');assert.equal(restored.picked_up_at,null);assert.equal(restored.dropped_off_at,null);
+  assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'IN_PROGRESS');
+  assert.deepEqual((await c.query('select pickup_stop_id from trip_segment_completions where trip_id=$1',[tripId])).rows,[{pickup_stop_id:stops[1].id}]);
+  assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT' and parent_absence",[tripId])).rows[0].n,1);
+  assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='DROPPED_OFF' and to_status='PICKED_UP'",[delivered.id])).rows[0].n,1);
+  await assert.rejects(undo(),/not allowed/);
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'DROPPED_OFF')),/not allowed/);
+  await c.query("update trip_students set picked_up_at='2026-09-10T13:00:00Z' where id=$1",[delivered.id]);
+  await finish(0);await undo();
+  restored=(await c.query('select picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
+  assert.equal(restored.picked_up_at.toISOString(),'2026-09-10T13:00:00.000Z');assert.equal(restored.dropped_off_at,null);
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });

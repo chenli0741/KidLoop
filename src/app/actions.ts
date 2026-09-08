@@ -3,7 +3,7 @@ import { requireTerm, openTerm, initializeSchools } from "@/lib/operating-terms"
 import { attachPhoto, photoPath } from "@/lib/student-photos";
 
 import { requireUser } from "@/lib/auth";
-import { recomputeTrip } from "@/lib/day-plans";
+import { changeRiderStatus } from "@/lib/rider-status";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { query, transaction } from "@/lib/db";
@@ -195,36 +195,6 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
-  const allowed: Record<RiderStatus, RiderStatus[]> = {
-    SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
-    PICKED_UP: ["DROPPED_OFF", "ABSENT", "EXCEPTION"],
-    DROPPED_OFF: [], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
-  };
-  await transaction(async (client) => {
-    await requireTerm(client);
-    const target = await client.query<{ student_id: string; trip_id: string }>(`
-      select ts.student_id, ts.trip_id from trip_students ts
-      join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
-      where ts.id = $1::uuid and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id = $2)
-    `, [tripStudentId, user.role === "DRIVER" ? user.driverId : null]);
-    if (!target.rowCount) throw new Error("Assignment unavailable.");
-    // Same lock order as parent plans: student, trip, assignment.
-    await client.query("select id from students where id = $1 for update", [target.rows[0].student_id]);
-    const trip = await client.query<{ status: string }>("select status from trips where id = $1 for update", [target.rows[0].trip_id]);
-    if (["DRAFT", "CANCELED", "COMPLETED"].includes(trip.rows[0].status)) throw new Error("Trip is not active.");
-    const current = await client.query<{ status: RiderStatus; parent_absence: boolean }>(
-      "select status, parent_absence from trip_students where id = $1 for update", [tripStudentId],
-    );
-    const rider = current.rows[0];
-    if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
-    await client.query(`
-      update trip_students set status = $2,
-        picked_up_at = case when $2 = 'PICKED_UP' then now() else picked_up_at end,
-        dropped_off_at = case when $2 = 'DROPPED_OFF' then now() else dropped_off_at end,
-        updated_at = now() where id = $1
-    `, [tripStudentId, nextStatus]);
-    await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id) values ($1, $2, $3, $4)", [tripStudentId, rider.status, nextStatus, user.id]);
-    await recomputeTrip(client, target.rows[0].trip_id);
-  });
+  await transaction((client) => changeRiderStatus(client, user, tripStudentId, nextStatus));
   for (const path of ["/", "/schedule/dispatch", "/driver", "/parent"]) revalidatePath(path);
 }

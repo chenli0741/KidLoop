@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, Check, UserCheck, UserX } from "lucide-react";
+import { AlertTriangle, Check, RotateCcw, UserCheck, UserX } from "lucide-react";
 import { updateRiderStatus } from "@/app/actions";
 import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
@@ -23,7 +23,7 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
     });
   }
 
-  if (status === "DROPPED_OFF" || status === "ABSENT") {
+  if (status === "ABSENT") {
     return <span className="status-complete"><Check size={16} /> {text(locale, "完成", "Complete")}</span>;
   }
 
@@ -35,9 +35,9 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
             <UserCheck size={16} /> {text(locale, "已接到", "Picked up")}
           </button>
         ) : null}
-        {status === "PICKED_UP" ? (
-          <button type="button" className="button compact primary" disabled={pending} onClick={() => update("DROPPED_OFF")}>
-            <Check size={16} /> {text(locale, "已送达", "Dropped off")}
+        {status === "DROPPED_OFF" ? (
+          <button type="button" className="icon-button" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} aria-label={text(locale, "撤销送达", "Undo drop-off")} disabled={pending} onClick={() => update("PICKED_UP")}>
+            <RotateCcw size={17} />
           </button>
         ) : null}
         {status === "SCHEDULED" || status === "EXCEPTION" || status === "PICKED_UP" ? (
@@ -45,7 +45,7 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
             <UserX size={17} />
           </button>
         ) : null}
-        {status !== "EXCEPTION" ? (
+        {status !== "EXCEPTION" && status !== "DROPPED_OFF" ? (
           <button type="button" className="icon-button danger" title={text(locale, "报告异常", "Report issue")} aria-label={text(locale, "报告异常", "Report issue")} disabled={pending} onClick={() => update("EXCEPTION")}>
             <AlertTriangle size={17} />
           </button>

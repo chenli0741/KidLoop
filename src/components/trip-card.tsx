@@ -101,7 +101,7 @@ function TripSegmentContent({trip,locale,interactive,showStops=true}:{trip:Trip;
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>
             <StatusBadge status={rider.status} />
-            {interactive && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} /> : null}
+            {interactive && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} /> : null}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>
         ))}

@@ -7,5 +7,5 @@ import {revalidatePath} from "next/cache";
 export async function finishSegment(tripId:string,pickupId:string,dropoffId:string) {
   const user=await requireUser(['ADMIN','DRIVER']);
   await transaction(c=>finishTripSegment(c,user,tripId,pickupId,dropoffId));
-  revalidatePath('/driver');revalidatePath('/');
+  revalidatePath('/driver');revalidatePath('/');revalidatePath('/parent');
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import {useId,useState,useTransition,type ReactNode} from "react";
+import {useId,useRef,useState,useTransition,type ReactNode} from "react";
 import {ArrowRight,Check,CarFront} from "lucide-react";
 import {useRouter} from "next/navigation";
 import {LocationMap} from "./location-map";
@@ -13,6 +13,7 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
   options:Option[];tripId:string;locale:Locale;interactive:boolean;children:ReactNode[];
 }) {
   const id=useId(),router=useRouter();
+  const confirmation=useRef<HTMLDialogElement>(null);
   const current=options.findIndex(option=>!option.done);
   const [selected,setSelected]=useState<string|null>(null);
   const [error,setError]=useState('');
@@ -25,8 +26,9 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
     startTransition(async()=>{
       try{
         await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id);
+        confirmation.current?.close();
         setSelected(null);router.refresh();
-      }catch{setError(text(locale,'无法完成，请确认本段学生均已送达或缺席，并刷新重试。','Could not finish. All riders must be dropped off or absent. Refresh and retry.'));}
+      }catch{setError(text(locale,'无法完成，请刷新后重试。','Could not finish. Refresh and retry.'));}
     });
   }
   return <>
@@ -48,10 +50,20 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
     <div id={`${id}-content`} key={option.id}>{children[index]}</div>
     {interactive && <div className="segment-finish">
       {option.done?<span><Check size={17}/>{text(locale,'本线路已完成','Route finished')}</span>:<>
-        <button type="button" className="button primary" disabled={pending||index!==current||option.remaining>0} onClick={finish}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Finish route')}</button>
+        <button type="button" className="button primary" disabled={pending||index!==current} onClick={()=>confirmation.current?.showModal()}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Finish route')}</button>
         {option.remaining>0 && <small>{text(locale,`${option.remaining} 名学生尚未完成`,`${option.remaining} riders unfinished`)}</small>}
       </>}
       {error&&<p role="alert" className="form-message error">{error}</p>}
     </div>}
+    <dialog ref={confirmation} className="record-dialog" aria-labelledby={`${id}-confirm`} onCancel={event=>{if(pending)event.preventDefault()}}>
+      <h2 id={`${id}-confirm`}>{text(locale,'确认全部送达','Confirm all dropped off')}</h2>
+      <p>{option.stops[0].name} → {option.stops.at(-1)!.name}</p>
+      <p>{text(locale,'确认本线路所有乘车学生均已送达？未完成的学生将统一标记为已送达，缺席记录保持不变。','Confirm that every rider on this route has arrived? Unfinished riders will be marked Dropped off; absent riders remain absent.')}</p>
+      {error&&<p role="alert" className="form-message error">{error}</p>}
+      <div className="segment-finish">
+        <button type="button" className="button secondary" disabled={pending} onClick={()=>confirmation.current?.close()}>{text(locale,'取消','Cancel')}</button>
+        <button type="button" className="button primary confirm-dropoff" disabled={pending} onClick={finish}><Check size={17}/>{text(locale,'确认全部送达','Confirm all dropped off')}</button>
+      </div>
+    </dialog>
   </>;
 }
