@@ -106,7 +106,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
       [source, id],
     );
     const routes = (
-      await c.query("select * from fixed_routes where operating_term_id=$1", [
+      await c.query("select * from fixed_routes where operating_term_id=$1 and route_type='RECURRING'", [
         source,
       ])
     ).rows;

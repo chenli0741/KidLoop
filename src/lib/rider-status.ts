@@ -19,10 +19,11 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   // Match parent-plan and route-completion lock order.
   await client.query("select id from students where id = $1 for update", [studentId]);
   const trip = await client.query<{ status: string }>("select status from trips where id = $1 for update", [tripId]);
-  const current = await client.query<{ status: RiderStatus; parent_absence: boolean; pickup_stop_id: string; dropoff_stop_id: string }>(
-    "select status, parent_absence, pickup_stop_id, dropoff_stop_id from trip_students where id = $1 for update", [assignmentId],
+  const current = await client.query<{ trip_id:string; status: RiderStatus; parent_absence: boolean; pickup_stop_id: string; dropoff_stop_id: string }>(
+    "select trip_id, status, parent_absence, pickup_stop_id, dropoff_stop_id from trip_students where id = $1 for update", [assignmentId],
   );
   const rider = current.rows[0];
+  if(!rider || rider.trip_id!==tripId)throw new Error('Assignment changed. Refresh before updating.');
   const undo = rider.status === "DROPPED_OFF" && nextStatus === "PICKED_UP";
   if (["DRAFT", "CANCELED"].includes(trip.rows[0].status) || (trip.rows[0].status === "COMPLETED" && !undo)) throw new Error("Trip is not active.");
   const allowed: Record<RiderStatus, RiderStatus[]> = {

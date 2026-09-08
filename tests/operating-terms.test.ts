@@ -215,6 +215,7 @@ test("operating term initializes once, archives frozen data and copies only revi
     const route = await id(
       "insert into fixed_routes(name,starts_on,ends_on,weekdays,enabled) values('School A → Program','2026-08-20','2026-12-20',array[1,2,3,4,5],false)",
     );
+    await c.query("insert into fixed_routes(name,starts_on,ends_on,weekdays,enabled,route_type) values('Temporary','2026-09-08','2026-09-08',array[2],false,'TEMPORARY')");
     const stop1 = await id(
       "insert into fixed_route_stops(id,route_id,position,school_id,name,address,arrival_time) values(gen_random_uuid(),$1,0,$2,'School A','A','14:30')",
       [route, school],
@@ -291,7 +292,10 @@ test("operating term initializes once, archives frozen data and copies only revi
       ).rows[0].n,
       1,
     );
-    const copied = (await readFixedRoutes(c))[0];
+    const copiedRoutes=await readFixedRoutes(c);
+    assert.equal(copiedRoutes.length,1);
+    assert.equal((await c.query("select count(*)::int n from fixed_routes where operating_term_id=$1 and route_type='TEMPORARY'",[old.id])).rows[0].n,1);
+    const copied = copiedRoutes[0];
     assert.equal(copied.enabled, false);
     assert.equal(copied.startsOn, "2027-01-01");
     assert.equal(copied.driverId, null);

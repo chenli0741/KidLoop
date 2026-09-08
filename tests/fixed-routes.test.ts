@@ -9,6 +9,7 @@ import {changeRiderStatus} from '../src/lib/rider-status';
 import {readTripExecution} from '../src/lib/read-trip-execution';
 import {savePickupSetting,parseGradeTimes} from '../src/lib/pickup-settings';
 import type {AuthUser} from '../src/lib/types';
+import {visibleRoutes} from '../src/lib/fixed-route-types';
 
 test('fixed multi-school route creates tasks once, skips holidays, changes driver and preserves started trips',async()=>{
  const url=process.env.KIDLOOP_TEST_DATABASE_URL; assert.ok(url&&['localhost','127.0.0.1'].includes(new URL(url).hostname));
@@ -33,8 +34,22 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await c.query('insert into term_students(operating_term_id,student_id,reviewed) select current_operating_term(),id,true from students');
   const stops=[{id:randomUUID(),name:'',address:'',schoolId:school,programId:null,time:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:schoolB,programId:null,time:'14:20'},{id:randomUUID(),name:'',address:'',schoolId:null,programId:program,time:'15:00'}];
   const make=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({name:'Route',startsOn:'2026-09-01',endsOn:'2026-09-30',driverId:driver,vehicleId:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify(ids.map((studentId,i)=>({studentId,pickupStopId:stops[i].id,dropoffStopId:stops[2].id}))),...extra}))f.set(k,v);for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;};
-  await tx(()=>saveFixedRoute(c,make()));
+  await assert.rejects(tx(()=>saveFixedRoute(c,make({routeType:'INVALID'}))),/Invalid route type/);
+  await tx(()=>saveFixedRoute(c,make({routeType:'TEMPORARY'})));
   let route=(await readFixedRoutes(c))[0];assert.equal(route.name,'A → B → P');assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
+  assert.equal(route.routeType,'TEMPORARY');
+  assert.equal(visibleRoutes([route],'2026-08-31').length,1);
+  assert.equal(visibleRoutes([route],'2026-09-30').length,1);
+  assert.equal(visibleRoutes([route],'2026-10-01').length,0);
+  assert.equal(visibleRoutes([{...route,routeType:'RECURRING'}],'2026-10-01').length,1);
+  await tx(()=>materializeRoutes(c,'2026-08-31','2026-08-31'));
+  await tx(()=>materializeRoutes(c,'2026-10-01','2026-09-01'));
+  assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
+  assert.equal((await readFixedRoutes(c)).length,1);
+  await tx(()=>materializeRoutes(c,'2026-09-30','2026-09-01'));
+  assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-09-30'")).rows[0].n,1);
+  await c.query("delete from trips where scheduled_date='2026-09-30'");
+  await c.query("delete from driver_shifts where shift_date='2026-09-30'");
   await assert.rejects(tx(()=>saveFixedRoute(c,make({name:'Overlap'}))),/overlapping/);
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07',backup));
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
