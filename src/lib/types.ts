@@ -28,7 +28,11 @@ export type Driver = {
 
 export type School = {
   id: string;
+  /** Preferred everyday display name. */
   name: string;
+  fullName: string;
+  shortName: string | null;
+  updatedAt: string;
   address: string;
   pickupMapUrl: string | null;
   pickupInstructions: string;

@@ -31,10 +31,10 @@ export async function getDrivers() {
 export async function getSchools() {
   await requireUser(["ADMIN"]);
   const result = await query<{
-    id: string; name: string; address: string; pickup_map_url: string | null;
+    id: string; name: string; full_name: string; short_name: string | null; updated_at: string; address: string; pickup_map_url: string | null;
     pickup_instructions: string; dismissal_time: string | null;
   }>(`
-    select id, name, address, pickup_map_url, pickup_instructions,
+    select id, coalesce(short_name,name) as name, name as full_name, short_name, updated_at::text, address, pickup_map_url, pickup_instructions,
            dismissal_time::text
     from schools
     order by name
@@ -43,6 +43,9 @@ export async function getSchools() {
     id: row.id,
     name: row.name,
     address: row.address,
+    fullName: row.full_name,
+    shortName: row.short_name,
+    updatedAt: row.updated_at,
     pickupMapUrl: row.pickup_map_url,
     pickupInstructions: row.pickup_instructions,
     dismissalTime: row.dismissal_time,
@@ -77,7 +80,7 @@ export async function getStudents() {
   }>(`
     select st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
            st.classroom_name, st.classroom_id,
-           sc.id as school_id, sc.name as school_name,
+           sc.id as school_id, coalesce(sc.short_name,sc.name) as school_name,
            p.id as program_id, p.name as program_name,
            coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone,
            coalesce(pa.relationship, '') as relationship,
@@ -161,7 +164,7 @@ export async function getTrips(date: string) {
              t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
              d.name as driver_name, d.phone as driver_phone,
              v.name as vehicle_name, v.plate as vehicle_plate, v.capacity,
-             sc.name as school_name, sc.address as school_address,
+             coalesce(sc.short_name,sc.name) as school_name, sc.address as school_address,
              sc.pickup_map_url, sc.pickup_instructions, sc.dismissal_time::text,
              p.name as program_name, p.address as program_address,
              p.dropoff_info, p.requirements as program_requirements
@@ -181,7 +184,7 @@ export async function getTrips(date: string) {
       parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean; pickup_stop_id: string|null; dropoff_stop_id:string|null; school_name:string;
     }>(`
       select (select note from status_history where trip_student_id=ts.id and to_status='EXCEPTION' order by created_at desc limit 1) as missed_pickup_note,
-             ts.pickup_stop_id,ts.dropoff_stop_id,(select name from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
+             ts.pickup_stop_id,ts.dropoff_stop_id,(select coalesce(short_name,name) from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
              st.classroom_name, st.grade, st.age,
              coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
              coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent

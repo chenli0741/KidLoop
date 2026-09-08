@@ -13,7 +13,7 @@ export async function getParentChildren() {
     parentName: string; relationship: string; parentPhone: string; backupPhone: string; email: string;
   }>(`
     select current_operating_term() as "operatingTermId", st.id, st.name, st.photo_url as "photoUrl", st.grade, st.age, st.notes,
-      sc.name as "schoolName", st.classroom_name as "classroomName", p.name as "programName", st.updated_at::text as "updatedAt",
+      coalesce(sc.short_name,sc.name) as "schoolName", st.classroom_name as "classroomName", p.name as "programName", st.updated_at::text as "updatedAt",
       coalesce(pa.name, '') as "parentName", coalesce(pa.relationship, '') as relationship,
       coalesce(pa.phone, '') as "parentPhone", coalesce(pa.backup_phone, '') as "backupPhone", coalesce(pa.email, '') as email
     from user_students us join students st on st.id = us.student_id
@@ -36,7 +36,7 @@ export async function getParentSchedule(date: string) {
     }>(`
       select ts.id, ts.student_id as "studentId", t.scheduled_date::text as date,
         coalesce((select stop->>'time' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.pickup_stop_id::text),t.departure_time::text) as departure, ts.status,
-        coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.pickup_stop_id::text),sc.name) as "schoolName", coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.dropoff_stop_id::text),p.name) as "programName", d.name as "driverName", d.phone as "driverPhone",
+        coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.pickup_stop_id::text),coalesce(sc.short_name,sc.name)) as "schoolName", coalesce((select stop->>'name' from jsonb_array_elements(t.route_stops) stop where stop->>'id'=ts.dropoff_stop_id::text),p.name) as "programName", d.name as "driverName", d.phone as "driverPhone",
         v.name as "vehicleName", v.plate as "vehiclePlate",
         ts.picked_up_at::text as "pickedUpAt", ts.dropped_off_at::text as "droppedOffAt"
       from user_students us join trip_students ts on ts.student_id = us.student_id

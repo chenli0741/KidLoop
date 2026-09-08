@@ -38,7 +38,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
   if(!/^[0-9a-f-]{36}$/i.test(s.id)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)|| (i>0 && s.time<=stops[i-1].time)) error("请按先后顺序填写站点时间。","Stop times must be in increasing order.");
   if(s.schoolId&&s.programId) error("每站只能选择一个地点。","Choose one location per stop.");
   if(s.schoolId||s.programId) {
-   const location=(await c.query(`select name,address from ${s.schoolId?"schools":"after_school_programs"} where id=$1`,[s.schoolId||s.programId])).rows[0];
+   const location=(await c.query(`select ${s.schoolId?"coalesce(short_name,name)":"name"} as name,address from ${s.schoolId?"schools":"after_school_programs"} where id=$1`,[s.schoolId||s.programId])).rows[0];
    if(!location) error("地点不存在。","Location not found.");
    s.name=location.name;s.address=location.address;
   }

@@ -527,3 +527,23 @@ MVP 至少需要通过以下端到端场景：
 
 - 测试车辆显示为 `Test Vehicle 01/02`，测试司机显示为 `Test Driver 01/02`；原编号、车牌和线路绑定不变。
 - 测试登录账号显示姓名统一为 `Test Admin`、`Test Driver`、`Test Parent`，不修改邮箱、密码或角色绑定。
+
+## 学校全称与简称（2026-09-08）
+
+- 学校基础资料保留全称 `schools.name`，新增可选简称 `schools.short_name`；普通页面、学校筛选、学生及家长资料、账号绑定和新线路站点优先显示简称，未填写时回退全称。学校资料页同时显示全称并提供名称编辑；管理员写入校验长度与并发版本。
+- 已按用户名单更新 3 所既有学校并新增 5 所：Christa McAuliffe Elementary School（McAuliffe）、Cherry Chase Elementary School（Cherry Chase）、Cumberland Elementary School（Cumberland）、Ellis Elementary School（Ellis）、Stratford School（Stratford）、John Muir Elementary School（John Muir）、Murdock-Portal Elementary School（Murdock-Portal）、Eaton Elementary School（Eaton）。
+- 保留原学校 ID、19 名学生与学校关联及既有接送配置。新学校地址、示意图、接送要求及每周时间待补充；只按现有机制初始化当前运营学期日期及可编辑的默认联邦假日，不推定官方放学时间。
+- 改名同步当前学期线路模板站点与自动标题；已保存的执行快照和归档不改写，未开始任务由既有生成流程后续同步。
+- 迁移 `022_school_short_names.sql`；名单脚本 `node --env-file=.env.local --conditions=react-server --import tsx scripts/update-school-roster.ts` 默认事务回滚预览，`--apply` 才写入。已应用配置数据库并再次预览确认无重复新增。
+
+- 本次验证：类型检查、Lint、生产构建及学校名称、固定线路、运营学期 5 项测试通过；数据库只读复核 8 所学校、每校 1 个当前学期，原有学生关联不变。浏览器可加载登录页，但现有测试账号凭据未通过登录，尚未完成登录后的桌面/手机页面验收；未修改账号密码，未提交、推送或部署。
+
+### 当前学期日期修正（2026-09-08）
+
+用户确认 Fall 2026 运营学期为 **2026-08-20 至 2026-12-18（含首尾）**，取代原 12 月 20 日结束的基线。已在数据库同步 6 所仍为 12 月 20 日结束的学校，以及 2 条固定线路的结束日期；McAuliffe、Stratford 原已为 12 月 18 日结束。保留各校既有开学日：Stratford 为 8 月 24 日，其余 7 所为 8 月 20 日；线路起始日仍为 9 月 7 日。操作前核对 12 月 18 日之后无本期行程，事务提交后只读复核 8 所学校及两条线路均于 12 月 18 日结束。未改动学生、假期、每周接送时间或历史任务。
+
+### 两校学生资料照片校正（2026-09-08）
+
+按用户提供的 2026 年 9 月 McAuliffe → One Stop、Stratford → 晨星两张名单修正学生资料：McAuliffe 更新 5 名、补录 5 名，Stratford 更新 5 名、补录 3 名，共覆盖照片中的 18 名学生。修正姓名、年级、班级及照片明确标记的每周不接送星期；K/GK 统一存为 K，G3/G4/G5 存为 3/4/5。照片空白班级留空，缺失年龄、照片和家长信息不编造。
+
+既有学生保留 ID、照片、家长与账号绑定、学校及目的地；新学生加入当前学期待用名单。照片未列出的 4 名旧学生保留，因此当前 McAuliffe、Stratford 各有 11 名在册学生，Ellis 仍为 5 名。未自动把新增学生分配到固定线路，本轮不调整学校时间或校历。执行前保存受限私有备份，事务内核验学校规则、线路、行程、状态历史及非目标学生均不变；提交后复核 18 条资料，重复预览新增/修改均为零。个人名单和执行脚本仅保存在 Git 忽略的 `.local-data/roster-corrections/`。

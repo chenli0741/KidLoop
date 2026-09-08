@@ -98,3 +98,15 @@
 ## 维护约定
 
 本轮已实现与未实现内容分开记录，不将“代码已完成”等同于“已提交、推送或部署”。提交推送需用户明确要求。后续改变业务流程时，同步维护本文、项目总览和涉及的数据模型、架构说明。
+
+## 学校全称与简称（2026-09-08）
+
+- 学校基础资料保留全称 `schools.name`，新增可选简称 `schools.short_name`；普通页面、学校筛选、学生及家长资料、账号绑定和新线路站点优先显示简称，未填写时回退全称。学校资料页同时显示全称并提供名称编辑；管理员写入校验长度与并发版本。
+- 已按用户名单更新 3 所既有学校并新增 5 所：Christa McAuliffe Elementary School（McAuliffe）、Cherry Chase Elementary School（Cherry Chase）、Cumberland Elementary School（Cumberland）、Ellis Elementary School（Ellis）、Stratford School（Stratford）、John Muir Elementary School（John Muir）、Murdock-Portal Elementary School（Murdock-Portal）、Eaton Elementary School（Eaton）。
+- 保留原学校 ID、19 名学生与学校关联及既有接送配置。新学校地址、示意图、接送要求及每周时间待补充；只按现有机制初始化当前运营学期日期及可编辑的默认联邦假日，不推定官方放学时间。
+- 改名同步当前学期线路模板站点与自动标题；已保存的执行快照和归档不改写，未开始任务由既有生成流程后续同步。
+- 迁移 `022_school_short_names.sql`；名单脚本 `node --env-file=.env.local --conditions=react-server --import tsx scripts/update-school-roster.ts` 默认事务回滚预览，`--apply` 才写入。已应用配置数据库并再次预览确认无重复新增。
+
+### 当前学期日期修正（2026-09-08）
+
+用户确认 Fall 2026 运营学期为 **2026-08-20 至 2026-12-18（含首尾）**，取代原 12 月 20 日结束的基线。已在数据库同步 6 所仍为 12 月 20 日结束的学校，以及 2 条固定线路的结束日期；McAuliffe、Stratford 原已为 12 月 18 日结束。保留各校既有开学日：Stratford 为 8 月 24 日，其余 7 所为 8 月 20 日；线路起始日仍为 9 月 7 日。操作前核对 12 月 18 日之后无本期行程，事务提交后只读复核 8 所学校及两条线路均于 12 月 18 日结束。未改动学生、假期、每周接送时间或历史任务。

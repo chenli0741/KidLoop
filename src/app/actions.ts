@@ -13,6 +13,7 @@ import { query, transaction } from "@/lib/db";
 import { isLocale, LOCALE_COOKIE, text, type Locale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 import type { FormState, RiderStatus } from "@/lib/types";
+import { schoolNames, updateSchoolNames } from "@/lib/school-management";
 import { pickupMapUrl } from "@/lib/map-url";
 
 export async function setLocale(formData: FormData) {
@@ -110,25 +111,33 @@ export async function createDriver(_: FormState, formData: FormData): Promise<Fo
 
 export async function createSchool(_: FormState, formData: FormData): Promise<FormState> {
   return runMutation(async () => {
+    const names = schoolNames(formData);
     const rawMapUrl = optional(formData, "pickupMapUrl");
     const mapUrl = pickupMapUrl(rawMapUrl);
     if (rawMapUrl && !mapUrl) throw new Error("Pickup map must be an HTTPS URL without credentials");
     await transaction(async client => {
       await client.query("select pg_advisory_xact_lock(70919009)");
       await client.query(`
-      insert into schools (name, address, pickup_map_url, pickup_instructions, dismissal_time)
-      values ($1, $2, $3, $4, $5::time)
+      insert into schools (name, address, pickup_map_url, pickup_instructions, dismissal_time, short_name)
+      values ($1, $2, $3, $4, $5::time, $6)
     `, [
-      required(formData, "name"),
+      names.name,
       required(formData, "address"),
       mapUrl,
       required(formData, "pickupInstructions"),
       optional(formData, "dismissalTime") || null,
+      names.shortName,
     ]);
       const term=await openTerm(client);
       if(term)await initializeSchools(client,term);
     });
   }, ["/resources", "/students", "/schedule"], { zh: "学校已添加。", en: "School added." });
+}
+
+export async function updateSchool(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(() => transaction(client => updateSchoolNames(client, formData)),
+    ["/resources", "/students", "/schedule", "/terms", "/admin/accounts", "/parent", "/parent/children", "/driver", "/"],
+    { zh: "学校名称已更新。", en: "School names updated." });
 }
 
 export async function createProgram(_: FormState, formData: FormData): Promise<FormState> {

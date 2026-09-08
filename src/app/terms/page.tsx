@@ -179,7 +179,7 @@ export default async function TermsPage({
     : [];
   const schools = (
     await query<{ id: string; name: string }>(
-      "select id,name from schools order by name",
+      "select id,coalesce(short_name,name) as name from schools order by name",
     )
   ).rows;
   const programs = (

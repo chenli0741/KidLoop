@@ -8,7 +8,7 @@
 
 | Table | Purpose |
 | --- | --- |
-| `schools` | School identity, address, map and pickup instructions; grade pickup times are in school rules. `calendar_archived_through` and `calendar_archived_at` hide retained historical calendar dates per school. |
+| `schools` | Full name in `name`, optional `short_name` for everyday display (fallback to full name); school identity, address, map and pickup instructions; grade pickup times are in school rules. `calendar_archived_through` and `calendar_archived_at` hide retained historical calendar dates per school. |
 | `after_school_programs` | Program name and driver-facing dropoff address, information, and requirements. |
 | `classrooms` | Simple class grouping within a school. |
 | `parents` | Primary parent contact associated with a student. |
