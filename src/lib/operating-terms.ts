@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { federalHolidays } from "./federal-holidays";
 import { validServiceDate } from "./day-plans";
+import { PICKUP_GRADES } from "./pickup-grades";
 export type OperatingTerm = {
   id: string;
   name: string;
@@ -91,8 +92,11 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
   await initializeSchools(c, t);
   if (old) {
     await c.query(
-      `insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades,operating_term_id) select school_id,name,weekdays,pickup_time,grades,$2 from school_pickup_rules where operating_term_id=$1`,
-      [source, id],
+      `insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades,operating_term_id)
+       select school_id,name,weekdays,pickup_time,
+         array(select g from unnest(grades) with ordinality as items(g,position) where g=any($3::text[]) order by position),$2
+       from school_pickup_rules where operating_term_id=$1 and grades && $3::text[]`,
+      [source, id, PICKUP_GRADES],
     );
     await c.query(
       `insert into term_students(operating_term_id,student_id,reviewed,previous_grade,previous_classroom_id)

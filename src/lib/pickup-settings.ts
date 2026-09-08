@@ -1,6 +1,7 @@
 import { requireTerm } from "./operating-terms";
 import "server-only";
 import type { PoolClient } from "pg";
+import { PICKUP_GRADES } from "./pickup-grades";
 
 export class PickupError extends Error {
   constructor(public zh: string, public en: string) { super(en); }
@@ -68,7 +69,7 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   if (kind === "rule") {
     const pickupTime = time(f);
     const grades = [...new Set(f.getAll("grades").map(v => String(v).trim()))];
-    if (!grades.length || grades.length > 30 || grades.some(g => !g || g.length > 30)) fail("请至少选择一个有效年级。", "Select at least one valid grade.");
+    if (!grades.length || grades.some(g => !PICKUP_GRADES.includes(g))) fail("请选择有效年级：TK、K、1–7。", "Select at least one valid grade: TK, K, 1-7.");
     if ((await c.query(`select 1 from school_pickup_rules p where p.operating_term_id=current_operating_term() and p.school_id=$1 and p.id<>coalesce($2::uuid,gen_random_uuid()) and p.weekdays && $3::integer[] and p.grades && $4::text[]`,[school,id||null,weekdays,grades])).rowCount) fail("所选年级在这些星期已有接送时间，请修改已有规则。", "These grades already have pickup times on these weekdays.");
     if (id && (await c.query("select 1 from pickup_routes where rule_id=$1 and not weekdays <@ $2::integer[]",[id,weekdays])).rowCount) fail("已有线路使用了被移除的星期，请先调整线路。", "Update routes before removing weekdays they use.");
     if (id)

@@ -48,6 +48,13 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 26px; }
 .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; color: #13271f; background: #91d8b5; border-radius: 7px; }
 .brand strong, .brand span { display: block; }
+.brand-identity { min-width: 0; }
+.trip-segment + .trip-segment { border-top: 1px solid #dce5df; }
+.trip-segment-title { margin: 0; padding: 20px 24px 12px; font-size: 17px; overflow-wrap: anywhere; }
+.trip-segment-picker { display: grid; gap: 8px; margin: 16px 20px; min-width: 0; }
+.trip-segment-picker select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; font-size: 16px; text-overflow: ellipsis; }
+.brand-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-mark { flex-shrink: 0; }
 .brand strong { font-size: 17px; }
 .brand span { margin-top: 2px; color: #aebbb5; font-size: 12px; }
 .sidebar nav { display: grid; gap: 5px; }

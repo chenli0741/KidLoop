@@ -6,16 +6,19 @@ import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { text, type Locale } from "@/lib/i18n";
+import { nearestTripSegment, tripSegments } from "@/lib/trip-segments";
+import { TripSegmentPicker } from "@/components/trip-segment-picker";
 
 export function TripCard({ trip, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
   const completed = trip.riders.filter((rider) => rider.status === "DROPPED_OFF" || rider.status === "ABSENT").length;
+  const segments = tripSegments(trip);
 
   return (
     <article className="trip-card">
       <header className="trip-header">
         <div>
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
-          <h3>{trip.routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
+          <h3>{segments.length > 1 ? text(locale, "接送行程", "Pickup trips") : segments[0].routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
         </div>
         <StatusBadge status={trip.status} />
       </header>
@@ -29,6 +32,19 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
       <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Trip completion")} aria-valuemin={0} aria-valuemax={trip.riders.length || 1} aria-valuenow={completed}>
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
+
+      <TripSegmentPicker label={text(locale,"线路","Route")} defaultIndex={nearestTripSegment(segments)} options={segments.map((segment,i)=>({id:`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`,label:`${formatTime(segment.departureTime,locale)} · ${segment.routeName ?? `${segment.schoolName} → ${segment.programName}`}`}))}>
+      {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
+        {segments.length>1 && <h4 className="trip-segment-title">{segment.routeName}</h4>}
+        <TripSegmentContent trip={segment} locale={locale} interactive={interactive}/>
+      </section>)}
+      </TripSegmentPicker>
+    </article>
+  );
+}
+
+function TripSegmentContent({trip,locale,interactive}:{trip:Trip;locale:Locale;interactive:boolean}) {
+  return <>
 
       {trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
@@ -87,6 +103,5 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
           </div>
         ))}
       </div>
-    </article>
-  );
+    </>;
 }

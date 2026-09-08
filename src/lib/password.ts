@@ -9,11 +9,11 @@ function derive(password: string, salt: string): Promise<Buffer> {
 }
 
 export function validPassword(password: string) {
-  return password.length >= 12 && password.length <= 128;
+  return password.length >= 6 && password.length <= 128;
 }
 
 export async function hashPassword(password: string) {
-  if (!validPassword(password)) throw new Error("Password must contain 12–128 characters.");
+  if (!validPassword(password)) throw new Error("Password must contain 6–128 characters.");
   const salt = randomBytes(16).toString("hex");
   return `scrypt:${salt}:${(await derive(password, salt)).toString("hex")}`;
 }

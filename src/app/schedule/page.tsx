@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { PickupSettingForm } from "@/components/pickup-setting-form";
+import { PICKUP_GRADES } from "@/lib/pickup-grades";
 
 export const dynamic = "force-dynamic";
 export default async function SchedulePage({ searchParams }: {searchParams:Promise<{school?:string;tab?:string;term?:string}>}) {
@@ -35,7 +36,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
 
   ]);
   const terms=termsResult.rows, exceptions=exceptionsResult.rows, rules=rulesResult.rows;
-  const grades = ["TK", "K", ...Array.from({length:7},(_,i)=>String(i+1))];
+  const grades = PICKUP_GRADES;
   const today=todayInOperationsTimeZone();
   const weekdays=(days?:number[])=>days?.map(d=>(locale==="zh" ? ["周一","周二","周三","周四","周五","周六","周日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])[d-1]).join("、");
   const form=(kind:SettingKind, initial?:PickupSetting, remove=false)=><PickupSettingForm operatingTermId={operation.id} kind={kind} schoolId={school!.id} locale={locale} initial={initial} remove={remove} rules={rules} programs={programs} grades={grades} />;

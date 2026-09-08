@@ -233,6 +233,7 @@ test("operating term initializes once, archives frozen data and copies only revi
       tx(() => archiveOperatingTerm(c, old.id, "2026-12-20")),
       /Archive after/,
     );
+    await c.query("update school_pickup_rules set grades=grades || array['8','12'] where operating_term_id=$1",[old.id]);
     await tx(() => archiveOperatingTerm(c, old.id, "2026-12-21"));
     assert.equal(await openTerm(c), undefined);
     assert.deepEqual(await readFixedRoutes(c), []);
@@ -261,6 +262,8 @@ test("operating term initializes once, archives frozen data and copies only revi
       ),
     );
     assert.notEqual(next.id, old.id);
+    assert.deepEqual((await c.query("select grades from school_pickup_rules where operating_term_id=$1",[next.id])).rows[0].grades,["1","2","3"]);
+    assert.deepEqual((await c.query("select grades from school_pickup_rules where operating_term_id=$1",[old.id])).rows[0].grades,["1","2","3","8","12"]);
     assert.equal(
       (
         await c.query(

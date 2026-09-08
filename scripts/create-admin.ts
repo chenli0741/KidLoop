@@ -7,7 +7,7 @@ async function main() {
   const email = process.env.KIDLOOP_ADMIN_EMAIL?.trim().toLowerCase();
   const name = process.env.KIDLOOP_ADMIN_NAME?.trim();
   const password = process.env.KIDLOOP_ADMIN_PASSWORD;
-  if (!email || !name || !password || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Set KIDLOOP_ADMIN_EMAIL, KIDLOOP_ADMIN_NAME and KIDLOOP_ADMIN_PASSWORD (12–128 characters).");
+  if (!email || !name || !password || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Set KIDLOOP_ADMIN_EMAIL, KIDLOOP_ADMIN_NAME and KIDLOOP_ADMIN_PASSWORD (6–128 characters).");
   const url = new URL(process.env.DATABASE_URL ?? "");
   if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
   const pool = new pg.Pool({ connectionString: url.toString() });

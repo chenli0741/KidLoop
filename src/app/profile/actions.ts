@@ -16,7 +16,7 @@ function failure(error: unknown, locale: Locale): FormState {
   if(error instanceof TermError)return {ok:false,message:error.message};
   const messages: Record<string, [string, string]> = {
     password: ["当前密码不正确。", "The current password is incorrect."],
-    newPassword: ["新密码需 12–128 个字符，且两次输入一致。", "Use 12–128 characters and matching new passwords."],
+    newPassword: ["新密码需 6–128 个字符，且两次输入一致。", "Use 6–128 characters and matching new passwords."],
     stale: ["资料已更新，请刷新后重新编辑。", "Details changed. Refresh before editing again."],
     limited: ["尝试次数过多，请 15 分钟后再试。", "Too many attempts. Try again in 15 minutes."],
     forbidden: ["你只能修改自己的账号和已绑定孩子的资料。", "You can only edit your own account and linked children."],

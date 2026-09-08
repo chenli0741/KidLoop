@@ -86,19 +86,29 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string) {
   // Preserve the actual journey once a driver has acted, including driver-marked absence.
   if(existing&&(await c.query("select 1 from trip_students where trip_id=$1 and (picked_up_at is not null or status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (status='ABSENT' and not parent_absence))",[existing.id])).rowCount) continue;
   const eligible:RouteStudent[]=[];
+  const schoolTimes = new Map<string,string>();
   let stops=r.stops.map(s=>({...s}));
   if(r.enabled&&r.driverId&&r.vehicleId&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday)) {
    for(const a of r.students) {
     const stop=stops.find(s=>s.id===a.pickupStopId)!;
     const match=(await c.query(`select coalesce(e.pickup_time,p.pickup_time)::text as time from students s join classrooms cl on cl.id=s.classroom_id join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=cl.school_id and $2::date between t.starts_on and t.ends_on join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=cl.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays) left join school_calendar_exceptions e on e.operating_term_id=current_operating_term() and e.school_id=cl.school_id and $2::date between e.starts_on and e.ends_on where s.id=$1 and s.active and cl.school_id=$4 and (e.id is null or e.pickup_time is not null)`,[a.studentId,date,weekday,stop.schoolId])).rows[0];
-    if(match) {eligible.push(a); if(match.time.slice(0,5)!==stop.time) { /* Earliest valid pickup is the school's rule; planned later arrivals remain valid. */
-      const special=(await c.query("select to_char(pickup_time,'HH24:MI') as time from school_calendar_exceptions where operating_term_id=current_operating_term() and school_id=$1 and $2::date between starts_on and ends_on and pickup_time is not null",[stop.schoolId,date])).rows[0];
-      if(special) stop.time=special.time; else if(stop.time<match.time.slice(0,5)) stop.time=match.time.slice(0,5);
-    }}
+    if(match) {
+      eligible.push(a);
+      const time=match.time.slice(0,5);
+      if(time>(schoolTimes.get(stop.id)??"")) schoolTimes.set(stop.id,time);
+    }
    }
   }
-  // Shift later stops to preserve the planned travel intervals after a school time change.
-  for(let i=1;i<stops.length;i++) {const minutes=(s:string)=>Number(s.slice(0,2))*60+Number(s.slice(3,5));const minimum=minutes(stops[i-1].time)+minutes(r.stops[i].time)-minutes(r.stops[i-1].time);if(minutes(stops[i].time)<minimum)stops[i].time=`${String(Math.floor(minimum/60)).padStart(2,'0')}:${String(minimum%60).padStart(2,'0')}`;}
+  // Anchor to the first active school's daily dismissal, including early days.
+  // Later stops retain travel intervals and never precede their own dismissal.
+  const minutes=(s:string)=>Number(s.slice(0,2))*60+Number(s.slice(3,5));
+  const anchor=stops.find(s=>schoolTimes.has(s.id));
+  const delta=anchor ? minutes(schoolTimes.get(anchor.id)!)-minutes(anchor.time) : 0;
+  for(let i=0;i<stops.length;i++) {
+    const arrival=i===0 ? minutes(r.stops[0].time)+delta : minutes(stops[i-1].time)+minutes(r.stops[i].time)-minutes(r.stops[i-1].time);
+    const time=Math.max(arrival,schoolTimes.has(stops[i].id)?minutes(schoolTimes.get(stops[i].id)!):arrival);
+    stops[i].time=`${String(Math.floor(time/60)).padStart(2,'0')}:${String(time%60).padStart(2,'0')}`;
+  }
   if(!eligible.length) {if(existing) {await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}
   stops=stops.filter(s=>!s.schoolId || eligible.some(a=>a.pickupStopId===s.id||a.dropoffStopId===s.id));
   if(stops.at(-1)!.time>"23:59") {await issue("站点时间超过当天，请调整线路 / Stop time exceeds this day");if(existing){await c.query("update trips set status='CANCELED' where id=$1",[existing.id]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[existing.shift_id]);}continue;}

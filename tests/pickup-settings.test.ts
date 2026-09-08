@@ -28,10 +28,17 @@ test("school rules share calendars across routes without drivers and validate ed
     const termId=(await c.query("select id from school_terms")).rows[0].id;
     const rule={schoolId:school,kind:"rule",name:"Regular",grades:["1","2","3"],weekdays:["1","2","4","5"],pickupTime:"14:30"};
     await assert.rejects(save({...rule,grades:[]}),/valid grade/);
+    await assert.rejects(save({...rule,grades:["1","8"]}),/valid grade/);
+    await assert.rejects(save({...rule,grades:["12"]}),/valid grade/);
     await save(rule);await assert.rejects(save({...rule,grades:["3","4"]}),/already have/);
     await save({...rule,name:"Wednesday",weekdays:["3"],pickupTime:"13:00"});
     const rules=(await c.query("select id,name from school_pickup_rules")).rows;
     const regular=rules.find(r=>r.name==="Regular")!.id, wed=rules.find(r=>r.name==="Wednesday")!.id;
+    await c.query("update school_pickup_rules set grades=grades || array['8','9','10','11','12'] where id=$1",[regular]);
+    const originalTime=(await c.query("select pickup_time,weekdays from school_pickup_rules where id=$1",[regular])).rows[0];
+    await c.query(await readFile("db/migrations/017_pickup_grade_scope.sql","utf8"));
+    const cleaned=(await c.query("select grades,pickup_time,weekdays from school_pickup_rules where id=$1",[regular])).rows[0];
+    assert.deepEqual(cleaned,{grades:rule.grades,...originalTime});
     const route={schoolId:school,kind:"route",name:"Ellis A",ruleId:regular,programId:program,weekdays:["1","2","4","5"]};
     await save(route);await save({...route,name:"Ellis B",programId:programB});
     await save({...route,name:"Wednesday A",ruleId:wed,weekdays:["3"]});

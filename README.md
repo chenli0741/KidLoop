@@ -76,7 +76,7 @@ npm run build
 
 ## Role login and parent plans
 
-Run the database migrations, then create the first administrator with `npm run auth:create-admin`. Supply `KIDLOOP_ADMIN_EMAIL`, `KIDLOOP_ADMIN_NAME` and `KIDLOOP_ADMIN_PASSWORD` through the environment. Passwords must contain 12–128 characters. The script refuses duplicate emails and never resets an existing account. Do not put passwords in source files or commits.
+Run the database migrations, then create the first administrator with `npm run auth:create-admin`. Supply `KIDLOOP_ADMIN_EMAIL`, `KIDLOOP_ADMIN_NAME` and `KIDLOOP_ADMIN_PASSWORD` through the environment. Passwords must contain 6–128 characters. The script refuses duplicate emails and never resets an existing account. Do not put passwords in source files or commits.
 
 Sign in at `/login`. Administrators land on `/`, drivers on `/driver`, and parents on `/parent`. The administrator's Accounts page creates accounts, binds a driver or children, updates child bindings, disables accounts and resets passwords. There is no public self-registration. Parent access comes only from explicit child bindings.
 

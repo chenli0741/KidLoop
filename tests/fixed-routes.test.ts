@@ -42,6 +42,11 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await tx(()=>materializeRoutes(c,'2026-09-09','2026-09-07'));
   const adjusted=(await c.query("select route_stops from trips where scheduled_date='2026-09-09'")).rows[0].route_stops;
   assert.deepEqual(adjusted.map((s:{time:string})=>s.time),['14:30','14:50','15:30']);
+  await c.query("update school_pickup_rules set pickup_time='13:00' where school_id=$1",[school]);
+  await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-07'));
+  const early=(await c.query("select route_stops from trips where scheduled_date='2026-09-10'")).rows[0].route_stops;
+  assert.deepEqual(early.map((s:{time:string})=>s.time),['13:00','14:00','14:40']);
+  await c.query("update school_pickup_rules set pickup_time='14:00' where school_id=$1",[school]);
   await tx(()=>materializeRoutes(c,'2026-09-12','2026-09-07'));
   assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-09-12'")).rows[0].n,0);
   await tx(()=>saveFixedRoute(c,make({id:route.id,updatedAt:route.updatedAt,driverId:backup})));

@@ -6,6 +6,7 @@
   .brand-mark { width: 35px; height: 35px; color: white; background: var(--green); border-radius: 12px; }
   .brand strong { font-size: 19px; letter-spacing: -.7px; }
   .brand span { color: var(--muted); font-size: 10px; }
+  .brand-identity { max-width: calc(100vw - 140px); }
   .sidebar-footer { display: none; }
   .sidebar nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
   .nav-link { min-width: 0; min-height: 52px; flex-direction: column; gap: 5px; justify-content: center; padding: 5px 2px; color: #6a7770; border-radius: 14px; font-size: 10px; }

@@ -23,8 +23,8 @@ export default async function ProfilePage() {
       <SettingsForm action={updatePassword} submitLabel={text(locale, "更新密码", "Update password")}>
         <input type="hidden" name="username" autoComplete="username" value={profile.email} />
         <label className="full"><span>{text(locale, "当前密码", "Current password")}</span><input name="currentPassword" type="password" autoComplete="current-password" maxLength={128} required /></label>
-        <label className="full"><span>{text(locale, "新密码（12–128 字符）", "New password (12–128 characters)")}</span><input name="newPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
-        <label className="full"><span>{text(locale, "确认新密码", "Confirm new password")}</span><input name="confirmPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+        <label className="full"><span>{text(locale, "新密码（6–128 字符）", "New password (6–128 characters)")}</span><input name="newPassword" type="password" autoComplete="new-password" minLength={6} maxLength={128} required /></label>
+        <label className="full"><span>{text(locale, "确认新密码", "Confirm new password")}</span><input name="confirmPassword" type="password" autoComplete="new-password" minLength={6} maxLength={128} required /></label>
       </SettingsForm>
     </section></div>
     {user.role === "PARENT" && <Link className="button secondary child-profile-link" href="/parent/children">{text(locale, "修改孩子资料", "Edit children's information")}</Link>}
