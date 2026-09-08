@@ -55,6 +55,7 @@ export type Student = {
   age: number | null;
   classroomName: string;
   noPickupWeekdays?: number[];
+  routeAssigned?: boolean;
   schoolId: string;
   schoolName: string;
   programId: string;

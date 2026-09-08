@@ -15,6 +15,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
     { href: "/parent", label: text(locale, "我的孩子", "My children"), icon: UsersRound },
   ] : user.role === "DRIVER" ? [
     { href: "/driver", label: text(locale, "我的行程", "My trips"), icon: BusFront },
+    { href: "/driver/week", label: text(locale, "日程", "Schedule"), icon: CalendarDays },
   ] : [
     { href: "/", label: text(locale, "今日", "Today"), icon: Gauge },
     { href: "/schedule", label: text(locale, "学校", "Schools"), icon: CalendarDays },
@@ -34,7 +35,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
       </div>
       <nav data-role={user.role} aria-label={text(locale, "主导航", "Main navigation")}>
         {items.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const active = (href === "/" || href === "/driver") ? pathname === href : pathname.startsWith(href);
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "nav-link active" : "nav-link"}>
               <Icon size={19} aria-hidden="true" />

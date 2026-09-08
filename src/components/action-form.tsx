@@ -13,9 +13,10 @@ type ActionFormProps = {
   children: React.ReactNode;
   submitLabel: string;
   className?: string;
+  onReset?: () => void;
 };
 
-export function ActionForm({ action, children, submitLabel, className = "form-grid" }: ActionFormProps) {
+export function ActionForm({ action, children, submitLabel, className = "form-grid", onReset }: ActionFormProps) {
   const locale = useLocale();
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -25,7 +26,7 @@ export function ActionForm({ action, children, submitLabel, className = "form-gr
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className={className}>
+    <form ref={formRef} action={formAction} className={className} onReset={onReset}>
       {children}
       <div className="form-footer">
         {state.message ? (

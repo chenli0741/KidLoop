@@ -135,7 +135,8 @@
 
 @media (max-width: 920px) {
   .sidebar nav[data-role="ADMIN"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .sidebar nav[data-role="PARENT"], .sidebar nav[data-role="DRIVER"] { grid-template-columns: 1fr; }
+  .sidebar nav[data-role="PARENT"] { grid-template-columns: 1fr; }
+  .sidebar nav[data-role="DRIVER"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar nav:not([data-role="ADMIN"]) .nav-link { flex-direction: row; gap: 10px; font-size: 14px; }
   .language-switcher { right: max(72px, calc(env(safe-area-inset-right) + 60px)); width: 88px; }
   .logout-form { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); margin: 0; }
@@ -173,4 +174,10 @@
   .profile-grid { grid-template-columns: 1fr; }
   .profile-panel { padding: 20px; }
   .web-admin-notice { padding: 20px; background: white; border: 1px solid var(--line); border-radius: 16px; color: var(--muted); line-height: 1.7; }
+}
+
+@media (max-width: 920px) {
+  .workweek-day-header h2 { font-size: 17px; }
+  .workweek-segment > div { grid-template-columns: minmax(0, 1fr) auto; }
+  .workweek-segment time { font-size: 14px; }
 }

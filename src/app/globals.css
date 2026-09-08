@@ -526,3 +526,45 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .school-setting-record p { grid-column: 1 / -1; margin: 0; }
 .school-setting-record .pickup-record-actions { grid-column: 2; grid-row: 1; align-self: start; }
 .school-setting-record .pickup-record-actions > button { width: 44px; height: 44px; min-height: 44px; }
+
+/* Driver weekday overview. Mobile overrides live in mobile.css. */
+.workweek-day { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: white; overflow: hidden; }
+.workweek-day.is-today { border-color: var(--green); }
+.workweek-day-header { padding: 14px; background: var(--green-soft); }
+.workweek-day-header a { display: block; min-height: 44px; }
+.workweek-day-header h2 { font-size: 15px; margin: 0 0 8px; }
+.workweek-day-header span { color: var(--muted); font-size: 12px; }
+.workweek-trips { padding: 12px; }
+.workweek-trip + .workweek-trip { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+.workweek-trip-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--green); font-size: 13px; }
+.workweek-vehicle { display: flex; gap: 5px; color: var(--muted); font-size: 11px; line-height: 1.5; margin: 12px 0; }
+.workweek-vehicle svg { flex-shrink: 0; margin-top: 2px; }
+.workweek-vehicle span { overflow-wrap: anywhere; }
+.workweek-segment { padding: 12px 0; border-top: 1px solid var(--line); }
+.workweek-segment > div { display: grid; gap: 5px; font-size: 13px; line-height: 1.4; }
+.workweek-segment strong { overflow-wrap: anywhere; }
+.workweek-segment time { color: var(--muted); font-size: 12px; }
+.workweek-arrow { display: block; color: var(--green); margin: 5px 0; }
+.workweek-segment p { display: flex; gap: 5px; align-items: center; font-size: 11px; color: var(--muted); margin: 10px 0 0; }
+.workweek-detail, .driver-week-return { display: inline-flex; align-items: center; min-height: 44px; color: var(--green); font-size: 12px; font-weight: 700; }
+.driver-week-return { margin-bottom: 12px; }
+.workweek-empty { padding: 18px 14px; margin: 0; color: var(--muted); font-size: 13px; }
+
+.weekday-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 18px; }
+.weekday-tabs button { min-width: 0; min-height: 64px; display: grid; gap: 5px; justify-items: center; align-content: center; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--muted); cursor: pointer; font: inherit; }
+.weekday-tabs button[aria-selected="true"] { background: var(--green); border-color: var(--green); color: white; }
+.weekday-tabs button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+.weekday-tabs strong { font-size: 14px; }
+.weekday-tabs span { font-size: 12px; }
+
+.schedule-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.schedule-view-switch { display: flex; padding: 3px; background: var(--green-soft); border-radius: 12px; }
+.schedule-controls a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 9px; color: var(--green); }
+.schedule-view-switch a[aria-current="page"] { background: var(--green); color: white; }
+.schedule-month-switch { display: flex; align-items: center; gap: 2px; font-size: 14px; }
+.calendar-weekdays, .weekday-tabs.calendar-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.calendar-weekdays { text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.weekday-tabs.calendar-month-grid button { min-height: 48px; border-color: transparent; border-radius: 9px; }
+.weekday-tabs.calendar-month-grid button[aria-selected="true"] { border-color: var(--green); }
+.calendar-dot { height: 5px; width: 5px; border-radius: 50%; }
+.calendar-dot.has-trips { background: currentColor; }

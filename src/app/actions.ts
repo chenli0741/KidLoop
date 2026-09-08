@@ -13,6 +13,8 @@ import { query, transaction } from "@/lib/db";
 import { isLocale, LOCALE_COOKIE, text, type Locale } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 import type { FormState, RiderStatus } from "@/lib/types";
+import { assignNewStudentRoute } from "@/lib/student-route-assignment";
+import { todayInOperationsTimeZone } from "@/lib/date";
 import { schoolNames, updateSchoolNames } from "@/lib/school-management";
 import { pickupMapUrl } from "@/lib/map-url";
 
@@ -155,6 +157,7 @@ export async function createProgram(_: FormState, formData: FormData): Promise<F
 }
 
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
+  const success = { zh: "学生已添加。", en: "Student added." };
   const user = await requireUser(["ADMIN"]);
   const photo = optional(formData, "photoUrl");
   if (!photoPath.test(photo)) return {ok:false,message:"请选择并上传学生照片。 / Please upload a student photo."};
@@ -194,8 +197,11 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
       ]);
       await attachPhoto(client,photo,student.rows[0].id,user.id);
       await client.query("insert into term_students(operating_term_id,student_id,reviewed) values($1,$2,true)",[operation.id,student.rows[0].id]);
+      const assignment = await assignNewStudentRoute(client, student.rows[0].id, optional(formData, "routeAssignment"), todayInOperationsTimeZone());
+      success.zh = assignment.zh;
+      success.en = assignment.en;
     });
-  }, ["/", "/students", "/schedule"], { zh: "学生已添加。", en: "Student added." });
+  }, ["/", "/students", "/schedule", "/driver", "/parent"], success);
 }
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails) {

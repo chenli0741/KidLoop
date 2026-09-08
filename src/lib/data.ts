@@ -1,3 +1,4 @@
+import { todayInOperationsTimeZone } from "./date";
 import { ensureRouteTasks } from "./ensure-route-tasks";
 import type { RouteStop } from "./fixed-route-types";
 import "server-only";
@@ -73,12 +74,15 @@ export async function getPrograms() {
 export async function getStudents() {
   await requireUser(["ADMIN"]);
   const result = await query<{
-    id: string; name: string; photo_url: string; grade: string; age: number | null;
+    id: string; name: string; photo_url: string; grade: string; age: number | null; route_assigned: boolean;
     no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
     backup_phone: string; email: string; notes: string; updated_at: string;
   }>(`
-    select st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
+    select exists(select 1 from fixed_route_students frs join fixed_routes fr on fr.id=frs.route_id
+             where frs.student_id=st.id and fr.operating_term_id=current_operating_term() and fr.enabled
+               and fr.route_type='RECURRING' and fr.ends_on >= $1::date) as route_assigned,
+           st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
            st.classroom_name, st.classroom_id,
            sc.id as school_id, coalesce(sc.short_name,sc.name) as school_name,
            p.id as program_id, p.name as program_name,
@@ -92,7 +96,7 @@ export async function getStudents() {
     left join parents pa on pa.id = st.parent_id
     where st.active = true and exists(select 1 from term_students ts where ts.student_id=st.id and ts.operating_term_id=current_operating_term())
     order by sc.name, st.classroom_name, st.name
-  `);
+  `, [todayInOperationsTimeZone()]);
   return result.rows.map((row): Student => ({
     id: row.id,
     name: row.name,
@@ -101,6 +105,7 @@ export async function getStudents() {
     age: row.age,
     classroomName: row.classroom_name,
     noPickupWeekdays: row.no_pickup_weekdays,
+    routeAssigned: row.route_assigned,
     schoolId: row.school_id,
     schoolName: row.school_name,
     programId: row.program_id,

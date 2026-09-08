@@ -76,3 +76,7 @@ Organization membership, teachers, push notification devices, offline queues and
 Migration `003_accounts_and_parent_requests.sql` adds `app_users` (ADMIN/DRIVER/PARENT), `user_students` (explicit parent-child links), `user_sessions` (hashed session tokens), `login_limits`, `student_day_plans` and append-only `student_day_plan_history`. `status_history.actor_id` records the authenticated operator; `trip_students.parent_absence` distinguishes parent absences from driver-recorded absences. One daily plan exists per child/date and can exist without a trip. Students, trips and assignments are locked in that order when applying a parent absence or updating a ride status, preventing a concurrent pickup from being overwritten.
 
 See [confirmed requirements](confirmed-requirements.md) for product boundaries and [project overview](../PROJECT_OVERVIEW.md) for migration and verification commands.
+
+## Student creation and route assignment
+
+New student creation optionally writes `fixed_route_students` in the same transaction after matching enabled, unexpired recurring routes by school and later program stop. A unique stop pair is automatic; multiple pairs require a choice or remain pending. A savepoint preserves the new student when expected route validation fails. Pending is derived from the absence of an enabled, unexpired current-term recurring route membership, not stored as a second roster state. Successful assignment uses the existing route validation and daily task synchronization, preserving started trips.
