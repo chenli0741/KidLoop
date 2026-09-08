@@ -6,16 +6,16 @@ import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 import { addressMapUrl, pickupMapUrl } from "@/lib/map-url";
 
-type Props = { name: string; address?: string; url?: string | null };
+type Props = { name: string; address?: string; url?: string | null; compact?: boolean };
 
-export function LocationMap({ name, address, url }: Props) {
+export function LocationMap({ name, address, url, compact = false }: Props) {
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const source = address?.trim() ? addressMapUrl(address) : pickupMapUrl(url);
   const label = address ? text(locale, "地址地图", "Address map") : text(locale, "接送示意图", "Pickup diagram");
   if (!source) return <small className="map-pending">{text(locale, "接送示意图待补充", "Pickup diagram pending")}</small>;
   return <>
-    <button type="button" className="map-link" onClick={() => setOpen(true)}>{address ? <MapPin size={14} /> : <Map size={14} />}{label}</button>
+    <button type="button" className={compact ? "icon-button segment-map" : "map-link"} aria-label={compact ? `${name} · ${label}` : undefined} title={compact ? `${name} · ${label}` : undefined} onClick={() => setOpen(true)}>{address ? <MapPin size={compact ? 17 : 14} /> : <Map size={compact ? 17 : 14} />}{!compact && label}</button>
     {open && <MapDialog title={`${name} · ${label}`} source={source} address={address} close={() => setOpen(false)} />}
   </>;
 }

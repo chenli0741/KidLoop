@@ -6,12 +6,13 @@ import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { text, type Locale } from "@/lib/i18n";
-import { nearestTripSegment, tripSegments } from "@/lib/trip-segments";
+import { tripSegments } from "@/lib/trip-segments";
 import { TripSegmentPicker } from "@/components/trip-segment-picker";
 
 export function TripCard({ trip, locale, interactive = true }: { trip: Trip; locale: Locale; interactive?: boolean }) {
   const completed = trip.riders.filter((rider) => rider.status === "DROPPED_OFF" || rider.status === "ABSENT").length;
   const segments = tripSegments(trip);
+  const paired = segments.every(s=>s.routeStops?.length===2 && s.riders.length>0 && s.riders.every(r=>r.pickupStopId===s.routeStops![0].id && r.dropoffStopId===s.routeStops![1].id));
 
   return (
     <article className="trip-card">
@@ -33,20 +34,22 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      <TripSegmentPicker label={text(locale,"线路","Route")} defaultIndex={nearestTripSegment(segments)} options={segments.map((segment,i)=>({id:`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`,label:`${formatTime(segment.departureTime,locale)} · ${segment.routeName ?? `${segment.schoolName} → ${segment.programName}`}`}))}>
+      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
+        const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
+        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,remaining:segment.riders.filter(r=>!['DROPPED_OFF','ABSENT'].includes(r.status)).length};
+      })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
-        {segments.length>1 && <h4 className="trip-segment-title">{segment.routeName}</h4>}
-        <TripSegmentContent trip={segment} locale={locale} interactive={interactive}/>
+        <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false}/>
       </section>)}
-      </TripSegmentPicker>
+      </TripSegmentPicker> : <TripSegmentContent trip={trip} locale={locale} interactive={interactive}/>}
     </article>
   );
 }
 
-function TripSegmentContent({trip,locale,interactive}:{trip:Trip;locale:Locale;interactive:boolean}) {
+function TripSegmentContent({trip,locale,interactive,showStops=true}:{trip:Trip;locale:Locale;interactive:boolean;showStops?:boolean}) {
   return <>
 
-      {trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
+      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
           <span className="route-dot pickup" />
           <div>
@@ -76,7 +79,7 @@ function TripSegmentContent({trip,locale,interactive}:{trip:Trip;locale:Locale;i
             </details>}
           </div>
         </div>
-      </div>}
+      </div>)}
 
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>

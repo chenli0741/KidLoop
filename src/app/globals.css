@@ -53,6 +53,21 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .trip-segment-title { margin: 0; padding: 20px 24px 12px; font-size: 17px; overflow-wrap: anywhere; }
 .trip-segment-picker { display: grid; gap: 8px; margin: 16px 20px; min-width: 0; }
 .trip-segment-picker select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; font-size: 16px; text-overflow: ellipsis; }
+.segment-route-list { list-style: none; padding: 0; margin: 0; }
+.segment-route-item { display: grid; grid-template-columns: 28px minmax(0,1fr); column-gap: 8px; padding: 14px 16px 8px; background: #f5f8f6; border-bottom: 1px solid #d8e4dc; }
+.segment-route-item.is-selected { background: #d8eae0; box-shadow: inset 3px 0 #237256; }
+.segment-route-marker { display: flex; align-items: flex-start; gap: 2px; color: #24684f; padding-top: 4px; }
+.segment-current { height: 18px; width: 18px; display: grid; place-items: center; }
+.segment-route-select { border: 0; background: transparent; color: inherit; padding: 0; display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); gap: 10px; text-align: left; align-items: start; min-width: 0; cursor: pointer; }
+.segment-route-select > svg { margin-top: 22px; }
+.segment-endpoint { display: grid; gap: 3px; min-width: 0; }
+.segment-endpoint time { font-size: 13px; color: #24684f; }
+.segment-endpoint strong { font-size: 16px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.segment-route-maps { grid-column: 2; display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); gap: 10px; }
+.segment-route-maps .segment-map { width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; justify-self: start; }
+.segment-done { grid-column: 2; color: #24684f; }
+.segment-finish { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px; border-top: 1px solid #e0e8e3; }
+.segment-finish > span { display: flex; align-items: center; gap: 8px; }
 .brand-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand-mark { flex-shrink: 0; }
 .brand strong { font-size: 17px; }

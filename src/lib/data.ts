@@ -168,13 +168,14 @@ export async function getTrips(date: string) {
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
-      route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
+      completed_segments: string[]; route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
       driver_name: string; driver_phone: string; vehicle_name: string; vehicle_plate: string; capacity: number;
       school_name: string; school_address: string; pickup_map_url: string | null;
       pickup_instructions: string; dismissal_time: string | null; program_name: string;
       program_address: string; dropoff_info: string; program_requirements: string;
     }>(`
-      select t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
+      select array(select pickup_stop_id::text||':'||dropoff_stop_id::text from trip_segment_completions where trip_id=t.id) as completed_segments,
+             t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
              d.name as driver_name, d.phone as driver_phone,
              v.name as vehicle_name, v.plate as vehicle_plate, v.capacity,
              sc.name as school_name, sc.address as school_address,
@@ -236,7 +237,7 @@ export async function getTrips(date: string) {
 
   return tripResult.rows.map((row): Trip => ({
     id: row.id,
-    routeName: row.route_name, routeStops:row.route_stops,
+    routeName: row.route_name, routeStops:row.route_stops, completedSegments:row.completed_segments,
     scheduledDate: row.scheduled_date,
     departureTime: row.departure_time,
     status: row.status,

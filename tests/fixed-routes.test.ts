@@ -4,6 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import pg from 'pg';
 import {saveFixedRoute,readFixedRoutes,materializeRoutes} from '../src/lib/fixed-routes';
+import {finishTripSegment} from '../src/lib/finish-trip-segment';
+import type {AuthUser} from '../src/lib/types';
 
 test('fixed multi-school route creates tasks once, skips holidays, changes driver and preserves started trips',async()=>{
  const url=process.env.KIDLOOP_TEST_DATABASE_URL; assert.ok(url&&['localhost','127.0.0.1'].includes(new URL(url).hostname));
@@ -57,5 +59,20 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));
   assert.equal((await c.query("select driver_id from driver_shifts sh join trips t on t.shift_id=sh.id where scheduled_date='2026-09-07'")).rows[0].driver_id,backup);
   await tx(()=>materializeRoutes(c,'2026-10-01','2026-09-07'));assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-10-01'")).rows[0].n,0);
+  const adminId=await id("insert into app_users(name,email,role,password_hash) values('QA','segment@example.test','ADMIN','no-login')");
+  const actor={id:adminId,role:'ADMIN',driverId:null} as AuthUser;
+  const tripId=(await c.query("select id from trips where scheduled_date='2026-09-10'")).rows[0].id;
+  const finish=(index:number,user=actor)=>tx(()=>finishTripSegment(c,user,tripId,stops[index].id,stops[2].id));
+  await assert.rejects(finish(0,{...actor,role:'PARENT'}),/Unavailable/);
+  await assert.rejects(finish(0,{...actor,role:'DRIVER',driverId:backup}),/Unavailable/);
+  await assert.rejects(finish(0),/Riders are not finished/);
+  await assert.rejects(finish(1),/current route/);
+  await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1",[tripId]);
+  await finish(0);await finish(0);
+  assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,1);
+  await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-07'));
+  assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT'",[tripId])).rows[0].n,2);
+  await finish(1);
+  assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,2);
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });

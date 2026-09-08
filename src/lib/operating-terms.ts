@@ -224,6 +224,9 @@ export async function archiveOperatingTerm(
       [id],
     )
   ).rows;
+  snapshot.segment_completions = (await c.query(
+    'select s.* from trip_segment_completions s join trips t on t.id=s.trip_id where t.operating_term_id=$1',[id]
+  )).rows;
   snapshot.day_plans = (
     await c.query(
       "select dp.* from student_day_plan_history dp where service_date between $1 and $2 and student_id in (select student_id from term_students where operating_term_id=$3)",

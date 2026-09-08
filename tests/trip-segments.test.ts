@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {nearestTripSegment,tripSegments} from "../src/lib/trip-segments";
+import {tripSegments} from "../src/lib/trip-segments";
 import type {Trip} from "../src/lib/types";
 
 test("pairs pickup and dropoff stops and keeps assignment IDs and route order",()=>{
@@ -19,12 +19,4 @@ test("pairs pickup and dropoff stops and keeps assignment IDs and route order",(
   assert.equal(trip.riders.length,2);
   assert.deepEqual(tripSegments({...trip,riders:[{...trip.riders[0],pickupStopId:null}]}).length,1);
   assert.equal(tripSegments({...trip,routeStops:null})[0].id,"trip");
-});
-
-test("defaults to the nearest pickup in Los Angeles time across service dates",()=>{
-  const segments=[{scheduledDate:"2026-09-08",departureTime:"14:00"},{scheduledDate:"2026-09-08",departureTime:"14:55"}] as Trip[];
-  assert.equal(nearestTripSegment(segments,new Date("2026-09-08T20:00:00Z")),0);
-  assert.equal(nearestTripSegment(segments,new Date("2026-09-08T21:40:00Z")),1);
-  assert.equal(nearestTripSegment(segments,new Date("2026-09-08T05:00:00Z")),0);
-  assert.equal(nearestTripSegment(segments,new Date("2026-09-09T05:00:00Z")),1);
 });

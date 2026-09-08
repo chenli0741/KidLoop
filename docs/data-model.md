@@ -26,6 +26,7 @@
 | `driver_shifts` | Dated assignment of one driver to one vehicle for a time window. |
 | `trips` | A dated execution snapshot of a fixed multi-stop route; legacy school-to-program trips are retained. |
 | `trip_students` | Students assigned to a trip and each student's current ride status. |
+| `trip_segment_completions` | Explicit per-trip pickup/dropoff segment completion, timestamp and actor; independent of which segment is being viewed. |
 | `status_history` | Append-only history of each student ride status transition. |
 | `kidloop_migrations` | Applied SQL migration records. |
 

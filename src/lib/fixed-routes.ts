@@ -83,6 +83,7 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string) {
   await c.query("delete from route_task_issues where route_id=$1 and service_date=$2",[r.id,date]);
   const issue=async(message:string)=>{await c.query("insert into route_task_issues values($1,$2,$3) on conflict(route_id,service_date) do update set message=$3",[r.id,date,message]);};
   const existing=(await c.query("select id,shift_id,status from trips where fixed_route_id=$1 and scheduled_date=$2 for update",[r.id,date])).rows[0];
+  if(existing && (await c.query("select 1 from trip_segment_completions where trip_id=$1",[existing.id])).rowCount) continue;
   // Preserve the actual journey once a driver has acted, including driver-marked absence.
   if(existing&&(await c.query("select 1 from trip_students where trip_id=$1 and (picked_up_at is not null or status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (status='ABSENT' and not parent_absence))",[existing.id])).rowCount) continue;
   const eligible:RouteStudent[]=[];

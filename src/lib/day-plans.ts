@@ -40,8 +40,9 @@ export async function saveDayPlan(client: PoolClient, user: AuthUser, input: {
       and exists (select 1 from trip_students ts where ts.trip_id = t.id and ts.student_id = $1)
     order by t.id for update
   `, [input.studentId, input.date]);
-  const assignments = await client.query<{ id: string; trip_id: string; status: string; picked_up_at: Date | null; parent_absence: boolean }>(`
-    select id, trip_id, status, picked_up_at, parent_absence from trip_students
+  const assignments = await client.query<{ finished: boolean; id: string; trip_id: string; status: string; picked_up_at: Date | null; parent_absence: boolean }>(`
+    select id, trip_id, status, picked_up_at, parent_absence,
+      exists(select 1 from trip_segment_completions f where f.trip_id=trip_students.trip_id and f.pickup_stop_id=trip_students.pickup_stop_id and f.dropoff_stop_id=trip_students.dropoff_stop_id) as finished from trip_students
     where student_id = $1 and trip_id = any($2::uuid[]) order by id for update
   `, [input.studentId, trips.rows.map((t) => t.id)]);
   if (input.absent && assignments.rows.some((r) => r.picked_up_at || ["PICKED_UP", "DROPPED_OFF"].includes(r.status))) {
@@ -55,6 +56,7 @@ export async function saveDayPlan(client: PoolClient, user: AuthUser, input: {
   `, [input.studentId, input.date, input.absent, input.note, user.id]);
   await client.query("insert into student_day_plan_history (student_id, service_date, absent, note, actor_id) values ($1, $2::date, $3, $4, $5)", [input.studentId, input.date, input.absent, input.note, user.id]);
   for (const rider of assignments.rows) {
+    if (rider.finished) continue;
     // A parent's cancellation must never reverse an absence recorded by a driver.
     const next = input.absent && ["SCHEDULED", "EXCEPTION"].includes(rider.status) ? "ABSENT"
       : !input.absent && rider.parent_absence && rider.status === "ABSENT" ? "SCHEDULED" : null;
