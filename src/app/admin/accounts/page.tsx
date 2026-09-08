@@ -17,7 +17,7 @@ export default async function AccountsPage() {
   const locale = await getLocale();
   const [accounts, drivers, students] = await Promise.all([
     query<{ id: string; name: string; email: string; phone:string; updatedAt:string; driver_id:string|null; role: UserRole; active: boolean; driver_name: string | null; student_ids: string[] }>(`
-      select u.id, u.name, u.email, u.phone, u.updated_at::text as "updatedAt", u.driver_id, u.role, u.active, d.name as driver_name,
+      select u.id, case when u.role='DRIVER' then d.name else u.name end as name, u.email, case when u.role='DRIVER' then d.phone else u.phone end as phone, u.updated_at::text as "updatedAt", u.driver_id, u.role, u.active, d.name as driver_name,
         coalesce((select array_agg(student_id::text) from user_students where user_id = u.id), '{}') as student_ids
       from app_users u left join drivers d on d.id = u.driver_id order by u.created_at
     `), getDrivers(), query<{id:string;name:string;schoolName:string}>(`select st.id,st.name,sc.name as "schoolName" from students st join classrooms c on c.id=st.classroom_id join schools sc on sc.id=c.school_id where st.active or exists(select 1 from user_students us where us.student_id=st.id) order by st.name`).then(result=>result.rows),

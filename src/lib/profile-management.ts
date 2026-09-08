@@ -21,7 +21,7 @@ export async function saveOwnProfile(client: PoolClient, userId: string, form: F
   if (!current.fresh) throw new ProfileError("stale");
   const emailChanged = email !== current.email;
   if (emailChanged && !await verifyPassword(String(form.get("currentPassword") ?? ""), current.password_hash)) throw new ProfileError("password");
-  await client.query("update app_users set name=$2,email=$3,phone=$4,updated_at=clock_timestamp() where id=$1", [userId, name, email, phone]);
+  await client.query("update app_users set name=$2,email=$3,phone=$4,updated_at=clock_timestamp() where id=$1", [userId, current.role === "DRIVER" ? null : name, email, current.role === "DRIVER" ? null : phone]);
   if (current.role === "DRIVER" && current.driver_id) {
     await client.query("update drivers set name=$2,phone=$3,updated_at=clock_timestamp() where id=$1", [current.driver_id, name, phone]);
   }

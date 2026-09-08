@@ -60,6 +60,12 @@ test("self-service profiles enforce ownership, preserve associations and revoke 
     const driverUser = await id("insert into app_users(name,email,role,password_hash,driver_id) values('Driver','driver@test.local','DRIVER','unused',$1)", [driver]);
     await tx(async () => saveOwnProfile(client, driverUser, form({ name: "Driver updated", email: "driver@test.local", phone: "98765", updatedAt: await version(driverUser) })));
     assert.deepEqual((await client.query("select name,phone from drivers where id=$1", [driver])).rows[0], { name: "Driver updated", phone: "98765" });
+    assert.deepEqual((await client.query("select name,phone from app_users where id=$1", [driverUser])).rows[0], { name: null, phone: null });
+    const beforeDriverEdit = await version(driverUser);
+    await client.query("update drivers set name='Driver renamed',phone='456' where id=$1", [driver]);
+    assert.notEqual(await version(driverUser), beforeDriverEdit);
+    await assert.rejects(tx(() => saveOwnProfile(client, driverUser, form({ name: "Stale driver", email: "driver@test.local", phone: "98765", updatedAt: beforeDriverEdit }))), /stale/);
+    assert.deepEqual((await client.query("select name,phone from app_users where id=$1", [driverUser])).rows[0], { name: null, phone: null });
   } finally {
     await client.query("rollback"); await client.query("set search_path to public"); await client.query(`drop schema ${schema} cascade`); client.release(); await pool.end();
   }

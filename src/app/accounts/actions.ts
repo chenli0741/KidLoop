@@ -17,12 +17,12 @@ export async function createAccount(_: FormState, form: FormData): Promise<FormS
     const role = String(form.get("role") ?? "");
     const driverId = String(form.get("driverId") ?? "") || null;
     const studentIds = [...new Set(form.getAll("studentIds").map(String))];
-    if (!name || name.length > 100 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["ADMIN", "DRIVER", "PARENT"].includes(role)) throw new Error("INVALID");
+    if ((role !== "DRIVER" && !name) || name.length > 100 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["ADMIN", "DRIVER", "PARENT"].includes(role)) throw new Error("INVALID");
     if (role === "DRIVER" && !driverId) throw new Error("INVALID");
     if (role === "PARENT" && studentIds.length === 0) throw new Error("INVALID");
     const passwordHash = await hashPassword(String(form.get("password") ?? ""));
     await transaction(async (client) => {
-      const result = await client.query<{ id: string }>("insert into app_users (name, email, role, password_hash, driver_id) values ($1, $2, $3, $4, $5) returning id", [name, email, role, passwordHash, role === "DRIVER" ? driverId : null]);
+      const result = await client.query<{ id: string }>("insert into app_users (name, email, role, password_hash, driver_id) values ($1, $2, $3, $4, $5) returning id", [role === "DRIVER" ? null : name, email, role, passwordHash, role === "DRIVER" ? driverId : null]);
       if (role === "PARENT") {
         for (const id of studentIds) await client.query("insert into user_students (user_id, student_id) values ($1, $2::uuid)", [result.rows[0].id, id]);
       }

@@ -59,7 +59,7 @@ export async function getParentRequests(date: string) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
   const result = await query<DayPlan & { studentName: string; parentName: string }>(`
     select dp.student_id as "studentId", dp.service_date::text as "serviceDate", dp.absent, dp.note,
-      dp.updated_at::text as "updatedAt", st.name as "studentName", u.name as "parentName"
+      dp.updated_at::text as "updatedAt", st.name as "studentName", case when u.role='DRIVER' then (select d.name from drivers d where d.id=u.driver_id) else u.name end as "parentName"
     from student_day_plans dp join students st on st.id = dp.student_id join app_users u on u.id = dp.updated_by
     where dp.service_date = $1::date and exists(select 1 from operating_terms o where o.id=current_operating_term() and dp.service_date between o.starts_on and o.ends_on) and (dp.absent or dp.note <> '')
       and ($2::uuid is null or exists (

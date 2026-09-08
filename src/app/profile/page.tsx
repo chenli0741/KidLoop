@@ -9,7 +9,7 @@ import { updatePassword, updateProfile } from "./actions";
 
 export default async function ProfilePage() {
   const user = await requireUser(); const locale = await getLocale();
-  const { rows: [profile] } = await query<{ name: string; email: string; phone: string; updated_at: string }>("select u.name,u.email,coalesce(nullif(u.phone,''),d.phone,'') as phone,u.updated_at::text from app_users u left join drivers d on d.id=u.driver_id where u.id=$1", [user.id]);
+  const { rows: [profile] } = await query<{ name: string; email: string; phone: string; updated_at: string }>("select case when u.role='DRIVER' then d.name else u.name end as name,u.email,case when u.role='DRIVER' then d.phone else u.phone end as phone,u.updated_at::text from app_users u left join drivers d on d.id=u.driver_id where u.id=$1", [user.id]);
   return <div className="page-container"><PageHeader eyebrow={text(locale, "我的账号", "My account")} title={text(locale, "个人资料", "Personal information")} description={text(locale, "管理你的联系信息、登录邮箱和密码。", "Manage your contact information, login email, and password.")} />
     <div className="profile-grid"><section className="profile-panel"><h2>{text(locale, "账号信息", "Account information")}</h2><p className="form-hint">{text(locale, "更改登录邮箱时，需要验证当前密码。", "Your current password is required when changing your login email.")}</p>
       <SettingsForm action={updateProfile} submitLabel={text(locale, "保存个人资料", "Save profile")}>

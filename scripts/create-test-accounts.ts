@@ -21,7 +21,7 @@ async function main() {
     if (!children.length) throw new Error("No historical-test-data children assigned to the test driver.");
     const accounts = [
       { role: "ADMIN", name: "Test Admin", email: "admin@test.kidloop.local", password: randomBytes(15).toString("base64url") },
-      { role: "DRIVER", name: "Test Driver", email: "driver@test.kidloop.local", password: randomBytes(15).toString("base64url") },
+      { role: "DRIVER", name: driver.name, email: "driver@test.kidloop.local", password: randomBytes(15).toString("base64url") },
       { role: "PARENT", name: "Test Parent", email: "parent@test.kidloop.local", password: randomBytes(15).toString("base64url") },
     ];
     for (const account of accounts) {

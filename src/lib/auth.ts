@@ -12,8 +12,8 @@ export const getUser = cache(async (): Promise<AuthUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
   const result = await query<AuthUser>(`
-    select u.id, u.email, u.name, u.role, u.driver_id as "driverId"
-    from user_sessions s join app_users u on u.id = s.user_id
+    select u.id, u.email, case when u.role='DRIVER' then d.name else u.name end as name, u.role, u.driver_id as "driverId"
+    from user_sessions s join app_users u on u.id = s.user_id left join drivers d on d.id=u.driver_id
     where s.token_hash = $1 and s.expires_at > now() and u.active = true
   `, [tokenHash(token)]);
   return result.rows[0] ?? null;
