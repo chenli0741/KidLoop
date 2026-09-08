@@ -35,6 +35,11 @@ export function StatusActions({ assignmentId, status }: { assignmentId: string; 
             <UserCheck size={16} /> {text(locale, "已接到", "Picked up")}
           </button>
         ) : null}
+        {status === "PICKED_UP" ? (
+          <button type="button" className="icon-button" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} aria-label={text(locale, "撤销接到", "Undo pickup")} disabled={pending} onClick={() => update("SCHEDULED")}>
+            <RotateCcw size={17} />
+          </button>
+        ) : null}
         {status === "DROPPED_OFF" ? (
           <button type="button" className="icon-button" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} aria-label={text(locale, "撤销送达", "Undo drop-off")} disabled={pending} onClick={() => update("PICKED_UP")}>
             <RotateCcw size={17} />

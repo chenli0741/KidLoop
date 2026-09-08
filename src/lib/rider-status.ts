@@ -26,14 +26,14 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   if (["DRAFT", "CANCELED"].includes(trip.rows[0].status) || (trip.rows[0].status === "COMPLETED" && !undo)) throw new Error("Trip is not active.");
   const allowed: Record<RiderStatus, RiderStatus[]> = {
     SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
-    PICKED_UP: ["ABSENT", "EXCEPTION"],
+    PICKED_UP: ["SCHEDULED", "ABSENT", "EXCEPTION"],
     DROPPED_OFF: ["PICKED_UP"], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
   if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
   await client.query(`
     update trip_students set status = $2,
-      picked_up_at = case when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
-      dropped_off_at = case when $3 then null else dropped_off_at end,
+      picked_up_at = case when $2 = 'SCHEDULED' then null when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
+      dropped_off_at = case when $3 or $2 = 'SCHEDULED' then null else dropped_off_at end,
       updated_at = now() where id = $1
   `, [assignmentId, nextStatus, undo]);
   if (undo) {

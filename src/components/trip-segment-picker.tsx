@@ -8,7 +8,7 @@ import {finishSegment} from "@/app/driver/actions";
 import {text,type Locale} from "@/lib/i18n";
 import type {RouteStop} from "@/lib/fixed-route-types";
 
-type Option={id:string;stops:RouteStop[];done:boolean;remaining:number};
+type Option={id:string;stops:RouteStop[];done:boolean;pendingPickups:number};
 export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
   options:Option[];tripId:string;locale:Locale;interactive:boolean;children:ReactNode[];
 }) {
@@ -21,7 +21,9 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
   const selectedIndex=options.findIndex(option=>option.id===selected);
   const index=selectedIndex>=0?selectedIndex:current>=0?current:options.length-1;
   const option=options[index];
+  const cannotFinish=pending||index!==current||option.done||option.pendingPickups>0;
   function finish(){
+    if(cannotFinish)return;
     setError('');
     startTransition(async()=>{
       try{
@@ -50,8 +52,8 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
     <div id={`${id}-content`} key={option.id}>{children[index]}</div>
     {interactive && <div className="segment-finish">
       {option.done?<span><Check size={17}/>{text(locale,'本线路已完成','Route finished')}</span>:<>
-        <button type="button" className="button primary" disabled={pending||index!==current} onClick={()=>confirmation.current?.showModal()}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Finish route')}</button>
-        {option.remaining>0 && <small>{text(locale,`${option.remaining} 名学生尚未完成`,`${option.remaining} riders unfinished`)}</small>}
+        <button type="button" className="button primary" disabled={cannotFinish} onClick={()=>confirmation.current?.showModal()}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Finish route')}</button>
+        {option.pendingPickups>0 && <small>{text(locale,`${option.pendingPickups} 名学生接人状态待处理`,`${option.pendingPickups} pickups unresolved`)}</small>}
       </>}
       {error&&<p role="alert" className="form-message error">{error}</p>}
     </div>}
@@ -62,7 +64,7 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children}:{
       {error&&<p role="alert" className="form-message error">{error}</p>}
       <div className="segment-finish">
         <button type="button" className="button secondary" disabled={pending} onClick={()=>confirmation.current?.close()}>{text(locale,'取消','Cancel')}</button>
-        <button type="button" className="button primary confirm-dropoff" disabled={pending} onClick={finish}><Check size={17}/>{text(locale,'确认全部送达','Confirm all dropped off')}</button>
+        <button type="button" className="button primary confirm-dropoff" disabled={cannotFinish} onClick={finish}><Check size={17}/>{text(locale,'确认全部送达','Confirm all dropped off')}</button>
       </div>
     </dialog>
   </>;

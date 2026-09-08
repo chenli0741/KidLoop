@@ -68,6 +68,11 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await assert.rejects(finish(0,{...actor,role:'DRIVER',driverId:backup}),/Unavailable/);
   await assert.rejects(finish(1),/current route/);
   await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[1].id]);
+  await assert.rejects(finish(0),/Resolve all pickups/);
+  assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,0);
+  await c.query("update trip_students set status='EXCEPTION' where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[0].id]);
+  await assert.rejects(finish(0),/Resolve all pickups/);
+  await c.query("update trip_students set status='PICKED_UP' where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[0].id]);
   await finish(0);await finish(0);
   const delivered=(await c.query('select id,status,picked_up_at,dropped_off_at from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
   assert.equal(delivered.status,'DROPPED_OFF');assert.ok(delivered.dropped_off_at);assert.equal(delivered.picked_up_at,null);
@@ -95,5 +100,16 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await finish(0);await undo();
   restored=(await c.query('select picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
   assert.equal(restored.picked_up_at.toISOString(),'2026-09-10T13:00:00.000Z');assert.equal(restored.dropped_off_at,null);
+  const undoPickup=(user=actor)=>tx(()=>changeRiderStatus(c,user,delivered.id,'SCHEDULED'));
+  await assert.rejects(undoPickup({...actor,role:'DRIVER',driverId:backup}),/unavailable/);
+  await undoPickup();
+  restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
+  assert.equal(restored.status,'SCHEDULED');assert.equal(restored.picked_up_at,null);assert.equal(restored.dropped_off_at,null);
+  assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'PUBLISHED');
+  assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='PICKED_UP' and to_status='SCHEDULED'",[delivered.id])).rows[0].n,1);
+  await assert.rejects(undoPickup(),/not allowed/);
+  await assert.rejects(finish(0),/Resolve all pickups/);
+  await tx(()=>changeRiderStatus(c,actor,delivered.id,'PICKED_UP'));
+  assert.ok((await c.query('select picked_up_at from trip_students where id=$1',[delivered.id])).rows[0].picked_up_at);
  } finally {await c.query(`drop schema if exists ${schema} cascade`);c.release();await pool.end();}
 });

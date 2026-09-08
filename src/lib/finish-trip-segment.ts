@@ -23,6 +23,7 @@ export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string
   const current=groups.find(g=>!done.has(`${g.routeStops?.[0]?.id}:${g.routeStops?.at(-1)?.id}`));
   if(!current || current.routeStops?.length!==2 || current.routeStops[0].id!==pickupId || current.routeStops[1].id!==dropoffId || current.riders.some(r=>r.pickupStopId!==pickupId||r.dropoffStopId!==dropoffId)) throw new Error('Finish the current route first');
   if(!current.riders.length) throw new Error('No riders');
+  if(current.riders.some(r=>!['PICKED_UP','DROPPED_OFF','ABSENT'].includes(r.status))) throw new Error('Resolve all pickups before finishing');
   for(const rider of current.riders) {
     if(['DROPPED_OFF','ABSENT'].includes(rider.status)) continue;
     await c.query("update trip_students set status='DROPPED_OFF',dropped_off_at=clock_timestamp(),updated_at=clock_timestamp() where id=$1",[rider.id]);

@@ -36,7 +36,7 @@ export function TripCard({ trip, locale, interactive = true }: { trip: Trip; loc
 
       {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
-        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,remaining:segment.riders.filter(r=>!['DROPPED_OFF','ABSENT'].includes(r.status)).length};
+        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!['PICKED_UP','DROPPED_OFF','ABSENT'].includes(r.status)).length};
       })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
         <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false}/>
