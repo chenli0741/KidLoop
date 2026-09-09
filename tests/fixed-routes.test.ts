@@ -36,7 +36,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   const make=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({name:'Route',startsOn:'2026-09-01',endsOn:'2026-09-30',driverId:driver,vehicleId:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify(ids.map((studentId,i)=>({studentId,pickupStopId:stops[i].id,dropoffStopId:stops[2].id}))),...extra}))f.set(k,v);for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;};
   await assert.rejects(tx(()=>saveFixedRoute(c,make({routeType:'INVALID'}))),/Invalid route type/);
   await tx(()=>saveFixedRoute(c,make({routeType:'TEMPORARY'})));
-  let route=(await readFixedRoutes(c))[0];assert.equal(route.name,'A → B → P');assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
+  let route=(await readFixedRoutes(c))[0];assert.equal(route.name,'Route');assert.equal(route.stops.length,3);assert.equal(route.stops[0].name,'A');
   assert.equal(route.routeType,'TEMPORARY');
   assert.equal(visibleRoutes([route],'2026-08-31').length,1);
   assert.equal(visibleRoutes([route],'2026-09-30').length,1);
@@ -81,7 +81,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await tx(()=>materializeRoutes(c,'2026-10-01','2026-09-07'));assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-10-01'")).rows[0].n,0);
   const adminId=await id("insert into app_users(name,email,role,password_hash) values('QA','segment@example.test','ADMIN','no-login')");
   const actor={id:adminId,role:'ADMIN',driverId:null} as AuthUser;
-  const tripId=(await c.query("select id from trips where scheduled_date='2026-09-10'")).rows[0].id;
+  let tripId=(await c.query("select id from trips where scheduled_date='2026-09-10'")).rows[0].id;
   const finish=(index:number,user=actor)=>tx(()=>finishTripSegment(c,user,tripId,stops[index].id,stops[2].id));
   await assert.rejects(finish(0,{...actor,role:'PARENT'}),/Unavailable/);
   await assert.rejects(finish(0,{...actor,role:'DRIVER',driverId:backup}),/Unavailable/);
@@ -91,12 +91,13 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,0);
   await c.query("update trip_students set status='PICKED_UP' where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[0].id]);
   await finish(0);await finish(0);
-  const delivered=(await c.query('select id,status,picked_up_at,dropped_off_at from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
+  let delivered=(await c.query('select id,status,picked_up_at,dropped_off_at from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
   assert.equal(delivered.status,'DROPPED_OFF');assert.ok(delivered.dropped_off_at);assert.equal(delivered.picked_up_at,null);
   assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and to_status='DROPPED_OFF'",[delivered.id])).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,1);
   await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-07'));
   assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT'",[tripId])).rows[0].n,1);
+  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'PICKED_UP')),/completed|not active/);
   await finish(1);
   assert.equal((await c.query('select count(*)::int n from trip_segment_completions where trip_id=$1',[tripId])).rows[0].n,2);
   const undo=(user=actor)=>tx(()=>changeRiderStatus(c,user,delivered.id,'PICKED_UP'));
@@ -104,28 +105,24 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   await assert.rejects(undo({...actor,role:'DRIVER',driverId:null}),/unavailable/);
   await assert.rejects(undo({...actor,role:'PARENT'}),/unavailable/);
   assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'COMPLETED');
-  await undo();
-  let restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
-  assert.equal(restored.status,'PICKED_UP');assert.equal(restored.picked_up_at,null);assert.equal(restored.dropped_off_at,null);
-  assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'IN_PROGRESS');
-  const snapshot=await readTripExecution(c,tripId);
-  assert.equal(snapshot.tripId,tripId);assert.equal(snapshot.status,'IN_PROGRESS');
-  assert.equal(snapshot.riders.find(r=>r.id===delivered.id)?.status,'PICKED_UP');
-  assert.deepEqual(snapshot.completedSegments,[`${stops[1].id}:${stops[2].id}`]);
-  assert.match(snapshot.version,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$/);
-  assert.deepEqual((await c.query('select pickup_stop_id from trip_segment_completions where trip_id=$1',[tripId])).rows,[{pickup_stop_id:stops[1].id}]);
-  assert.equal((await c.query("select count(*)::int n from trip_students where trip_id=$1 and status='ABSENT' and parent_absence",[tripId])).rows[0].n,1);
-  assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='DROPPED_OFF' and to_status='PICKED_UP'",[delivered.id])).rows[0].n,1);
-  await assert.rejects(undo(),/not allowed/);
-  await assert.rejects(tx(()=>changeRiderStatus(c,actor,delivered.id,'DROPPED_OFF')),/not allowed/);
-  await c.query("update trip_students set picked_up_at='2026-09-10T13:00:00Z' where id=$1",[delivered.id]);
-  await finish(0);await undo();
-  restored=(await c.query('select picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
-  assert.equal(restored.picked_up_at.toISOString(),'2026-09-10T13:00:00.000Z');assert.equal(restored.dropped_off_at,null);
+  const before=await readTripExecution(c,tripId);
+  for(const user of [actor,{...actor,role:'DRIVER',driverId:driver} as AuthUser]) {
+    for(const status of ['PICKED_UP','SCHEDULED','ABSENT','EXCEPTION'] as const) {
+      await assert.rejects(tx(()=>changeRiderStatus(c,user,delivered.id,status)),/not active/);
+    }
+  }
+  assert.deepEqual(await readTripExecution(c,tripId),before);
+  assert.equal(before.status,'COMPLETED');assert.equal(before.completedSegments.length,2);
+  assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='DROPPED_OFF'",[delivered.id])).rows[0].n,0);
+  // Continue pickup/exception regression coverage on a separate unfinished trip.
+  tripId=(await c.query("select id from trips where scheduled_date='2026-09-09'")).rows[0].id;
+  delivered=(await c.query('select id from trip_students where trip_id=$1 and pickup_stop_id=$2',[tripId,stops[0].id])).rows[0];
+  await c.query("update trip_students set status='ABSENT',parent_absence=true where trip_id=$1 and pickup_stop_id=$2",[tripId,stops[1].id]);
+  await tx(()=>changeRiderStatus(c,actor,delivered.id,'PICKED_UP'));
   const undoPickup=(user=actor)=>tx(()=>changeRiderStatus(c,user,delivered.id,'SCHEDULED'));
   await assert.rejects(undoPickup({...actor,role:'DRIVER',driverId:backup}),/unavailable/);
   await undoPickup();
-  restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
+  const restored=(await c.query('select status,picked_up_at,dropped_off_at from trip_students where id=$1',[delivered.id])).rows[0];
   assert.equal(restored.status,'SCHEDULED');assert.equal(restored.picked_up_at,null);assert.equal(restored.dropped_off_at,null);
   assert.equal((await c.query('select status from trips where id=$1',[tripId])).rows[0].status,'PUBLISHED');
   assert.equal((await c.query("select count(*)::int n from status_history where trip_student_id=$1 and from_status='PICKED_UP' and to_status='SCHEDULED'",[delivered.id])).rows[0].n,1);

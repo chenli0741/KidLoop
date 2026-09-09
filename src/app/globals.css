@@ -495,7 +495,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-stop-list { display: grid; gap: 12px; }
 .fixed-stop-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .fixed-stop-heading { display: flex; gap: 6px; align-items: center; }
-.fixed-stop-heading strong { flex: 1; }
+.fixed-stop-heading strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fixed-riders { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .fixed-rider { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .fixed-stop-editor .form-hint { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -571,12 +571,22 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .schedule-navigation-icon { display: inline-flex; align-items: center; justify-content: center; }
 .schedule-spinner { animation: schedule-spin 1s linear infinite; }
 .calendar-dot.is-loading { background: var(--line); }
-.weekday-tabs [data-status="planned"], .schedule-status-legend [data-status="planned"] { background: #d8efe3; color: #195c43; }
-.weekday-tabs [data-status="empty"], .schedule-status-legend [data-status="empty"] { background: #fff; color: #65716b; }
-.weekday-tabs [data-status="loading"] { background: #edf0ee; color: #65716b; }
-.schedule-status-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: -4px 0 18px; }
-.schedule-status-legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
-.schedule-status-legend i { width: 12px; height: 12px; border: 1px solid #c8d1cb; border-radius: 3px; }
+/* Date colors describe time; dots describe whether a trip exists. */
+.weekday-tabs button[data-period="past"], .schedule-period-legend [data-period="past"] { background: #eef0ef; color: #606a65; }
+.weekday-tabs button[data-period="future"], .schedule-period-legend [data-period="future"] { background: #eaf3fb; color: #285c83; }
+.weekday-tabs button[data-period="today"], .schedule-period-legend [data-period="today"] { background: var(--green); color: white; }
+.weekday-tabs button[aria-selected="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+.weekday-tabs button[data-period="today"][aria-selected="true"] { box-shadow: inset 0 0 0 2px white; }
+.weekday-tabs .calendar-dot { border: 1px solid currentColor; }
+.schedule-status-legend, .schedule-period-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: -4px 0 14px; }
+.schedule-status-legend span, .schedule-period-legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.schedule-period-legend i { width: 12px; height: 12px; border: 1px solid #c8d1cb; border-radius: 3px; }
+.schedule-status-legend i { width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
+.schedule-status-legend [data-status="planned"] { background: currentColor; }
+.workweek-day.is-past .workweek-day-header { background: #eef0ef; }
+.workweek-day.is-future .workweek-day-header { background: #eaf3fb; }
+.workweek-day.is-today .workweek-day-header { background: var(--green); color: white; }
+.workweek-day.is-today .workweek-day-header span { color: white; }
 @keyframes schedule-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .schedule-spinner { animation: none; } }
 

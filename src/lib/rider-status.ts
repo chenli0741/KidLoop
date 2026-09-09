@@ -34,7 +34,8 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   const rider = current.rows[0];
   if(!rider || rider.trip_id!==tripId)throw new Error('Assignment changed. Refresh before updating.');
   const undo = rider.status === "DROPPED_OFF" && nextStatus === "PICKED_UP";
-  if (["DRAFT", "CANCELED"].includes(trip.rows[0].status) || (trip.rows[0].status === "COMPLETED" && !undo)) throw new Error("Trip is not active.");
+  if (["DRAFT", "CANCELED", "COMPLETED"].includes(trip.rows[0].status)) throw new Error("Trip is not active.");
+  if ((await client.query("select 1 from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id])).rowCount) throw new Error("Segment already completed.");
   const allowed: Record<RiderStatus, RiderStatus[]> = {
     SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
     PICKED_UP: ["SCHEDULED", "ABSENT"],

@@ -110,6 +110,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
         source,
       ])
     ).rows;
+    const routeMap=new Map<string,string>();
     for (const r of routes) {
       const next = (
         await c.query(
@@ -117,6 +118,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
           [r.name, start, end, r.weekdays, id],
         )
       ).rows[0].id;
+      routeMap.set(r.id,next);
       const stops = (
         await c.query(
           "select * from fixed_route_stops where route_id=$1 order by position",
@@ -154,6 +156,9 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
           map.get(a.dropoff_stop_id),
         ]);
     }
+    for(const group of (await c.query('select * from fixed_route_sharing where operating_term_id=$1',[source])).rows){
+      if(routeMap.has(group.source_route_id)&&routeMap.has(group.partner_route_id))await c.query('insert into fixed_route_sharing(operating_term_id,source_route_id,partner_route_id,school_id) values($1,$2,$3,$4)',[id,routeMap.get(group.source_route_id),routeMap.get(group.partner_route_id),group.school_id]);
+    }
   }
   return t;
 }
@@ -179,6 +184,7 @@ export async function archiveOperatingTerm(
     "school_pickup_rules",
     "school_calendar_exceptions",
     "fixed_routes",
+    "fixed_route_sharing",
     "trips",
   ])
     snapshot[table] = (

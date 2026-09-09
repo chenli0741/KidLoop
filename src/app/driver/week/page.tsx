@@ -12,6 +12,7 @@ import { formatDate, formatTime } from '@/lib/date';
 import { tripSegments } from '@/lib/trip-segments';
 import { PageHeader } from '@/components/page-header';
 import { DriverWeekTabs } from '@/components/driver-week-tabs';
+import { scheduleDatePeriod, schedulePeriodLabels } from '@/lib/schedule-day-status';
 import { StatusBadge } from '@/components/status-badge';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ export default async function DriverWeekPage({ searchParams }: { searchParams: P
     <PageHeader title={text(locale, '我的日程', 'My schedule')}
       description={text(locale, '选择日期，查看当天接送计划。', 'Choose a date to view your plans.')} />
     <Suspense key={`${monthly}-${date}-${params.day}`} fallback={
-      <DriverWeekTabs loading monthly={monthly} month={month} statuses={dates.map(() => 'loading')} dates={dates} locale={locale} initialDate={params.day || today}>
+      <DriverWeekTabs today={today} loading monthly={monthly} month={month} statuses={dates.map(() => 'loading')} dates={dates} locale={locale} initialDate={params.day || today}>
         {dates.map(day => <p key={day} role="status" className="workweek-empty">{text(locale, '正在加载日程…', 'Loading schedule…')}</p>)}
       </DriverWeekTabs>
     }>
@@ -44,13 +45,13 @@ async function ScheduleContent({ params, locale }: { params: ScheduleParams; loc
   const monthly = params.view === 'month';
   const week = await getDriverWeek(params.week, monthly,params.day);
   return (
-    <DriverWeekTabs key={`${monthly}-${week.selectedDate}`} monthly={monthly} month={week.month} statuses={week.days.map(day => day.hasTrips?'planned':'empty')} dates={week.days.map(day => day.date)} locale={locale}
+    <DriverWeekTabs today={week.today} key={`${monthly}-${week.selectedDate}`} monthly={monthly} month={week.month} statuses={week.days.map(day => day.hasTrips?'planned':'empty')} dates={week.days.map(day => day.date)} locale={locale}
       initialDate={week.selectedDate}>
-      {week.days.map(day => <section className={`workweek-day${day.date === week.today ? ' is-today' : ''}`} key={day.date} aria-labelledby={`day-${day.date}`}>
+      {week.days.map(day => <section className={`workweek-day is-${scheduleDatePeriod(day.date,week.today)}`} key={day.date} aria-labelledby={`day-${day.date}`}>
         <header className="workweek-day-header">
           <Link href={`/driver?date=${day.date}&week=${week.days[0].date}&view=${monthly ? 'month' : 'week'}`} id={`day-${day.date}`}>
             <h2>{formatDate(day.date, locale)}</h2>
-            <span>{day.date === week.today ? text(locale, '今天 · ', 'Today · ') : ''}{day.trips.length} {text(locale, '个行程', 'trips')} →</span>
+            <span>{schedulePeriodLabels[scheduleDatePeriod(day.date,week.today)][locale]} · {day.trips.length} {text(locale, '个行程', 'trips')} →</span>
           </Link>
         </header>
         {day.trips.length === 0 ? <p className="workweek-empty">{text(locale, '暂无接送计划', 'No trips planned')}</p> : <div className="workweek-trips">

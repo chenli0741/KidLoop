@@ -192,3 +192,7 @@ CAPACITOR_SERVER_URL=https://your-kidloop-domain.example npm run ios:sync
 - 照片上传已使用私有 Vercel Blob 和授权读取接口，iPhone 通过 Capacitor Camera 选图或拍照；不复用参考项目的公开存储权限。
 
 完整的界面、状态、角色及未实现范围见 [已确认需求](confirmed-requirements.md)。
+
+## 固定线路共享生成
+
+`fixed_route_sharing` 以当前学期的主线路、另一线路和学校定义共享组；主线路是该校候选名单的唯一编辑来源，另一线路的站点映射和名单在事务内同步。`materializeSharedRoutes` 在现有线路咨询锁内同时计划两车、检查资源与合并容量、维护唯一 `trip_students` 记录及两份 `shared_pickup_members` 展示关系。车次的 `shared_route_revision` 用于识别执行后配置变动。普通非共享线路沿用原生成器；共享组无独立定时任务。学期归档及复制保留共享关系，但复制的线路仍保持禁用。

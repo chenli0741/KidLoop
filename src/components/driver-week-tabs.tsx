@@ -5,16 +5,16 @@ import { CalendarDays, Columns3, ChevronLeft, ChevronRight, LoaderCircle } from 
 import { Children, useState, useTransition, type ReactNode } from 'react';
 import {useRouter} from 'next/navigation';
 import { text, type Locale } from '@/lib/i18n';
-import {scheduleStatusLabels,type ScheduleDayStatus} from '@/lib/schedule-day-status';
+import {scheduleDatePeriod,schedulePeriodLabels,scheduleStatusLabels,type ScheduleDayStatus} from '@/lib/schedule-day-status';
 
 function NavigationIcon({ children }: { children: ReactNode }) {
   const { pending } = useLinkStatus();
   return <span className="schedule-navigation-icon" aria-busy={pending}>{pending ? <LoaderCircle size={21} className="schedule-spinner" /> : children}</span>;
 }
 
-export function DriverWeekTabs({ dates, initialDate, locale, children, monthly, month, statuses, loading = false }: {
+export function DriverWeekTabs({ dates, today, initialDate, locale, children, monthly, month, statuses, loading = false }: {
   loading?: boolean; monthly: boolean; month: { first: string; previous: string; next: string; offset: number }; statuses: ScheduleDayStatus[];
-  dates: string[]; initialDate: string; locale: Locale; children: ReactNode;
+  today: string; dates: string[]; initialDate: string; locale: Locale; children: ReactNode;
 }) {
   const [selected, setSelected] = useState(Math.max(0, dates.indexOf(initialDate)));
   const router=useRouter();
@@ -42,8 +42,9 @@ export function DriverWeekTabs({ dates, initialDate, locale, children, monthly, 
     <div className={monthly ? 'weekday-tabs calendar-month-grid' : 'weekday-tabs'} role="tablist" aria-busy={loading} aria-label={text(locale, '选择日期', 'Choose a date')}>
       {dates.map((date, index) => <button key={date} type="button" role="tab"
         style={monthly && index === 0 ? { gridColumnStart: month.offset + 1 } : undefined}
-        data-status={loading?'loading':statuses[index]} title={scheduleStatusLabels[loading?'loading':statuses[index]][locale]}
-        aria-label={`${date} ${scheduleStatusLabels[loading?'loading':statuses[index]][locale]}`} id={`weekday-tab-${date}`} aria-controls={`weekday-panel-${date}`}
+        data-period={scheduleDatePeriod(date,today)} aria-current={date === today ? 'date' : undefined}
+        data-status={loading?'loading':statuses[index]} title={`${schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} · ${scheduleStatusLabels[loading?'loading':statuses[index]][locale]}`}
+        aria-label={`${date} ${schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} ${scheduleStatusLabels[loading?'loading':statuses[index]][locale]}`} id={`weekday-tab-${date}`} aria-controls={`weekday-panel-${date}`}
         aria-selected={selected === index} tabIndex={selected === index ? 0 : -1}
         onClick={() => selectDate(index)} onKeyDown={event => {
           const next = event.key === 'ArrowRight' ? (index + 1) % dates.length
@@ -54,9 +55,10 @@ export function DriverWeekTabs({ dates, initialDate, locale, children, monthly, 
           selectDate(next);
           document.getElementById(`weekday-tab-${dates[next]}`)?.focus();
         }}>
-        {monthly ? <><strong>{Number(date.slice(8))}</strong><span className={`calendar-dot${loading ? ' is-loading' : statuses[index]!=='empty' ? ' has-trips' : ''}`} aria-hidden="true" /></> : <><strong>{labels[index]}</strong><span>{Number(date.slice(5, 7))}/{Number(date.slice(8))}</span></>}
+        {monthly ? <><strong>{date === today ? text(locale,'今天','Today') : Number(date.slice(8))}</strong><span className={`calendar-dot${loading ? ' is-loading' : statuses[index]!=='empty' ? ' has-trips' : ''}`} aria-hidden="true" /></> : <><strong>{date === today ? text(locale,'今天','Today') : labels[index]}</strong><span>{Number(date.slice(5, 7))}/{Number(date.slice(8))}</span><span className={`calendar-dot${loading ? ' is-loading' : statuses[index]!=='empty' ? ' has-trips' : ''}`} aria-hidden="true" /></>}
       </button>)}
     </div>
+    <div className="schedule-period-legend">{(['past','today','future'] as const).map(period=><span key={period}><i data-period={period} aria-hidden="true"/>{schedulePeriodLabels[period][locale]}</span>)}</div>
     <div className="schedule-status-legend">{(['planned','empty'] as const).map(status=><span key={status}><i data-status={status} aria-hidden="true"/>{scheduleStatusLabels[status][locale]}</span>)}</div>
     {Children.toArray(children).map((child, index) => <div key={dates[index]} role="tabpanel"
       id={`weekday-panel-${dates[index]}`} aria-labelledby={`weekday-tab-${dates[index]}`}

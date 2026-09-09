@@ -1,3 +1,4 @@
+import {readRouteSharing,validateSharedRoutes,syncSharedRoster,materializeSharedRoutes} from './fixed-route-sharing';
 import { requireTerm, openTerm } from "./operating-terms";
 import "server-only";
 import { readPickupMatches, planRoute, overCapacity as exceedsCapacity } from "./route-plan";
@@ -11,6 +12,7 @@ const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
 export async function lockRoutes(c:PoolClient) { await c.query("select pg_advisory_xact_lock(70919009)"); }
 export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string}):Promise<FixedRoute[]> {
  return (await c.query(`select r.id,r.name,r.notes,r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
+ (select jsonb_build_object('id',g.id,'sourceRouteId',g.source_route_id,'partnerRouteId',g.partner_route_id,'schoolId',g.school_id) from fixed_route_sharing g where r.id in (g.source_route_id,g.partner_route_id)) as sharing,
  coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),'')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  coalesce((select jsonb_agg(jsonb_build_object('studentId',a.student_id,'pickupStopId',a.pickup_stop_id,'dropoffStopId',a.dropoff_stop_id)) from fixed_route_students a where a.route_id=r.id),'[]') as students
  from fixed_routes r where r.operating_term_id=current_operating_term()
@@ -20,11 +22,12 @@ export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverI
 export async function readRouteTaskIssues(c:Pick<PoolClient,"query">,date:string) {
  return (await c.query<{name:string;message:string}>("select r.name,i.message from route_task_issues i join fixed_routes r on r.id=i.route_id where r.operating_term_id=current_operating_term() and i.service_date=$1 order by r.name",[date])).rows;
 }
-export async function saveFixedRoute(c:PoolClient,f:FormData) {
+export async function saveFixedRoute(c:PoolClient,f:FormData,pairedSave=false) {
  await lockRoutes(c);
  const operation=await requireTerm(c);
  const str=(key:string)=>String(f.get(key)??"").trim();
  const id=str("id"), starts=str("startsOn"), ends=str("endsOn"), driver=str("driverId")||null, vehicle=str("vehicleId")||null, enabled=str("enabled")==="on";
+ const group=id?(await readRouteSharing(c)).find(g=>[g.sourceRouteId,g.partnerRouteId].includes(id)):undefined;
  const notes=str("notes");
  if(notes.length>4000) error("线路说明过长。","Route notes are too long.");
  const routeType=str('routeType')||'RECURRING';
@@ -52,6 +55,15 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  let name=baseName, suffix=2;
  while((await c.query("select 1 from fixed_routes where operating_term_id=current_operating_term() and lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
  if(!Array.isArray(students)||students.length>200||new Set(students.map(s=>s.studentId)).size!==students.length) error("学生清单无效。","Invalid student list.");
+ let partner:FixedRoute|undefined;
+ if(group){
+  partner=(await readFixedRoutes(c)).find(r=>r.id===(id===group.sourceRouteId?group.partnerRouteId:group.sourceRouteId))!;
+  partner={...partner,startsOn:starts,endsOn:ends,weekdays,enabled};
+  if(id===group.partnerRouteId){
+   const projected=await validateSharedRoutes(c,partner,{id,name:'',routeType:routeType as FixedRoute['routeType'],startsOn:starts,endsOn:ends,weekdays,driverId:driver,vehicleId:vehicle,enabled,updatedAt:'',stops,students},group.schoolId);
+   students.splice(0,students.length,...projected.partner.students);
+  }
+ }
  const studentRows=(await c.query("select s.id,s.program_id,s.school_id from students s where s.active and s.id=any($1::uuid[])",[students.map(s=>s.studentId)])).rows;
  for(const a of students) {
   const st=studentRows.find(s=>s.id===a.studentId), from=stops.findIndex(s=>s.id===a.pickupStopId), to=stops.findIndex(s=>s.id===a.dropoffStopId);
@@ -64,11 +76,15 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  if(driver&&!(await c.query("select id from drivers where id=$1 and active and status='AVAILABLE'",[driver])).rowCount) error("司机不可用。","Driver unavailable.");
  const v=vehicle?(await c.query("select capacity from vehicles where id=$1 and active and status<>'MAINTENANCE'",[vehicle])).rows[0]:null;
  if(vehicle&&!v) error("车辆不可用。","Vehicle unavailable.");
- if(enabled&&v) for(let i=0;i<stops.length;i++) if(students.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>v.capacity) error("某段线路学生数超过车辆座位数。","Vehicle capacity exceeded on a route segment.");
+ if(enabled&&v&&!group) for(let i=0;i<stops.length;i++) if(students.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>v.capacity) error("某段线路学生数超过车辆座位数。","Vehicle capacity exceeded on a route segment.");
  if(enabled&&(!driver||!vehicle||!students.length)) error("启用前请绑定司机、车辆并选择学生。","Assign driver, vehicle and students before enabling.");
  if(enabled&&(await c.query(`select 1 from fixed_routes r where r.operating_term_id=current_operating_term() and enabled and id<>coalesce($1::uuid,gen_random_uuid()) and starts_on<=$3::date and ends_on>=$2::date and weekdays && $4::integer[] and (
  ((driver_id=$5 or vehicle_id=$6) and (select min(arrival_time) from fixed_route_stops where route_id=r.id)<$9::time and (select max(arrival_time) from fixed_route_stops where route_id=r.id)>$8::time)
- or (r.route_type=$10 and exists(select 1 from fixed_route_students where route_id=r.id and student_id=any($7::uuid[]))))`,[id||null,starts,ends,weekdays,driver,vehicle,students.map(a=>a.studentId),stops[0].time,stops.at(-1)!.time,routeType])).rowCount) error("同一日期的司机、车辆或学生已有冲突安排。","Driver, vehicle or student has an overlapping route.");
+ or (r.route_type=$10 and exists(select 1 from fixed_route_students a join students s on s.id=a.student_id where a.route_id=r.id and a.student_id=any($7::uuid[]) and not(coalesce(r.id=$11::uuid and s.school_id=$12::uuid,false)))))`,[id||null,starts,ends,weekdays,driver,vehicle,students.map(a=>a.studentId),stops[0].time,stops.at(-1)!.time,routeType,partner?.id??null,group?.schoolId??null])).rowCount) error("同一日期的司机、车辆或学生已有冲突安排。","Driver, vehicle or student has an overlapping route.");
+ if(group&&partner){
+  const current:FixedRoute={id,name,routeType:routeType as FixedRoute['routeType'],startsOn:starts,endsOn:ends,weekdays,driverId:driver,vehicleId:vehicle,enabled,updatedAt:'',stops,students};
+  await validateSharedRoutes(c,id===group.sourceRouteId?current:partner,id===group.sourceRouteId?partner:current,group.schoolId);
+ }
  if(id) {
   if(!(await c.query("select id from fixed_routes where id=$1 and updated_at::text=$2",[id,str("updatedAt")])).rowCount) error("线路已更新，请刷新后再试。","Route changed. Refresh before saving.");
   await c.query("update fixed_routes set name=$2,starts_on=$3,ends_on=$4,weekdays=$5,driver_id=$6,vehicle_id=$7,enabled=$8,route_type=$9,updated_at=clock_timestamp() where id=$1",[id,name,starts,ends,weekdays,driver,vehicle,enabled,routeType]);
@@ -79,6 +95,12 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  await c.query("delete from fixed_route_stops where route_id=$1",[routeId]);
  for(const [position,s] of stops.entries()) await c.query("insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time) values($1,$2,$3,$4,$5,$6,$7,$8)",[s.id,routeId,position,s.schoolId,s.programId,s.name,s.address,s.time||null]);
  for(const a of students) await c.query("insert into fixed_route_students values($1,$2,$3,$4)",[routeId,a.studentId,a.pickupStopId,a.dropoffStopId]);
+ if(group&&partner&&!pairedSave){
+  const latest=(await readFixedRoutes(c)).find(r=>r.id===id)!;
+  const pair=await validateSharedRoutes(c,id===group.sourceRouteId?latest:partner,id===group.sourceRouteId?partner:latest,group.schoolId);
+  const other=id===group.sourceRouteId?pair.partner:pair.source;
+  await saveFixedRoute(c,routeForm(other),true);
+ }
 }
 
 // One transaction serializes automatic creation and route edits; rider locks share the parent workflow's order.
@@ -102,6 +124,15 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
    for(const r of allRoutes)if(!selected.has(r.id)&&[...members.get(r.id)!].some(id=>students.has(id))){selected.add(r.id);expanded=true;}
   }
   routes=allRoutes.filter(r=>selected.has(r.id));
+ }
+ const sharing=await readRouteSharing(c);
+ const selectedGroups=sharing.filter(g=>routes.some(r=>[g.sourceRouteId,g.partnerRouteId].includes(r.id)));
+ if(selectedGroups.length){
+  const all=await readFixedRoutes(c);
+  for(const group of selectedGroups)for(const id of [group.sourceRouteId,group.partnerRouteId])if(!routes.some(r=>r.id===id))routes.push(all.find(r=>r.id===id)!);
+  await materializeSharedRoutes(c,routes,selectedGroups,date);
+  const grouped=new Set(selectedGroups.flatMap(g=>[g.sourceRouteId,g.partnerRouteId]));
+  routes=routes.filter(r=>!grouped.has(r.id));
  }
  routes.sort((a,b)=>Number(b.routeType==='TEMPORARY')-Number(a.routeType==='TEMPORARY')||a.id.localeCompare(b.id));
  const weekday=new Date(`${date}T12:00:00Z`).getUTCDay()||7;
@@ -177,4 +208,27 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   if((await c.query("select 1 from trip_students where trip_id=$1",[tripId])).rowCount) await recomputeTrip(c,tripId);
   else {await c.query("update trips set status='CANCELED' where id=$1",[tripId]);await c.query("update driver_shifts set status='CANCELED' where id=$1",[shiftId]);}
  }
+}
+
+export function routeForm(route:FixedRoute) {
+ const f=new FormData();
+ for(const [key,value] of Object.entries({id:route.id,name:route.name,notes:route.notes??'',routeType:route.routeType,startsOn:route.startsOn,endsOn:route.endsOn,driverId:route.driverId??'',vehicleId:route.vehicleId??'',enabled:route.enabled?'on':'',updatedAt:route.updatedAt,stops:JSON.stringify(route.stops),students:JSON.stringify(route.students)}))f.set(key,value);
+ for(const day of route.weekdays)f.append('weekdays',String(day));
+ return f;
+}
+
+export async function configureRouteSharing(c:PoolClient,f:FormData) {
+ await lockRoutes(c);const term=await requireTerm(c);
+ const sourceId=String(f.get('sourceRouteId')??''),partnerId=String(f.get('partnerRouteId')??''),schoolId=String(f.get('schoolId')??'');
+ if(sourceId===partnerId)error('请选择两条不同的线路。','Select two different routes.');
+ const routes=await readFixedRoutes(c),source=routes.find(r=>r.id===sourceId),partner=routes.find(r=>r.id===partnerId);
+ if(!source||!partner)error('线路不存在或不属于当前学期。','Routes must belong to the current term.');
+ if(source!.updatedAt!==String(f.get('sourceVersion'))||partner!.updatedAt!==String(f.get('partnerVersion')))error('线路已更新，请刷新后再试。','Routes changed. Refresh before saving.');
+ if((await readRouteSharing(c)).some(g=>[g.sourceRouteId,g.partnerRouteId].some(id=>[sourceId,partnerId].includes(id))))error('线路已有共享关系。请在原线路中维护。','Route already belongs to a sharing pair.');
+ const pair=await validateSharedRoutes(c,{...source!,enabled:true},{...partner!,enabled:true},schoolId);
+ await c.query('insert into fixed_route_sharing(operating_term_id,source_route_id,partner_route_id,school_id) values($1,$2,$3,$4)',[term.id,sourceId,partnerId,schoolId]);
+ // One transaction enables both routes, validates fixed reservations, and checks external conflicts.
+ await syncSharedRoster(c,pair);
+ const latest=await readFixedRoutes(c);
+ await saveFixedRoute(c,routeForm({...latest.find(r=>r.id===sourceId)!,enabled:true}));
 }

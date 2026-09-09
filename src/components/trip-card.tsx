@@ -68,12 +68,12 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
+      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED','COMPLETED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
         return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!r.otherVehicle&&!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
       })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
-        <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} locale={locale} interactive={interactive} showStops={false} onUpdated={onUpdated}/>
+        <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} locale={locale} interactive={interactive && !trip.completedSegments?.includes(`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`)} showStops={false} onUpdated={onUpdated}/>
       </section>)}
       </TripSegmentPicker> : <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>}
     </article>
@@ -136,7 +136,7 @@ function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true,ca
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>}
             {rider.otherVehicle ? <span>{text(locale,`已由 ${rider.otherVehicle} ${["ABSENT","EXCEPTION"].includes(rider.status)?"处理":"接走"}`,`${["ABSENT","EXCEPTION"].includes(rider.status)?"Handled":"Picked up"} by ${rider.otherVehicle}`)}</span> : <StatusBadge status={rider.status} />}
-            {interactive && !rider.otherVehicle && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
+            {interactive && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>

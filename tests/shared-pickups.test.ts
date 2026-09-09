@@ -83,10 +83,16 @@ test('shared pickups: simultaneous claim, authorization, undo, fixed seat reserv
  assert.deepEqual((await setup.query('select operation_location from trip_segment_completions where trip_id=$1',[tripIds[0]])).rows[0].operation_location,{status:'DENIED'});
  assert.equal((await setup.query("select count(*)::int n from status_history where to_status='DROPPED_OFF' and operation_location=$1::jsonb",[JSON.stringify({status:'DENIED'})])).rows[0].n,7);
  assert.deepEqual((await setup.query("select operation_location from status_history where trip_student_id=$1 and to_status='PICKED_UP' limit 1",[assignments[0]])).rows[0].operation_location,gps);
- await claim(0,assignments[0]); // Undo drop-off, then undo pickup without losing membership.
- await claim(0,assignments[0],'SCHEDULED');
- await claim(1,assignments[0]);
+ const before=(await setup.query('select * from trip_students where id=$1',[assignments[0]])).rows;
+ const history=(await setup.query('select count(*)::int n from status_history')).rows[0].n;
+ for(const user of [drivers[0],admin]) {
+   for(const status of ['PICKED_UP','SCHEDULED','ABSENT','EXCEPTION'] as const) {
+     await assert.rejects(txn(c=>changeRiderStatus(c,user,assignments[0],status,undefined,tripIds[0])),/completed/);
+   }
+ }
+ assert.deepEqual((await setup.query('select * from trip_students where id=$1',[assignments[0]])).rows,before);
+ assert.equal((await setup.query('select count(*)::int n from status_history')).rows[0].n,history);
+ await assert.rejects(claim(1,assignments[0]),/ALREADY_CLAIMED/);
  assert.equal((await setup.query('select count(*)::int as n from trip_students')).rows[0].n,13);
- assert.equal((await setup.query('select count(*)::int as n from status_history where trip_student_id=$1',[assignments[0]])).rows[0].n,9);
  }finally{await setup.query(`drop schema ${schema} cascade`);setup.release();await pool.end();}
 });

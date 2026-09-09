@@ -59,8 +59,8 @@ export async function claimSharedPickup(c:PoolClient,user:AuthUser,assignmentId:
     and ($3::uuid is null or sh.driver_id=$3)`,[assignmentId,targetId,user.role==='DRIVER'?user.driverId:null])).rows[0];
   if(!row)throw new Error('Assignment unavailable');
   if(row.trip_id!==targetId && (row.status!=='SCHEDULED'||nextStatus!=='PICKED_UP'))throw new Error('ALREADY_CLAIMED');
-  if((await c.query('select 1 from trip_segment_completions where trip_id=$1 and pickup_stop_id=$2 and dropoff_stop_id=$3',[targetId,row.pickup_stop_id,row.dropoff_stop_id])).rowCount && !(row.status==='DROPPED_OFF'&&nextStatus==='PICKED_UP'&&row.trip_id===targetId))throw new Error('Segment already completed');
-  if(['DRAFT','CANCELED'].includes(row.trip_status)||(row.trip_status==='COMPLETED'&&!(row.status==='DROPPED_OFF'&&nextStatus==='PICKED_UP'&&row.trip_id===targetId)))throw new Error('Trip is not active');
+  if((await c.query('select 1 from trip_segment_completions where trip_id=$1 and pickup_stop_id=$2 and dropoff_stop_id=$3',[targetId,row.pickup_stop_id,row.dropoff_stop_id])).rowCount)throw new Error('Segment already completed');
+  if(['DRAFT','CANCELED','COMPLETED'].includes(row.trip_status))throw new Error('Trip is not active');
   if(nextStatus==='PICKED_UP') {
     // Fixed riders reserve seats, including those at later stops. Unclaimed shared riders do not.
     const riders=(await c.query(`select ts.student_id as "studentId",ts.pickup_stop_id as "pickupStopId",ts.dropoff_stop_id as "dropoffStopId"
