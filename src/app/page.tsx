@@ -1,3 +1,4 @@
+import { SharedPickupForm } from '@/components/shared-pickup-form';
 import { db } from "@/lib/db";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
@@ -56,7 +57,7 @@ export default async function DashboardPage() {
           <div><span className="eyebrow">{text(locale, "实时清单", "Live manifest")}</span><h2>{text(locale, "今日行程", "Today’s trips")}</h2></div>
           <span className="section-count">{trips.length} {text(locale, "条路线", "routes")}</span>
         </div>
-        <div className="trip-list">
+        <SharedPickupForm trips={trips} locale={locale}/><div className="trip-list">
           {trips.length ? trips.map((trip) => <TripCard key={trip.id} trip={trip} locale={locale} />) : (
             <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "已启用的固定线路会按学校日历自动显示每日任务。", "Enabled recurring routes generate daily tasks using school calendars.")} href="/routes" action={text(locale, "固定线路", "Recurring routes")} />
           )}

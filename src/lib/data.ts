@@ -1,3 +1,4 @@
+import { addSharedRiders } from './shared-pickups';
 import { displayedStudentPhoto } from './photo-display';
 import { todayInOperationsTimeZone } from "./date";
 import { ensureRouteTasks } from "./ensure-route-tasks";
@@ -5,7 +6,7 @@ import type { RouteStop } from "./fixed-route-types";
 import "server-only";
 
 import { requireUser } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { db, query } from "@/lib/db";
 import type { Driver, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
 
 export async function getVehicles() {
@@ -228,7 +229,7 @@ export async function getTrips(date: string) {
     ridersByTrip.set(row.trip_id, riders);
   }
 
-  return tripResult.rows.map((row): Trip => ({
+  return addSharedRiders(db, tripResult.rows.map((row): Trip => ({
     id: row.id,
     executionVersion: row.execution_version,
     routeName: row.route_name, routeStops:row.route_stops, completedSegments:row.completed_segments,
@@ -250,7 +251,7 @@ export async function getTrips(date: string) {
     dropoffInfo: row.dropoff_info,
     programRequirements: row.program_requirements,
     riders: ridersByTrip.get(row.id) ?? [],
-  }));
+  })), user);
 }
 
 export async function getDashboardCounts(date: string) {

@@ -108,6 +108,7 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
   await c.query("delete from route_task_issues where route_id=$1 and service_date=$2",[r.id,date]);
   const issue=async(message:string)=>{await c.query("insert into route_task_issues values($1,$2,$3) on conflict(route_id,service_date) do update set message=$3",[r.id,date,message]);};
   const existing=(await c.query("select id,shift_id,status from trips where fixed_route_id=$1 and scheduled_date=$2 for update",[r.id,date])).rows[0];
+  if(existing && (await c.query("select 1 from shared_pickup_members where trip_id=$1",[existing.id])).rowCount) continue;
   if(existing && (await c.query("select 1 from trip_segment_completions where trip_id=$1",[existing.id])).rowCount) continue;
   // Preserve the actual journey once a driver has acted, including driver-marked absence.
   if(existing&&(await c.query("select 1 from trip_students where trip_id=$1 and (picked_up_at is not null or status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (status='ABSENT' and not parent_absence))",[existing.id])).rowCount) continue;
@@ -140,6 +141,7 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,dr
    // Move the assignment itself to retain parent absence and status history. Never alter a started source trip.
    const movable=(await c.query<{id:string;student_id:string;trip_id:string}>(`select ts.id,ts.student_id,ts.trip_id from trip_students ts join trips t on t.id=ts.trip_id join fixed_routes fr on fr.id=t.fixed_route_id
     where ts.student_id=any($1::uuid[]) and t.scheduled_date=$2 and t.id<>$3 and ((t.status<>'CANCELED' and fr.route_type='RECURRING') or (fr.route_type='TEMPORARY' and not fr.enabled and fr.id=any($4::uuid[])))
+    and not exists(select 1 from shared_pickup_members m where m.trip_id=t.id)
     and not exists(select 1 from trip_segment_completions f where f.trip_id=t.id)
     and not exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))
     and not exists(select 1 from trip_students other join trips ot on ot.id=other.trip_id where other.student_id=ts.student_id and ot.scheduled_date=$2 and ot.status<>'CANCELED' and ot.id not in (t.id,$3))

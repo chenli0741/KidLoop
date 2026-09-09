@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Check, RotateCcw, UserCheck, UserX } from "lucide-react";
 import { updateRiderStatus } from "@/app/actions";
@@ -9,8 +10,9 @@ import type { RiderStatus } from "@/lib/types";
 import { missedPickupReasons } from "@/lib/missed-pickup";
 import type { TripExecution } from "@/lib/trip-execution";
 
-export function StatusActions({ assignmentId, status, onUpdated }: { assignmentId: string; status: RiderStatus; onUpdated: (update: TripExecution) => void }) {
+export function StatusActions({ assignmentId, status, onUpdated, targetTripId }: { targetTripId?: string; assignmentId: string; status: RiderStatus; onUpdated: (update: TripExecution) => void }) {
   const locale = useLocale();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
@@ -22,11 +24,12 @@ export function StatusActions({ assignmentId, status, onUpdated }: { assignmentI
     setError("");
     startTransition(async () => {
       try {
-        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined);
+        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined, targetTripId);
         dialog.current?.close();
         onUpdated(result);
       } catch {
-        setError(text(locale, "无法更新状态。", "Could not update status."));
+        router.refresh();
+        setError(text(locale, "未能登记，名单已刷新。孩子可能已被另一车接走，或本车座位已满。", "Could not save. Refreshing: rider may be on another vehicle or seats are full."));
       }
     });
   }

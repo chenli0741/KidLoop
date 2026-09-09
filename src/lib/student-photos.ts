@@ -23,6 +23,6 @@ export const photoAccessSql = `select p.blob_url,p.purpose from student_photos p
    $3='ADMIN' or (p.student_id is null and p.uploaded_by=$2) or
    (s.photo_url='/api/photos/'||p.id::text and (
      ($3='PARENT' and exists(select 1 from user_students u where u.student_id=s.id and u.user_id=$2)) or
-     ($3='DRIVER' and exists(select 1 from trip_students ts join trips t on t.id=ts.trip_id join driver_shifts sh on sh.id=t.shift_id where ts.student_id=s.id and sh.driver_id=$4 and t.status<>'CANCELED'))
+     ($3='DRIVER' and (exists(select 1 from shared_pickup_members m join trip_students x on x.id=m.assignment_id join trips t on t.id=m.trip_id join driver_shifts sh on sh.id=t.shift_id where x.student_id=s.id and sh.driver_id=$4 and t.operating_term_id=current_operating_term() and t.status not in ('DRAFT','CANCELED')) or exists(select 1 from trip_students ts join trips t on t.id=ts.trip_id join driver_shifts sh on sh.id=t.shift_id where ts.student_id=s.id and sh.driver_id=$4 and t.status<>'CANCELED')))
    ))
  )`;

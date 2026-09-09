@@ -207,10 +207,10 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
   }, ["/", "/students", "/schedule", "/driver", "/parent"], success);
 }
 
-export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails) {
+export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
   return transaction(async (client) => {
-    const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details);
+    const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details, targetTripId);
     return readTripExecution(client, tripId);
   });
 }

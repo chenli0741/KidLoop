@@ -84,6 +84,8 @@ export type Shift = {
 };
 
 export type Rider = {
+  shared?: boolean;
+  otherVehicle?: string;
   pickupStopId?:string|null; dropoffStopId?:string|null; schoolName?:string;
   id: string;
   studentId: string;
@@ -101,6 +103,7 @@ export type Rider = {
 };
 
 export type Trip = {
+  hasSharedPickups?: boolean;
   executionVersion?: string;
   completedSegments?: string[];
   routeName?:string|null; routeStops?:import("./fixed-route-types").RouteStop[]|null;

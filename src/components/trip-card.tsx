@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { BusFront, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
@@ -20,15 +20,35 @@ export function TripCard({ trip: source, locale, interactive = true }: { trip: T
     trip = (source.executionVersion ?? '') >= (state.trip.executionVersion ?? '') ? source : state.trip;
     setState({ source, trip });
   }
+  const refreshEpoch = useRef(0);
+  const [syncFailed,setSyncFailed]=useState(false);
+  useEffect(()=>{
+    if(!source.hasSharedPickups)return;
+    let stopped=false;
+    let busy=false;
+    async function refresh(){
+      if(busy||document.visibilityState!=="visible")return;
+      busy=true; const epoch=refreshEpoch.current;
+      try{const res=await fetch(`/api/shared-pickups?trip=${source.id}`,{cache:"no-store",signal:AbortSignal.timeout(10000)});
+        if(!res.ok)throw new Error("Sync failed");
+        if(!stopped)setSyncFailed(false);
+        if(res.ok){const riders:Trip["riders"]=await res.json();if(!stopped&&epoch===refreshEpoch.current)setState(prev=>({...prev,trip:{...prev.trip,riders:[...prev.trip.riders.filter(r=>!r.shared),...riders]}}));}
+      }catch{if(!stopped)setSyncFailed(true);}finally{busy=false;}
+    }
+    const timer=setInterval(()=>{void refresh().catch(()=>{});},2000);
+    return ()=>{stopped=true;clearInterval(timer);};
+  },[source.id,source.hasSharedPickups]);
   function onUpdated(update: TripExecution) {
+    refreshEpoch.current++;
     setState(previous => ({ ...previous, trip: applyTripExecution(previous.trip, update) }));
   }
-  const completed = trip.riders.filter((rider) => ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
+  const completed = trip.riders.filter((rider) => !rider.otherVehicle && ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
   const segments = tripSegments(trip);
   const paired = segments.every(s=>s.routeStops?.length===2 && s.riders.length>0 && s.riders.every(r=>r.pickupStopId===s.routeStops![0].id && r.dropoffStopId===s.routeStops![1].id));
 
   return (
     <article className="trip-card">
+      {syncFailed&&<p role="alert">{text(locale,"名单同步中断，正在重试。请联网后核对再操作。","Manifest sync interrupted. Retrying; reconnect and verify before updating.")}</p>}
       <header className="trip-header">
         <div>
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
@@ -49,7 +69,7 @@ export function TripCard({ trip: source, locale, interactive = true }: { trip: T
 
       {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
-        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
+        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!r.otherVehicle&&!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
       })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
         <TripSegmentContent trip={segment} locale={locale} interactive={interactive} showStops={false} onUpdated={onUpdated}/>
@@ -96,11 +116,11 @@ function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true}:{
 
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
-        <span>{trip.routeName ? text(locale, `${trip.riders.length} 名学生 · ${trip.capacity} 座`, `${trip.riders.length} riders · ${trip.capacity} seats`) : text(locale, `${trip.riders.length}/${trip.capacity} 个座位`, `${trip.riders.length} of ${trip.capacity} seats`)}</span>
+        <span>{trip.hasSharedPickups ? text(locale,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} 人本车已接 · ${trip.capacity} 座 · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} 人待接`,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} picked up here · ${trip.capacity} seats · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} pending`) : trip.routeName ? text(locale, `${trip.riders.length} 名学生 · ${trip.capacity} 座`, `${trip.riders.length} riders · ${trip.capacity} seats`) : text(locale, `${trip.riders.length}/${trip.capacity} 个座位`, `${trip.riders.length} of ${trip.capacity} seats`)}</span>
       </div>
       <div className="manifest-list">
-        {trip.riders.map((rider) => (
-          <div className="rider-row" key={rider.id}>
+        {[...trip.riders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
+          <div className="rider-row" style={rider.otherVehicle ? {opacity:0.55,background:"#f2f3f3"}:undefined} key={rider.id}>
             <div className="student-photo">
               {rider.photoUrl ? <Image unoptimized={rider.photoUrl.startsWith("/api/photos/")} src={rider.photoUrl} alt="" fill sizes="48px" /> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
             </div>
@@ -113,8 +133,8 @@ function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true}:{
               <small>{text(locale, "家长", "Parent")}</small>
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>
-            <StatusBadge status={rider.status} />
-            {interactive && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
+            {rider.otherVehicle ? <span>{text(locale,`已由 ${rider.otherVehicle} ${["ABSENT","EXCEPTION"].includes(rider.status)?"处理":"接走"}`,`${["ABSENT","EXCEPTION"].includes(rider.status)?"Handled":"Picked up"} by ${rider.otherVehicle}`)}</span> : <StatusBadge status={rider.status} />}
+            {interactive && !rider.otherVehicle && !["DRAFT", "CANCELED"].includes(trip.status) ? <StatusActions targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>
