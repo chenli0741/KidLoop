@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {PickupCamera} from './pickup-camera';
-import Image from "next/image";
+import {StudentPhotoPreview} from './student-photo-preview';
 import { BusFront, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
 import { formatTime } from "@/lib/date";
@@ -124,7 +124,7 @@ function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true,ca
         {[...trip.riders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
           <div className="rider-row" style={rider.otherVehicle ? {opacity:0.55,background:"#f2f3f3"}:undefined} key={rider.id}>
             <div className="student-photo">
-              {rider.photoUrl ? <Image unoptimized={rider.photoUrl.startsWith("/api/photos/")} src={rider.photoUrl} alt="" fill sizes="48px" /> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
+              {rider.photoUrl ? <StudentPhotoPreview src={rider.photoUrl} name={rider.name} locale={locale} sizes="80px"/> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
             </div>
             <div className="rider-primary">
               <strong>{rider.name}</strong>

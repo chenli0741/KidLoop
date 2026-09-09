@@ -229,7 +229,15 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     for (const r of immutable) {
       const before = asPlan(r, day.matches),
         after = asPlan(r, changedMatches);
+      // A dismissal change still affects a protected student when another grade
+      // keeps the shared stop at the same latest pickup time.
+      const changesProtectedDismissal = before.students.some((student) => {
+        const oldMatch = day.matches.find((m) => m.student_id === student.studentId);
+        const newMatch = changedMatches.find((m) => m.student_id === student.studentId);
+        return oldMatch && newMatch && minutes(oldMatch.time) !== minutes(newMatch.time);
+      });
       if (
+        changesProtectedDismissal ||
         !samePlan(before, after) ||
         intent.unavailableDriverIds.includes(r.driverId!) ||
         intent.unavailableVehicleIds.includes(r.vehicleId!)

@@ -1,6 +1,8 @@
 /* iPhone and compact touch layouts. Desktop styles live in globals.css. */
 @media (max-width: 920px) {
-  html { scroll-padding-top: calc(80px + env(safe-area-inset-top)); scroll-padding-bottom: 100px; }
+  /* Keep document rubber-banding from moving the app chrome on iOS. */
+  html:has(.app-shell), body:has(.app-shell) { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .app-shell { position: fixed; inset: 0; height: 100dvh; min-height: 0; overflow: hidden; }
   .sidebar { inset: auto 0 0; width: auto; height: auto; padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); color: var(--ink); background: rgba(255,255,255,.96); border-top: 1px solid var(--line); }
   .brand { position: fixed; inset: 0 0 auto; height: calc(64px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 20px 0 max(20px, env(safe-area-inset-left)); gap: 10px; background: #f5f7f5; border-bottom: 1px solid #e7ece8; }
   .brand-mark { width: 35px; height: 35px; color: white; background: var(--green); border-radius: 12px; }
@@ -15,7 +17,18 @@
   .language-switcher { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); width: 100px; margin: 0; padding: 2px; background: #e8eee9; border: 0; border-radius: 12px; }
   .language-switcher button { height: 40px; color: #65716b; border-radius: 10px; }
   .language-switcher button.active { color: var(--green); background: white; box-shadow: 0 2px 5px #17211d0a; }
-  .app-main { margin-left: 0; padding-top: calc(64px + env(safe-area-inset-top)); padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .app-main {
+    position: absolute;
+    inset: calc(64px + env(safe-area-inset-top)) 0 calc(69px + env(safe-area-inset-bottom));
+    min-height: 0;
+    margin-left: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: none;
+    scroll-padding-block: 20px;
+    -webkit-overflow-scrolling: touch;
+  }
   .page-container { padding: 26px max(20px, env(safe-area-inset-right)) 24px max(20px, env(safe-area-inset-left)); }
   .split-layout, .students-layout, .planner-grid { grid-template-columns: 1fr; gap: 16px; }
   .split-layout > .form-panel { order: -1; }
@@ -94,8 +107,8 @@
   .manifest-header { padding: 18px 16px 12px; }
   .manifest-header h4 { font-size: 15px; }
   .manifest-list { padding: 0 12px 12px; }
-  .rider-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; padding: 16px 4px; }
-  .student-photo { width: 44px; height: 44px; border-radius: 14px; }
+  .rider-row { grid-template-columns: 80px minmax(0, 1fr) auto; gap: 10px; padding: 16px 4px; }
+  .student-photo { width: 80px; height: 80px; border-radius: 8px; }
   .rider-primary strong { font-size: 15px; }
   .rider-primary span { font-size: 11px; line-height: 1.5; }
   .rider-row > .status-badge { grid-column: 3; grid-row: 1; justify-self: end; }
@@ -108,8 +121,8 @@
   .status-button-row .primary { flex: 1; padding-inline: 8px; }
   .status-badge { min-height: 27px; padding-inline: 9px; font-size: 10px; }
   .student-grid { grid-template-columns: 1fr; }
-  .student-card { grid-template-columns: 64px minmax(0, 1fr); padding: 16px; gap: 14px; }
-  .student-card-photo { overflow: hidden; min-height: 64px; height: 64px; border-radius: 16px; }
+  .student-card { grid-template-columns: 80px minmax(0, 1fr); padding: 16px; gap: 14px; }
+  .student-card-photo { overflow: hidden; min-height: 80px; height: 80px; border-radius: 8px; }
   .student-card-body { padding: 0; }
   .student-card h3 { font-size: 17px; }
   .student-card-heading { grid-template-columns: minmax(0, 1fr) 98px; }

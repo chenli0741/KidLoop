@@ -28,10 +28,10 @@ export default async function DriverWeekPage({ searchParams }: { searchParams: P
   const month = calendarMonth(date);
   const dates = monthly ? month.days : workweek(date).days;
   return <div className="page-container driver-week-page">
-    <PageHeader eyebrow={text(locale, '我的安排', 'My schedule')} title={text(locale, '日程', 'Schedule')}
+    <PageHeader title={text(locale, '我的日程', 'My schedule')}
       description={text(locale, '选择日期，查看当天接送计划。', 'Choose a date to view your plans.')} />
     <Suspense key={`${monthly}-${date}-${params.day}`} fallback={
-      <DriverWeekTabs loading monthly={monthly} month={month} hasTrips={dates.map(() => false)} dates={dates} locale={locale} initialDate={params.day || today}>
+      <DriverWeekTabs loading monthly={monthly} month={month} statuses={dates.map(() => 'loading')} dates={dates} locale={locale} initialDate={params.day || today}>
         {dates.map(day => <p key={day} role="status" className="workweek-empty">{text(locale, '正在加载日程…', 'Loading schedule…')}</p>)}
       </DriverWeekTabs>
     }>
@@ -42,10 +42,10 @@ export default async function DriverWeekPage({ searchParams }: { searchParams: P
 
 async function ScheduleContent({ params, locale }: { params: ScheduleParams; locale: Locale }) {
   const monthly = params.view === 'month';
-  const week = await getDriverWeek(params.week, monthly);
+  const week = await getDriverWeek(params.week, monthly,params.day);
   return (
-    <DriverWeekTabs key={`${monthly}-${week.days[0].date}`} monthly={monthly} month={week.month} hasTrips={week.days.map(day => day.trips.length > 0)} dates={week.days.map(day => day.date)} locale={locale}
-      initialDate={params.day || week.today}>
+    <DriverWeekTabs key={`${monthly}-${week.selectedDate}`} monthly={monthly} month={week.month} statuses={week.days.map(day => day.hasTrips?'planned':'empty')} dates={week.days.map(day => day.date)} locale={locale}
+      initialDate={week.selectedDate}>
       {week.days.map(day => <section className={`workweek-day${day.date === week.today ? ' is-today' : ''}`} key={day.date} aria-labelledby={`day-${day.date}`}>
         <header className="workweek-day-header">
           <Link href={`/driver?date=${day.date}&week=${week.days[0].date}&view=${monthly ? 'month' : 'week'}`} id={`day-${day.date}`}>

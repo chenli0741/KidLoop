@@ -79,3 +79,15 @@ test("locked unavailable resources report a conflict instead of silently droppin
   assert.equal(result.candidates.length, 0);
   assert.match(result.conflicts.join(" "), /锁定线路的人车不可用/);
 });
+
+test("a started mixed-grade route rejects dismissal changes even when its latest stop time stays unchanged", () => {
+  const { snapshot, intent } = fixture();
+  const route = snapshot.routes[0];
+  snapshot.students.push({ ...snapshot.students[0], id: "older", grade: "3" });
+  route.students.push({ ...route.students[0], studentId: "older" });
+  snapshot.days[0].matches.push({ student_id: "older", school_id: "s1", time: "12:00" });
+  snapshot.days[0].tasks.push({ routeId: route.id, tripId: "started", driverId: "d1", vehicleId: "v1", start: "12:00", end: "12:30", started: true, students: route.students, stops: route.stops });
+  const result = calculatePlan(snapshot, { ...intent, changes: [{ schoolId: "s1", grades: ["K"], time: "11:45" }] });
+  assert.equal(result.candidates.length, 0);
+  assert.match(result.conflicts.join(" "), /已执行或锁定线路不能改动/);
+});

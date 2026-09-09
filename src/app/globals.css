@@ -552,7 +552,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 
 .weekday-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 18px; }
 .weekday-tabs button { min-width: 0; min-height: 64px; display: grid; gap: 5px; justify-items: center; align-content: center; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--muted); cursor: pointer; font: inherit; }
-.weekday-tabs button[aria-selected="true"] { background: var(--green); border-color: var(--green); color: white; }
+.weekday-tabs button[aria-selected="true"] { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); }
 .weekday-tabs button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
 .weekday-tabs strong { font-size: 14px; }
 .weekday-tabs span { font-size: 12px; }
@@ -571,6 +571,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .schedule-navigation-icon { display: inline-flex; align-items: center; justify-content: center; }
 .schedule-spinner { animation: schedule-spin 1s linear infinite; }
 .calendar-dot.is-loading { background: var(--line); }
+.weekday-tabs [data-status="planned"], .schedule-status-legend [data-status="planned"] { background: #d8efe3; color: #195c43; }
+.weekday-tabs [data-status="empty"], .schedule-status-legend [data-status="empty"] { background: #fff; color: #65716b; }
+.weekday-tabs [data-status="loading"] { background: #edf0ee; color: #65716b; }
+.schedule-status-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: -4px 0 18px; }
+.schedule-status-legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.schedule-status-legend i { width: 12px; height: 12px; border: 1px solid #c8d1cb; border-radius: 3px; }
 @keyframes schedule-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .schedule-spinner { animation: none; } }
 

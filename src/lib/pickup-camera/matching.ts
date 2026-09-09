@@ -33,3 +33,9 @@ export function suppressFaces(faces:FaceBox[]){
  }
  return kept.sort((a,b)=>a.y-b.y||a.x-b.x);
 }
+
+// Recognition can label every manifest rider; confirmation only includes currently eligible pickups.
+export function selectablePickups(ids:string[],riders:{id:string;status:string;parentAbsent?:boolean;otherVehicle?:string}[]){
+ const allowed=new Set(riders.filter(r=>r.status==='SCHEDULED'&&!r.parentAbsent&&!r.otherVehicle).map(r=>r.id));
+ return [...new Set(ids.filter(id=>allowed.has(id)))];
+}

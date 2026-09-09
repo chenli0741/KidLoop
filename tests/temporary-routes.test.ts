@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import pg from 'pg';
 import {saveFixedRoute,readFixedRoutes,materializeRoutes} from '../src/lib/fixed-routes';
+import {readDriverScheduleOverview} from '../src/lib/driver-schedule-overview';
 
 test('temporary route transfers four of ten, reconciles either driver scope, restores and protects execution',async()=>{
  const url=process.env.KIDLOOP_TEST_DATABASE_URL;assert.ok(url&&['localhost','127.0.0.1'].includes(new URL(url).hostname));
@@ -39,6 +40,13 @@ test('temporary route transfers four of ten, reconciles either driver scope, res
   await c.query("insert into status_history(trip_student_id,from_status,to_status,note) values($1,'SCHEDULED','ABSENT','Parent absence')",[absentId]);
   await tx(()=>saveFixedRoute(c,make(true)));
   let temporary=(await readFixedRoutes(c)).find(r=>r.routeType==='TEMPORARY')!;
+  const countBefore=(await c.query('select count(*)::int n from trips')).rows[0].n;
+  const dates=['2026-08-31','2026-09-09','2026-09-10','2026-09-11','2026-09-12'];
+  assert.deepEqual([...await readDriverScheduleOverview(c,driver,dates,'2026-09-08')].map(([,has])=>has),[false,true,true,true,false]);
+  assert.deepEqual([...await readDriverScheduleOverview(c,temporaryDriver,dates,'2026-09-08')].map(([,has])=>has),[false,true,true,false,false]);
+  assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,countBefore,'Calendar overview must not materialize trips');
+  await c.query("insert into school_calendar_exceptions(school_id,name,starts_on,ends_on) values($1,'Holiday','2026-09-14','2026-09-14')",[school]);
+  assert.equal((await readDriverScheduleOverview(c,driver,['2026-09-14'],'2026-09-08')).get('2026-09-14'),false);
   await assert.rejects(tx(()=>saveFixedRoute(c,make(true))),/overlapping/);
   const duplicate=make(true);
   duplicate.set('stops',JSON.stringify(JSON.parse(String(duplicate.get('stops'))).map((s:Record<string,unknown>,i:number)=>({...s,time:i?'16:30':'16:00'}))));

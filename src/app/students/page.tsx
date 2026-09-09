@@ -5,7 +5,7 @@ import { PhotoUpload } from "@/components/photo-upload";
 import { requireUser } from "@/lib/auth";
 import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { StudentRecordActions } from "@/components/student-record-actions";
-import Image from "next/image";
+import {StudentPhotoPreview} from '@/components/student-photo-preview';
 import { GraduationCap, Phone, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { StudentCreateForm } from "@/components/student-create-form";
@@ -70,7 +70,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             <div className="student-grid">
               {visibleStudents.map((student) => (
                 <article className="student-card" key={student.id}>
-                  <div className="student-card-photo">{student.photoUrl ? <Image unoptimized={student.photoUrl.startsWith("/api/photos/")} src={student.photoUrl} alt={text(locale, `${student.name} 的照片`, `${student.name} profile`)} fill sizes="96px" /> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
+                  <div className="student-card-photo">{student.photoUrl ? <StudentPhotoPreview src={student.photoUrl} name={student.name} locale={locale} sizes="96px"/> : <UsersRound size={48} aria-label={text(locale, "照片待补充", "Photo pending")} />}</div>
                   <div className="student-card-body">
                     <div className="student-card-heading">
                       <div className="student-card-identity"><h3>{student.name}</h3><p>{student.schoolName}</p></div>

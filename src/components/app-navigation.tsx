@@ -14,7 +14,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
   const items = user.role === "PARENT" ? [
     { href: "/parent", label: text(locale, "我的孩子", "My children"), icon: UsersRound },
   ] : user.role === "DRIVER" ? [
-    { href: "/driver", label: text(locale, "我的行程", "My trips"), icon: BusFront },
+    { href: "/driver", label: text(locale, "行程", "Trips"), icon: BusFront },
     { href: "/driver/week", label: text(locale, "日程", "Schedule"), icon: CalendarDays },
   ] : [
     { href: "/", label: text(locale, "今日", "Today"), icon: Gauge },

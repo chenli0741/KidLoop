@@ -6,7 +6,7 @@
 
 Only the driver trip page enables the icon-only camera entry. It appears between route details and the pickup manifest. A dialog opens a rear-camera live preview. Capture freezes the frame and stops the video tracks. Recognized faces show candidate student names; unmatched faces remain numbered and marked Unknown. The driver can correct selections, retake or close. Only Confirm pickup writes statuses, using one transaction and one captured device location for the selected group.
 
-Candidates are this displayed trip segment's scheduled, non-absent riders. Shared assignments are claimed through the existing serialized claim path. A stale selection, already claimed child, completed segment, unauthorized trip or exceeded capacity fails the whole batch. Other drivers continue receiving the existing shared-manifest updates. No camera recognition result bypasses the final confirmation.
+Recognition references include all riders in the displayed trip segment; only scheduled, non-absent, unclaimed riders can be confirmed for pickup. Shared assignments are claimed through the existing serialized claim path. A stale selection, already claimed child, completed segment, unauthorized trip or exceeded capacity fails the whole batch. Other drivers continue receiving the existing shared-manifest updates. No camera recognition result bypasses the final confirmation.
 
 ## Processing and data
 
@@ -16,7 +16,7 @@ The app compares the captured image to authorized student photo URLs already use
 
 Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video and discards state. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
 
-Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The UI discloses this upload. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
+Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The explanatory paragraph was removed from the camera dialog at user request; processing behavior is unchanged. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
 
 `OPENAI_API_KEY` enables belt analysis; `OPENAI_PICKUP_VISION_MODEL` defaults to `gpt-4o-mini`. Results are VISIBLE / CHECK / UNCLEAR; a missing key or provider failure displays unavailable and does not block manual pickup confirmation. Visible means a belt was seen, not that its fit or restraint is certified. The per-process 5-second throttle prevents repeated taps but is not a distributed billing quota.
 
@@ -39,3 +39,7 @@ Enabled for testing by default. Set `NEXT_PUBLIC_PICKUP_GALLERY_ENABLED=false` a
 ### Photo-library read compatibility
 
 Native selection now requests JPEG Base64 content from the camera bridge instead of requesting a URI and fetching its temporary `webPath` from the remotely hosted WebView. This removes the temporary-file URL dependency. Native plugin unavailability is reported separately and does not fall back to a source menu. Byte conversion and invalid/oversized response tests pass; the reported device failure still requires an iPhone retry to establish whether the cause was URI reading or native plugin availability.
+
+### Recognition candidate scope correction
+
+Recognition now uses every rider in the displayed segment, including picked-up and dropped-off riders. Previously the detector ran but reference matching received an empty list whenever no scheduled riders remained. Identity labels and eligible pickup selection are now separate: non-pending riders can be labeled but cannot be submitted again. Final server-side status/ownership/capacity checks remain unchanged. Missing photos, demo avatars, load failures, no reference face, multiple reference faces and processing failures are reported separately, alongside matched-face and usable-reference counts.

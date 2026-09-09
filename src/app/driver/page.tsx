@@ -13,12 +13,12 @@ import { ParentRequests } from "@/components/parent-requests";
 import { LiveRefresh } from "@/components/live-refresh";
 
 export default async function DriverPage({ searchParams }: { searchParams: Promise<{ date?: string; week?: string; view?: string }> }) {
-  const user = await requireUser(["DRIVER"]);
+  await requireUser(["DRIVER"]);
   const locale = await getLocale();
   const params = await searchParams;
   const date = params.date && validServiceDate(params.date) ? params.date : todayInOperationsTimeZone();
   const trips = await getTrips(date);
-  return <div className="page-container"><LiveRefresh /><PageHeader eyebrow={text(locale, `你好，${user.name}`, `Hello, ${user.name}`)} title={text(locale, "我的行程", "My trips")} description={text(locale, "查看负责的路线、学生名单和家长留言。", "Your assigned routes, riders, and parent notes.")} actions={<form className="date-picker"><CalendarDays size={18} /><input type="date" name="date" defaultValue={date} aria-label={text(locale, "行程日期", "Trip date")} /><button className="button secondary">{text(locale, "查看", "View")}</button></form>} />
+  return <div className="page-container"><LiveRefresh /><PageHeader title={text(locale, "我的行程", "My trips")} description={text(locale, "查看负责的路线、学生名单和家长留言。", "Your assigned routes, riders, and parent notes.")} actions={<form className="date-picker"><CalendarDays size={18} /><input type="date" name="date" defaultValue={date} aria-label={text(locale, "行程日期", "Trip date")} /><button className="button secondary">{text(locale, "查看", "View")}</button></form>} />
     {params.week && validServiceDate(params.week) && <Link className="driver-week-return" href={`/driver/week?week=${params.week}&day=${date}&view=${params.view === 'month' ? 'month' : 'week'}`}>{text(locale, "← 返回日程", "← Back to schedule")}</Link>}
     <section className="day-banner"><div><span>{formatDate(date, locale)}</span><strong>{trips.length} {text(locale, "个行程", "trips")}</strong></div><CalendarDays size={24} /></section>
     <ParentRequests date={date} locale={locale} />

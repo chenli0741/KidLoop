@@ -16,3 +16,12 @@ test('alignment reverses rotation, scale and translation',()=>{
  assert.throws(()=>alignment(Array(5).fill({x:0,y:0})));
 });
 test('face boxes suppress duplicate detections but preserve separate people',()=>assert.equal(suppressFaces([face,{...face,x:1,score:.7},{...face,x:20}]).length,2));
+
+test('recognition labels completed riders while pickup selection excludes completed and unavailable riders',async()=>{
+ const {selectablePickups}=await import('../src/lib/pickup-camera/matching');
+ const riders=[{id:'done',status:'DROPPED_OFF'},{id:'onboard',status:'PICKED_UP'},{id:'next',status:'SCHEDULED'},{id:'absent',status:'SCHEDULED',parentAbsent:true},{id:'other',status:'PICKED_UP',otherVehicle:'Other car'}];
+ const matches=matchFaces([{face,embedding:[1,0]}],riders.map((r,i)=>({assignmentId:r.id,embedding:i===0?[1,0]:[0,1]})));
+ assert.equal(matches[0].assignmentId,'done');
+ assert.deepEqual(selectablePickups(['done','onboard','next','absent','other','next','unknown'],riders),['next']);
+ assert.deepEqual(selectablePickups(['done','onboard'],riders),[]);
+});
