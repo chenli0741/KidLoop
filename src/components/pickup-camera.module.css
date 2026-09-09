@@ -1,4 +1,4 @@
-.launch {display:flex;justify-content:flex-end;padding:12px 24px 0}
+.launch {display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:12px 24px 0}
 .launch button,.tools button,.header button {display:grid;place-items:center;min-width:48px;min-height:48px;border-radius:50%;border:1px solid #dce5df;background:white;color:#176b52}
 .dialog {width:min(680px,100vw);max-height:95dvh;border:0;border-radius:20px;padding:16px;background:#f6f8f6;color:#173d32;overflow:auto}
 .dialog::backdrop {background:#000b}

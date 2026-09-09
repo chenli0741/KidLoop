@@ -29,3 +29,9 @@ Seatbelt assistance sends the frame and numbered normalized face boxes (no names
 - Still required: physical iPhone camera permissions, real vehicle lighting/angles, speed and recognition usefulness, and actual provider seatbelt output. Do not describe desktop checks as iPhone acceptance.
 
 Speech remains a separate deferred task in `docs/pending-local-speech.md`.
+
+## Temporary photo-library test entry
+
+An image icon sits beside the camera entry and in the camera dialog. In the iPhone App it calls the native photo-library source directly, with no app source-selection menu. Web uses the browser's image-file chooser; any system-provided chooser options are controlled by the browser/OS. Selecting a photo compresses it locally and feeds the same recognition/confirmation flow without opening the camera or uploading to the student-photo store. Cancel leaves the current scan unchanged. The existing final confirmation is still required to write Pickup.
+
+Enabled for testing by default. Set `NEXT_PUBLIC_PICKUP_GALLERY_ENABLED=false` and rebuild/redeploy to hide both image buttons. Native album selection still needs physical iPhone acceptance.
