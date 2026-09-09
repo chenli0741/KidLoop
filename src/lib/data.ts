@@ -1,3 +1,4 @@
+import {readFixedRoutes} from './fixed-routes';
 import { addSharedRiders } from './shared-pickups';
 import { displayedStudentPhoto } from './photo-display';
 import { todayInOperationsTimeZone } from "./date";
@@ -81,9 +82,7 @@ export async function getStudents() {
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
     backup_phone: string; email: string; notes: string; updated_at: string;
   }>(`
-    select exists(select 1 from fixed_route_students frs join fixed_routes fr on fr.id=frs.route_id
-             where frs.student_id=st.id and fr.operating_term_id=current_operating_term() and fr.enabled
-               and fr.route_type='RECURRING' and fr.ends_on >= $1::date) as route_assigned,
+    select false as route_assigned,
            st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
            st.classroom_name, st.classroom_id,
            sc.id as school_id, coalesce(sc.short_name,sc.name) as school_name,
@@ -98,7 +97,9 @@ export async function getStudents() {
     left join parents pa on pa.id = st.parent_id
     where st.active = true and exists(select 1 from term_students ts where ts.student_id=st.id and ts.operating_term_id=current_operating_term())
     order by sc.name, st.classroom_name, st.name
-  `, [todayInOperationsTimeZone()]);
+  `);
+  const routes=await readFixedRoutes(db);
+  const assigned=new Set(routes.filter(r=>r.enabled&&r.endsOn>=todayInOperationsTimeZone()).flatMap(r=>r.students.map(a=>a.studentId)));
   return result.rows.map((row): Student => ({
     id: row.id,
     name: row.name,
@@ -107,7 +108,7 @@ export async function getStudents() {
     age: row.age,
     classroomName: row.classroom_name,
     noPickupWeekdays: row.no_pickup_weekdays,
-    routeAssigned: row.route_assigned,
+    routeAssigned: assigned.has(row.id),
     schoolId: row.school_id,
     schoolName: row.school_name,
     programId: row.program_id,

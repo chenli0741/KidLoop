@@ -32,7 +32,7 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
    await c.query("insert into school_pickup_rules(school_id,name,weekdays,pickup_time,grades) values($1,'Rule',array[1,2,3,4,5],'14:00',array['1'])",[s]);
   }
   await c.query('insert into term_students(operating_term_id,student_id,reviewed) select current_operating_term(),id,true from students');
-  const stops=[{id:randomUUID(),name:'',address:'',schoolId:school,programId:null,time:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:schoolB,programId:null,time:'14:20'},{id:randomUUID(),name:'',address:'',schoolId:null,programId:program,time:'15:00'}];
+  const stops=[{id:randomUUID(),name:'',address:'',schoolId:school,programId:null,time:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:schoolB,programId:null,time:'14:20',pickupTime:'14:00'},{id:randomUUID(),name:'',address:'',schoolId:null,programId:program,time:'15:00'}];
   const make=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({name:'Route',startsOn:'2026-09-01',endsOn:'2026-09-30',driverId:driver,vehicleId:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify(ids.map((studentId,i)=>({studentId,pickupStopId:stops[i].id,dropoffStopId:stops[2].id}))),...extra}))f.set(k,v);for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;};
   await assert.rejects(tx(()=>saveFixedRoute(c,make({routeType:'INVALID'}))),/Invalid route type/);
   await tx(()=>saveFixedRoute(c,make({routeType:'TEMPORARY'})));
@@ -50,9 +50,9 @@ test('fixed multi-school route creates tasks once, skips holidays, changes drive
   assert.equal((await c.query("select count(*)::int n from trips where scheduled_date='2026-09-30'")).rows[0].n,1);
   await c.query("delete from trips where scheduled_date='2026-09-30'");
   await c.query("delete from driver_shifts where shift_date='2026-09-30'");
-  await assert.rejects(tx(()=>saveFixedRoute(c,make({name:'Overlap'}))),/overlapping/);
+  // Conflicts are now checked after arranging, not rejected while editing.
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07',backup));
-  assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
+  assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,1);
   await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));await tx(()=>materializeRoutes(c,'2026-09-07','2026-09-07'));
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_students')).rows[0].n,2);

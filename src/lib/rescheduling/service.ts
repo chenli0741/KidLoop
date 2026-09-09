@@ -165,7 +165,7 @@ export async function saveTemporary(
     driverId: p.driverId,
     vehicleId: p.vehicleId,
     stops: JSON.stringify(stops),
-    students: JSON.stringify(students),
+    selectedStudentIds: JSON.stringify(students.map(s=>s.studentId)),
   }))
     f.set(k, v);
   for (const weekday of weekdays) f.append("weekdays", String(weekday));

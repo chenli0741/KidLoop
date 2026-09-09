@@ -634,3 +634,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
   .adjust-usage-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .adjust-usage-metrics > div:last-child { grid-column:1 / -1; }
 }
+
+.review-controls { display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:16px 0; }
+.review-controls label { display:grid;gap:6px; }
+.review-calendar { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px; }
+.review-date { position:relative;display:flex;flex-direction:column;gap:8px;padding:12px 8px;min-height:72px;border:1px solid #cbd5d1;border-radius:12px;min-width:0;overflow-wrap:anywhere; }
+.review-date.is-past { background:#f1f2f2;color:#626c68; }
+.review-date.is-today { background:#196d54;color:white; }
+.review-date.is-future { background:#edf5fb;color:#244863; }
+.review-date.is-selected { outline:3px solid #196d54;outline-offset:2px; }
+.review-issue-label { color:#a32222;font-weight:700; }
+.review-date.is-today .review-issue-label { color:#fff; }
+@media(max-width:680px) { .review-calendar { gap:5px; }.review-date { font-size:12px;padding:10px 4px; }.review-controls input,.review-controls select { font-size:16px; }.fixed-rider { padding:12px 0; } }

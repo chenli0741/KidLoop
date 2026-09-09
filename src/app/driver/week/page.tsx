@@ -1,78 +1,47 @@
-import { Suspense } from 'react';
-import { calendarMonth, workweek } from '@/lib/workweek';
-import { todayInOperationsTimeZone } from '@/lib/date';
-import { requireUser } from '@/lib/auth';
-import type { Locale } from '@/lib/i18n';
+import {Suspense} from 'react';
 import Link from 'next/link';
-import { BusFront, UsersRound } from 'lucide-react';
-import { driverScheduleDate, getDriverWeek } from '@/lib/driver-week';
-import { getLocale } from '@/lib/i18n-server';
-import { text } from '@/lib/i18n';
-import { formatDate, formatTime } from '@/lib/date';
-import { tripSegments } from '@/lib/trip-segments';
-import { PageHeader } from '@/components/page-header';
-import { DriverWeekTabs } from '@/components/driver-week-tabs';
-import { scheduleDatePeriod, schedulePeriodLabels } from '@/lib/schedule-day-status';
-import { StatusBadge } from '@/components/status-badge';
-
-export const dynamic = 'force-dynamic';
-
-type ScheduleParams = { week?: string | string[]; day?: string; view?: string };
-
-export default async function DriverWeekPage({ searchParams }: { searchParams: Promise<ScheduleParams> }) {
-  await requireUser(['DRIVER']);
-  const params = await searchParams;
-  const locale = await getLocale();
-  const monthly = params.view === 'month';
-  const today = todayInOperationsTimeZone();
-  const date = driverScheduleDate(params.week, today);
-  const month = calendarMonth(date);
-  const dates = monthly ? month.days : workweek(date).days;
-  return <div className="page-container driver-week-page">
-    <PageHeader title={text(locale, '我的日程', 'My schedule')}
-      description={text(locale, '选择日期，查看当天接送计划。', 'Choose a date to view your plans.')} />
-    <Suspense key={`${monthly}-${date}-${params.day}`} fallback={
-      <DriverWeekTabs today={today} loading monthly={monthly} month={month} statuses={dates.map(() => 'loading')} dates={dates} locale={locale} initialDate={params.day || today}>
-        {dates.map(day => <p key={day} role="status" className="workweek-empty">{text(locale, '正在加载日程…', 'Loading schedule…')}</p>)}
-      </DriverWeekTabs>
-    }>
-      <ScheduleContent params={params} locale={locale} />
-    </Suspense>
-  </div>;
+import {calendarMonth,workweek} from '@/lib/workweek';
+import {todayInOperationsTimeZone,formatDate} from '@/lib/date';
+import {requireUser} from '@/lib/auth';
+import {getLocale} from '@/lib/i18n-server';
+import {text,type Locale} from '@/lib/i18n';
+import {driverScheduleDate} from '@/lib/driver-week';
+import {readDriverScheduleOverview} from '@/lib/driver-schedule-overview';
+import {readTrialRange} from '@/lib/schedule-trial-data';
+import {db} from '@/lib/db';
+import {getTrips} from '@/lib/data';
+import {DriverWeekTabs} from '@/components/driver-week-tabs';
+import {PageHeader} from '@/components/page-header';
+import {scheduleDatePeriod,schedulePeriodLabels} from '@/lib/schedule-day-status';
+export const dynamic='force-dynamic';
+type Params={week?:string|string[];day?:string;view?:string};
+export default async function DriverWeekPage({searchParams}:{searchParams:Promise<Params>}){
+ const user=await requireUser(['DRIVER']);const locale=await getLocale(),params=await searchParams,today=todayInOperationsTimeZone();
+ const date=driverScheduleDate(params.week,today),monthly=params.view==='month',month=calendarMonth(date),dates=monthly?month.days:workweek(date).days;
+ const selected=dates.includes(params.day??'')?params.day!:dates.includes(today)?today:dates[0];
+ const props={today,monthly,month,dates,locale,initialDate:selected};
+ return <div className="page-container driver-week-page"><PageHeader title={text(locale,'我的日程','My schedule')} description={text(locale,'选择日期，查看当天接送计划。','Choose a date to view your plans.')}/>
+  <Suspense key={monthly+'-'+date+'-'+selected} fallback={<DriverWeekTabs {...props} loading statuses={dates.map(()=>'loading')}>{dates.map(d=><p key={d}>{text(locale,'正在加载日程…','Loading schedule…')}</p>)}</DriverWeekTabs>}>
+   <Calendar {...props} driverId={user.driverId??''}/>
+  </Suspense>
+ </div>;
 }
-
-async function ScheduleContent({ params, locale }: { params: ScheduleParams; locale: Locale }) {
-  const monthly = params.view === 'month';
-  const week = await getDriverWeek(params.week, monthly,params.day);
-  return (
-    <DriverWeekTabs today={week.today} key={`${monthly}-${week.selectedDate}`} monthly={monthly} month={week.month} statuses={week.days.map(day => day.hasTrips?'planned':'empty')} dates={week.days.map(day => day.date)} locale={locale}
-      initialDate={week.selectedDate}>
-      {week.days.map(day => <section className={`workweek-day is-${scheduleDatePeriod(day.date,week.today)}`} key={day.date} aria-labelledby={`day-${day.date}`}>
-        <header className="workweek-day-header">
-          <Link href={`/driver?date=${day.date}&week=${week.days[0].date}&view=${monthly ? 'month' : 'week'}`} id={`day-${day.date}`}>
-            <h2>{formatDate(day.date, locale)}</h2>
-            <span>{schedulePeriodLabels[scheduleDatePeriod(day.date,week.today)][locale]} · {day.trips.length} {text(locale, '个行程', 'trips')} →</span>
-          </Link>
-        </header>
-        {day.trips.length === 0 ? <p className="workweek-empty">{text(locale, '暂无接送计划', 'No trips planned')}</p> : <div className="workweek-trips">
-          {day.trips.map(trip => <article className="workweek-trip" key={trip.id}>
-            <div className="workweek-trip-heading"><strong>{formatTime(trip.departureTime, locale)}</strong><StatusBadge status={trip.status} /></div>
-            <p className="workweek-vehicle"><BusFront size={15} /><span>{trip.vehicleName} · {trip.vehiclePlate}</span></p>
-            {tripSegments(trip).map((segment, index) => {
-              const stops = segment.routeStops;
-              const paired = stops?.length === 2;
-              const absent = segment.riders.filter(r => r.status === 'ABSENT').length;
-              return <div className="workweek-segment" key={index}>
-                <div><strong>{paired ? stops[0].name : segment.schoolName || segment.routeName}</strong><time>{formatTime(paired ? stops[0].time : segment.departureTime, locale)}</time></div>
-                <span className="workweek-arrow" aria-hidden="true">↓</span>
-                <div><strong>{paired ? stops[1].name : segment.programName || text(locale, '接送地点待补充', 'Stops pending')}</strong>{paired && <time>{formatTime(stops[1].time, locale)}</time>}</div>
-                <p><UsersRound size={14} />{segment.riders.length} {text(locale, '名学生', 'students')}{absent > 0 && text(locale, ` · ${absent} 名缺席`, ` · ${absent} absent`)}</p>
-              </div>;
-            })}
-            <Link className="workweek-detail" href={`/driver?date=${day.date}&week=${week.days[0].date}&view=${monthly ? 'month' : 'week'}`}>{text(locale, '查看当天任务', 'View day')} →</Link>
-          </article>)}
-        </div>}
-      </section>)}
-    </DriverWeekTabs>
-  );
+async function Calendar(props:{today:string;monthly:boolean;month:ReturnType<typeof calendarMonth>;dates:string[];locale:Locale;initialDate:string;driverId:string}){
+ const overview=await readDriverScheduleOverview(db,props.driverId,props.dates,props.today);
+ return <DriverWeekTabs {...props} key={props.initialDate} statuses={props.dates.map(d=>overview.get(d)?'planned':'empty')}>
+  {props.dates.map(date=><Suspense key={date} fallback={<p role="status">{text(props.locale,'正在加载当天详情…','Loading day details…')}</p>}>{date===props.initialDate?<Day date={date} today={props.today} locale={props.locale} driverId={props.driverId} monthly={props.monthly}/>:null}</Suspense>)}
+ </DriverWeekTabs>;
+}
+async function Day({date,today,locale,driverId,monthly}:{date:string;today:string;locale:Locale;driverId:string;monthly:boolean}){
+ const future=date>today;
+ const trips=future?[]:await getTrips(date);
+ const trial=future?(await readTrialRange(db,[date],true)).days[0]:undefined;
+ const plans=trial?.plans.filter(p=>p.driverId===driverId)??[];
+ const rows=future?plans.map(p=>({id:p.routeId,name:p.name,stops:p.stops,count:p.students.length})):trips.map(t=>({id:t.id,name:t.routeName??'',stops:t.routeStops??[],count:t.riders.length}));
+ return <section className={`workweek-day is-${scheduleDatePeriod(date,today)}`}><header className="workweek-day-header"><h2>{formatDate(date,locale)}</h2><span>{schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} · {rows.length} {text(locale,'个行程','trips')}</span></header>
+  {!rows.length&&<p className="workweek-empty">{text(locale,'暂无接送计划','No trips planned')}</p>}
+  {rows.map(row=><article className="workweek-trip" key={row.id}><h3>{row.name}</h3>{row.stops.map(s=><p key={s.id}><strong>{s.name}</strong> · {s.time}</p>)}<p>{row.count} {text(locale,'名学生','students')}</p></article>)}
+  {trial?.issues.filter(i=>i.routeId&&plans.some(p=>p.routeId===i.routeId)).map((i,index)=><p className="form-error" key={index}>{i.message.split(' / ')[locale==='zh'?0:1]??i.message}</p>)}
+  {!future&&<Link className="workweek-detail" href={`/driver?date=${date}&week=${date}&view=${monthly?'month':'week'}`}>{text(locale,'查看当天任务','View day')} →</Link>}
+ </section>;
 }

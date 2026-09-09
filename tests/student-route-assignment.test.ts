@@ -1,3 +1,4 @@
+import {readTrialRange} from '../src/lib/schedule-trial-data';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -54,37 +55,33 @@ async function setup(c: pg.PoolClient) {
     await saveFixedRoute(c, f);
     return (await readFixedRoutes(c)).find(r => r.driverId === driver)!;
   };
-  const assigned = async (studentId: string) => (await c.query('select * from fixed_route_students where student_id=$1', [studentId])).rows;
+  const assigned = async (studentId:string) => (await readFixedRoutes(c)).filter(r=>r.students.some(a=>a.studentId===studentId)).map(r=>({route_id:r.id}));
   return { c, id, school, program, student, route, assigned };
 }
 
-test('one matching route auto-assigns and creates today; repeated processing keeps one assignment', async () => fixture(async f => {
+test('one matching route derives new student without creating trips; generation remains idempotent', async () => fixture(async f => {
   const route = await f.route(); const student = await f.student();
   assert.equal((await assignNewStudentRoute(f.c, student, '', today)).assigned, true);
   assert.equal((await f.assigned(student))[0].route_id, route.id);
-  assert.equal((await f.c.query('select count(*)::int n from trip_students where student_id=$1', [student])).rows[0].n, 1);
+  assert.equal((await f.c.query('select count(*)::int n from trip_students where student_id=$1', [student])).rows[0].n, 0);
+  await materializeRoutes(f.c,today,today);
   assert.equal((await assignNewStudentRoute(f.c, student, '', today)).assigned, true);
   assert.equal((await f.assigned(student)).length, 1);
 }));
 
-test('no matching route saves pending; two matching routes stay pending unless explicitly selected', async () => fixture(async f => {
-  const student = await f.student();
-  assert.equal((await assignNewStudentRoute(f.c, student, '', today)).assigned, false);
-  await f.route(); const second = await f.route();
-  assert.equal((await assignNewStudentRoute(f.c, student, '', today)).assigned, false);
-  assert.equal((await f.assigned(student)).length, 0);
-  const choice = studentRouteOptions([second], today)[0];
-  assert.equal((await assignNewStudentRoute(f.c, student, choice.key, today)).assigned, true);
-  assert.equal((await f.assigned(student))[0].route_id, second.id);
+test('multiple non-shared matches are automatic and reported in the post-arrangement review', async()=>fixture(async f=>{
+ const student=await f.student();assert.equal((await assignNewStudentRoute(f.c,student,'',today)).assigned,false);
+ await f.route(10);await f.route(10);
+ assert.equal((await assignNewStudentRoute(f.c,student,'',today)).assigned,true);
+ assert.equal((await f.assigned(student)).length,2);
+ const review=await readTrialRange(f.c,[today],true);assert.ok(review.days[0].issues.some(i=>i.studentId===student&&i.code==='DUPLICATE'));
 }));
-
-test('capacity failure preserves the student and prior route without adding to daily trips', async () => fixture(async f => {
-  const route = await f.route(1); const student = await f.student();
-  const result = await assignNewStudentRoute(f.c, student, '', today);
-  assert.equal(result.assigned, false); assert.match(result.en, /capacity/i);
-  assert.equal((await f.assigned(student)).length, 0);
-  assert.equal((await f.c.query('select count(*)::int n from students where id=$1', [student])).rows[0].n, 1);
-  assert.deepEqual((await readFixedRoutes(f.c))[0], route);
+test('capacity issue retains automatic student matching and prevents unsafe publication',async()=>fixture(async f=>{
+ await f.route(1);const student=await f.student();
+ assert.equal((await assignNewStudentRoute(f.c,student,'',today)).assigned,true);
+ assert.equal((await f.assigned(student)).length,1);
+ const review=await readTrialRange(f.c,[today],true);assert.ok(review.days[0].issues.some(i=>i.code==='CAPACITY'));
+ await materializeRoutes(f.c,today,today);assert.equal((await f.c.query('select count(*)::int n from trips')).rows[0].n,0);
 }));
 
 test('weekly exclusions apply immediately and future unstarted tasks synchronize', async () => fixture(async f => {
@@ -92,6 +89,8 @@ test('weekly exclusions apply immediately and future unstarted tasks synchronize
   await materializeRoutes(f.c, '2026-09-09', today);
   const student = await f.student([2,4]);
   assert.equal((await assignNewStudentRoute(f.c, student, '', today)).assigned, true);
+  await materializeRoutes(f.c,today,today);
+  await materializeRoutes(f.c,'2026-09-09',today);
   const days = (await f.c.query('select scheduled_date::text as date from trip_students ts join trips t on t.id=ts.trip_id where ts.student_id=$1', [student])).rows;
   assert.deepEqual(days, [{ date: '2026-09-09' }]);
   assert.equal((await f.assigned(student))[0].route_id, route.id);

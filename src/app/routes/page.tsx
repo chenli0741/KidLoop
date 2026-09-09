@@ -1,4 +1,4 @@
-import { FixedRouteSharingForm } from "@/components/fixed-route-sharing-form";
+import {readRosterData} from "@/lib/roster-data";
 import Link from "next/link";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
@@ -22,18 +22,19 @@ export default async function RoutesPage() {
   const locale = await getLocale();
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
-  const [allRoutes, schools, programs, drivers, vehicles, students, rules] = await Promise.all([
+  const [allRoutes, schools, programs, drivers, vehicles, students, rules, roster] = await Promise.all([
     readFixedRoutes(db), getSchools(), getPrograms(), getDrivers(), getVehicles(), getStudents(),
-    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules where operating_term_id=current_operating_term() order by pickup_time`),
+    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules where operating_term_id=current_operating_term() order by pickup_time`), readRosterData(db),
   ]);
   const routes=visibleRoutes(allRoutes,todayInOperationsTimeZone());
-  const formProps = { operatingTermId:operation.id, termStart:operation.startsOn, termEnd:operation.endsOn, schools, programs, drivers, vehicles, students, rules: rules.rows, today: todayInOperationsTimeZone(), locale };
+  const formProps = { operatingTermId:operation.id, termStart:operation.startsOn, termEnd:operation.endsOn, schools, programs, drivers, vehicles, students:students.map(({id,name,grade,schoolId,programId})=>({id,name,grade,schoolId,programId})), rules: rules.rows, today: todayInOperationsTimeZone(), locale, batches:roster.batches };
   const weekdays = (days: number[]) => days.map(d => (locale === "zh" ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[d - 1]).join("、");
   return <div className="page-container">
       <TermWorkspace term={operation} locale={locale}/>
     <PageHeader eyebrow={text(locale, "线路管理", "Route management")} title={text(locale, "线路", "Routes")} description={text(locale, "固定线路、站点与司机车辆。", "Recurring routes, stops, drivers and vehicles.")} />
+    <Link className="button secondary" href="/schedule/review">{text(locale,"每日接送核对","Daily pickup review")}</Link>
     <Link className="button secondary" href="/routes/adjust">{text(locale,"智能调整接送安排","Adjust pickup schedules")}</Link>
-    <section className="pickup-section"><div className="section-heading"><h2>{text(locale,'固定线路共享名单','Shared recurring rosters')}</h2><RosterCreateDialog title={text(locale,'设置共享线路','Set up shared routes')} closeLabel={text(locale,'关闭','Close')}><FixedRouteSharingForm routes={routes} operatingTermId={operation.id} locale={locale}/></RosterCreateDialog></div><p>{text(locale,'两条线路共同接送同一学校，司机实际接到后确定车辆。','Two routes share a school roster; the driver who picks up each rider claims them.')}</p></section>
+
     <section className="pickup-section">
       <div className="section-heading"><h2>{text(locale, "接送线路", "Routes")}</h2><RosterCreateDialog title={text(locale, "添加线路", "Add route")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>
       {!routes.length && <p>{text(locale, "暂无线路。", "No routes.")}</p>}
@@ -41,10 +42,6 @@ export default async function RoutesPage() {
         <div><h3>{route.name} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
           <p>{route.routeType==='TEMPORARY'?text(locale,'临时行程','Temporary trip'):text(locale,'固定线路','Recurring route')} · {route.startsOn} — {route.endsOn} · {weekdays(route.weekdays)}</p>
           <p>{drivers.find(d => d.id === route.driverId)?.name ?? text(locale, "司机待绑定", "Driver unassigned")} · {vehicles.find(v => v.id === route.vehicleId)?.name ?? text(locale, "车辆待绑定", "Vehicle unassigned")} · {route.students.length} {text(locale, "名学生", "riders")}</p>
-          {route.sharing&&<p><strong>{text(locale,'共享名单','Shared roster')}</strong> · {schools.find(s=>s.id===route.sharing!.schoolId)?.name} · {text(locale,'主线路：','Source: ')}{allRoutes.find(r=>r.id===route.sharing!.sourceRouteId)?.name}</p>}
-          {route.sharing&&<p>{text(locale,
-            `${route.students.filter(a=>route.stops.find(s=>s.id===a.pickupStopId)?.schoolId===route.sharing!.schoolId).length} 名共享候选 · ${route.students.filter(a=>route.stops.find(s=>s.id===a.pickupStopId)?.schoolId!==route.sharing!.schoolId).length} 名本车固定学生；共享候选按实际接到占座。`,
-            `${route.students.filter(a=>route.stops.find(s=>s.id===a.pickupStopId)?.schoolId===route.sharing!.schoolId).length} shared candidates · ${route.students.filter(a=>route.stops.find(s=>s.id===a.pickupStopId)?.schoolId!==route.sharing!.schoolId).length} fixed riders; shared seats count when picked up.`)}</p>}
           <p style={{whiteSpace:"pre-line"}}>{route.notes}</p>
           <ol>{route.stops.map(stop => <li key={stop.id}>{stop.time || text(locale,"时间待确认","Time pending")} · {stop.name}</li>)}</ol>
         </div>

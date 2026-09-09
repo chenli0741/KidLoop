@@ -2,7 +2,7 @@
 
 > Status: MVP implementation baseline
 >
-> Updated: 2026-09-07
+> Updated: 2026-09-09
 
 ## Core records
 
@@ -18,13 +18,14 @@
 | `school_terms` | School term date ranges. |
 | `school_calendar_exceptions` | School closures and special pickup times. |
 | `school_pickup_rules` | Multiple grades sharing weekdays and a pickup time. |
-| `fixed_routes` | Independent recurring route, dates, weekdays, regular driver/vehicle and enabled state. |
-| `fixed_route_stops` | Ordered school, program or custom locations with planned arrival times. |
-| `fixed_route_students` | Student pickup and later dropoff stops on a fixed route. |
+| `fixed_routes` | Route dates, weekdays, driver/vehicle, enabled state and excluded student IDs. |
+| `fixed_route_stops` | Ordered school/program locations, arrival times and dismissal batch. |
+| `school_pickup_batches` | School, dismissal time and weekday sharing policy, with batch exclusions. |
+| `schedule_preview_cache` | Content-versioned daily summaries; no execution records. |
 | `route_task_issues` | Per-route, per-date generation conflicts shown to administrators. |
 | `student_photos` | Private upload metadata, uploader and optional student association. |
 | `driver_shifts` | Dated assignment of one driver to one vehicle for a time window. |
-| `trips` | A dated execution snapshot of a fixed multi-stop route; legacy school-to-program trips are retained. |
+| `trips` | A dated execution snapshot of a configured multi-stop route. |
 | `trip_students` | Students assigned to a trip and each student's current ride status. |
 | `trip_segment_completions` | Explicit per-trip pickup/dropoff segment completion, timestamp and actor; independent of which segment is being viewed. |
 | `status_history` | Append-only history of each student ride status transition. |
@@ -36,8 +37,8 @@
 schools ──< school_terms / school_calendar_exceptions / school_pickup_rules
 schools ──< classrooms ──< students >── parents
 fixed_routes >── drivers / vehicles
-      |──< fixed_route_stops >── schools / after_school_programs (or custom location)
-      |──< fixed_route_students >── students + pickup/dropoff stops
+      |──< fixed_route_stops >── schools / after_school_programs
+      |    automatic roster ← students + school dismissal rules + program relationship
       +──< trips >── driver_shifts >── drivers / vehicles
               +──< trip_students >── students
                          +──< status_history
@@ -47,7 +48,7 @@ fixed_routes >── drivers / vehicles
 
 - School pickup rules contain a `grades` array, not a classroom selection. Legacy `school_pickup_rule_classes` and `pickup_routes` remain for compatibility.
 - Stops must be ordered with increasing times. Student pickup must match the student's school; dropoff must be a later stop.
-- Enabled routes require school terms/rules, a driver, vehicle and riders. Capacity is checked per segment, not against total riders throughout a multi-stop trip.
+- Enabled routes require school terms/rules and driver/vehicle bindings. Students are derived; arrangement review checks omissions, conflicts and per-segment capacity.
 - Recurring route conflicts check overlapping dates, weekdays, time windows and shared resources/students. Daily generation also checks actual dated assignments.
 - `(fixed_route_id, scheduled_date)` is unique. Saving routes and reading current/future dates synchronize tasks under a transaction-level advisory lock; no daily manual shift creation is required.
 - Trips store `route_name` and JSON `route_stops` snapshots; assignments store pickup/dropoff stop IDs. Legacy `school_id` and `program_id` on trips are nullable for multi-stop routes.
@@ -77,6 +78,10 @@ Migration `003_accounts_and_parent_requests.sql` adds `app_users` (ADMIN/DRIVER/
 
 See [confirmed requirements](confirmed-requirements.md) for product boundaries and [project overview](../PROJECT_OVERVIEW.md) for migration and verification commands.
 
-## Student creation and route assignment
+## Automatic rosters and batch sharing
 
-New student creation optionally writes `fixed_route_students` in the same transaction after matching enabled, unexpired recurring routes by school and later program stop. A unique stop pair is automatic; multiple pairs require a choice or remain pending. A savepoint preserves the new student when expected route validation fails. Pending is derived from the absence of an enabled, unexpired current-term recurring route membership, not stored as a second roster state. Successful assignment uses the existing route validation and daily task synchronization, preserving started trips.
+School and program foreign keys already exist on students. The route resolves students and stop mappings through `automatic-roster.ts`; there is no editable per-child stop assignment table. Exclusions retain separately arranged children without deleting them. `school_pickup_batches` owns the sharing policy for a school/dismissal-time/weekday, common to every participating route.
+
+`schedule-trial.ts` derives daily plans and checks requirements, resources and per-segment capacity. The same result drives execution and calendar summaries. `schedule_preview_cache` hashes date-relevant inputs and stores small summaries; details are calculated only for a selected date. Viewing future calendars never requires creating trips.
+
+Migrations 030/031 replace the manual route roster and route-pair tables. The user authorized a one-time clear/rebuild of all old execution data; school calendars, students, program relationships and resource identities remain inputs. Subsequent normal operations retain started trips and enforce completed-state locks.

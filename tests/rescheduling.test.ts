@@ -236,15 +236,7 @@ test("rescheduling: read-only trial, atomic date-limited application, retained h
     assert.equal((await roster("2026-09-09")).length, 4);
     await tx(() => materializeRoutes(c, "2026-09-10", "2026-09-01", driver));
     assert.ok((await roster("2026-09-10")).every((r) => r.time === "14:00"));
-    assert.equal(
-      (
-        await c.query(
-          "select count(*)::int n from fixed_route_students where route_id=$1",
-          [original.id],
-        )
-      ).rows[0].n,
-      4,
-    );
+    assert.equal((await readFixedRoutes(c)).find(r=>r.id===original.id)!.students.length,4);
     // Re-adjust an already applied temporary route without losing its assignment/history.
     const repeated = await create();
     const repeatedIntent = { ...intent, endsOn: intent.startsOn, changes: [{ schoolId: school, grades: ['K'], time: '11:30' }] };

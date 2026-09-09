@@ -224,12 +224,8 @@ test("operating term initializes once, archives frozen data and copies only revi
       "insert into fixed_route_stops(id,route_id,position,program_id,name,address,arrival_time) values(gen_random_uuid(),$1,1,$2,'Program','P','15:00')",
       [route, program],
     );
-    await c.query("insert into fixed_route_students values($1,$2,$3,$4)", [
-      route,
-      student,
-      stop1,
-      stop2,
-    ]);
+    assert.ok(stop1 && stop2);
+    await c.query('update fixed_routes set excluded_student_ids=$2 where id=$1',[route,[student]]);
     await assert.rejects(
       tx(() => archiveOperatingTerm(c, old.id, "2026-12-20")),
       /Archive after/,
@@ -299,7 +295,8 @@ test("operating term initializes once, archives frozen data and copies only revi
     assert.equal(copied.enabled, false);
     assert.equal(copied.startsOn, "2027-01-01");
     assert.equal(copied.driverId, null);
-    assert.equal(copied.students.length, 1);
+    assert.equal(copied.students.length, 0);
+    assert.deepEqual(copied.excludedStudentIds,[student]);
     const driver = await id(
         "insert into drivers(name,phone) values('Driver','')",
       ),
@@ -319,10 +316,10 @@ test("operating term initializes once, archives frozen data and copies only revi
       students: JSON.stringify(copied.students),
     });
     for (const d of copied.weekdays) rf.append("weekdays", String(d));
-    await assert.rejects(
-      tx(() => saveFixedRoute(c, rf)),
-      /Review this term/,
-    );
+    await tx(() => saveFixedRoute(c, rf));
+    await tx(() => materializeRoutes(c, "2027-01-05", "2027-01-05"));
+    assert.equal((await c.query('select count(*)::int n from trips where operating_term_id=$1',[next.id])).rows[0].n,0);
+    rf.set('updatedAt',(await readFixedRoutes(c))[0].updatedAt);
     await tx(() =>
       reviewTermStudent(
         c,

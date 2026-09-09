@@ -58,7 +58,7 @@ export function planRoute(
   const stops = r.stops.map((s) => ({ ...s }));
   const anchor = stops.find((s) => schoolTimes.has(s.id));
   const delta = anchor
-    ? minutes(schoolTimes.get(anchor.id)!) - minutes(anchor.time)
+    ? minutes(schoolTimes.get(anchor.id)!) - minutes(anchor.pickupTime || anchor.time)
     : 0;
   for (let i = 0; i < stops.length; i++) {
     const arrival =

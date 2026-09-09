@@ -130,7 +130,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
         const stop = randomUUID();
         map.set(s.id, stop);
         await c.query(
-          "insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time) values($1,$2,$3,$4,$5,$6,$7,$8)",
+          "insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time,pickup_time) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",
           [
             stop,
             next,
@@ -140,25 +140,14 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
             s.name,
             s.address,
             s.arrival_time,
+            s.pickup_time,
           ],
         );
       }
-      for (const a of (
-        await c.query(
-          "select a.* from fixed_route_students a join term_students ts on ts.student_id=a.student_id and ts.operating_term_id=$2 where a.route_id=$1",
-          [r.id, id],
-        )
-      ).rows)
-        await c.query("insert into fixed_route_students values($1,$2,$3,$4)", [
-          next,
-          a.student_id,
-          map.get(a.pickup_stop_id),
-          map.get(a.dropoff_stop_id),
-        ]);
+      await c.query('update fixed_routes set excluded_student_ids=$2 where id=$1',[next,r.excluded_student_ids]);
     }
-    for(const group of (await c.query('select * from fixed_route_sharing where operating_term_id=$1',[source])).rows){
-      if(routeMap.has(group.source_route_id)&&routeMap.has(group.partner_route_id))await c.query('insert into fixed_route_sharing(operating_term_id,source_route_id,partner_route_id,school_id) values($1,$2,$3,$4)',[id,routeMap.get(group.source_route_id),routeMap.get(group.partner_route_id),group.school_id]);
-    }
+    await c.query(`insert into school_pickup_batches(operating_term_id,school_id,pickup_time,weekday,shared,excluded_student_ids) select $2,school_id,pickup_time,weekday,shared,excluded_student_ids from school_pickup_batches where operating_term_id=$1`,[source,id]);
+
   }
   return t;
 }
@@ -184,7 +173,7 @@ export async function archiveOperatingTerm(
     "school_pickup_rules",
     "school_calendar_exceptions",
     "fixed_routes",
-    "fixed_route_sharing",
+    "school_pickup_batches",
     "trips",
   ])
     snapshot[table] = (
@@ -203,12 +192,6 @@ export async function archiveOperatingTerm(
   snapshot.stops = (
     await c.query(
       "select s.* from fixed_route_stops s join fixed_routes r on r.id=s.route_id where r.operating_term_id=$1",
-      [id],
-    )
-  ).rows;
-  snapshot.route_students = (
-    await c.query(
-      "select s.* from fixed_route_students s join fixed_routes r on r.id=s.route_id where r.operating_term_id=$1",
       [id],
     )
   ).rows;

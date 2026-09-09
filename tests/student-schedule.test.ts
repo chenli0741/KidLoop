@@ -19,12 +19,13 @@ test('migration preserves class text and student edits need no classroom object'
  try{
   await c.query(`create schema ${schema}`);await c.query(`set search_path to ${schema}`);
   const migrations=(await readdir('db/migrations')).filter(f=>f.endsWith('.sql')).sort();
-  for(const file of migrations.filter(f=>!f.startsWith('019_')))await c.query(await readFile(`db/migrations/${file}`,'utf8'));
+  for(const file of migrations.filter(f=>f<'019_'))await c.query(await readFile(`db/migrations/${file}`,'utf8'));
   const school=(await c.query("insert into schools(name,address) values('School','Address') returning id")).rows[0].id;
   const cl=(await c.query("insert into classrooms(school_id,name) values($1,'B102') returning id",[school])).rows[0].id;
   const program=(await c.query("insert into after_school_programs(name,address) values('Program','Address') returning id")).rows[0].id;
   const student=(await c.query("insert into students(classroom_id,program_id,name,photo_url,grade) values($1,$2,'Child','','3') returning id",[cl,program])).rows[0].id;
   await c.query(await readFile('db/migrations/019_student_school_and_weekly_schedule.sql','utf8'));
+  for(const file of migrations.filter(f=>f>='020_'))await c.query(await readFile(`db/migrations/${file}`,'utf8'));
   const before=(await c.query('select * from students where id=$1',[student])).rows[0];
   assert.equal(before.school_id,school);assert.equal(before.classroom_name,'B102');
   const form=new FormData();

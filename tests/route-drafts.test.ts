@@ -13,8 +13,10 @@ test('draft retains route label and instructions without inventing times; incomp
  await c.query(`create schema ${schema}`);await c.query(`set search_path to ${schema}`);
  for(const file of (await readdir('db/migrations')).filter(f=>f.endsWith('.sql')).sort())await c.query(await readFile('db/migrations/'+file,'utf8'));
  await c.query("insert into operating_terms(name,starts_on,ends_on) values('Term','2026-08-20','2026-12-18')");
+ const school=(await c.query("insert into schools(name,address) values('School','A') returning id")).rows[0].id;
+ const program=(await c.query("insert into after_school_programs(name,address) values('Program','B') returning id")).rows[0].id;
  const form=new FormData();
- for(const [k,v] of Object.entries({name:'Little Tree 1',notes:'Lina normally; Chen on early release.',startsOn:'2026-08-20',endsOn:'2026-12-18',stops:JSON.stringify([{id:randomUUID(),schoolId:null,programId:null,name:'School',address:'A',time:''},{id:randomUUID(),schoolId:null,programId:null,name:'Program',address:'B',time:''}]),students:'[]'}))form.set(k,v);
+ for(const [k,v] of Object.entries({name:'Little Tree 1',notes:'Lina normally; Chen on early release.',startsOn:'2026-08-20',endsOn:'2026-12-18',stops:JSON.stringify([{id:randomUUID(),schoolId:school,programId:null,name:'School',address:'A',time:''},{id:randomUUID(),schoolId:null,programId:program,name:'Program',address:'B',time:''}]),students:'[]'}))form.set(k,v);
  form.append('weekdays','5');
  await c.query('begin');await saveFixedRoute(c,form);await c.query('commit');
  const [route]=await readFixedRoutes(c);

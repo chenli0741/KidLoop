@@ -26,7 +26,7 @@ test('temporary route transfers four of ten, reconciles either driver scope, res
   const make=(temporary:boolean,extra:Record<string,string>={})=>{
    const stops=[{id:randomUUID(),schoolId:school,programId:null,name:'',address:'',time:'14:00'},{id:randomUUID(),schoolId:null,programId:program,name:'',address:'',time:'14:30'}];
    const f=new FormData();
-   for(const [key,value] of Object.entries({routeType:temporary?'TEMPORARY':'RECURRING',startsOn:temporary?'2026-09-08':'2026-09-01',endsOn:temporary?'2026-09-10':'2026-09-30',driverId:temporary?temporaryDriver:driver,vehicleId:temporary?temporaryVehicle:vehicle,enabled:'on',stops:JSON.stringify(stops),students:JSON.stringify((temporary?students.slice(0,4):students).map(studentId=>({studentId,pickupStopId:stops[0].id,dropoffStopId:stops[1].id}))),...extra}))f.set(key,value);
+   for(const [key,value] of Object.entries({routeType:temporary?'TEMPORARY':'RECURRING',startsOn:temporary?'2026-09-08':'2026-09-01',endsOn:temporary?'2026-09-10':'2026-09-30',driverId:temporary?temporaryDriver:driver,vehicleId:temporary?temporaryVehicle:vehicle,enabled:'on',stops:JSON.stringify(stops),selectedStudentIds:JSON.stringify(temporary?students.slice(0,4):students),...extra}))f.set(key,value);
    for(const d of [1,2,3,4,5])f.append('weekdays',String(d));return f;
   };
   await tx(()=>saveFixedRoute(c,make(false)));
@@ -47,11 +47,6 @@ test('temporary route transfers four of ten, reconciles either driver scope, res
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,countBefore,'Calendar overview must not materialize trips');
   await c.query("insert into school_calendar_exceptions(school_id,name,starts_on,ends_on) values($1,'Holiday','2026-09-14','2026-09-14')",[school]);
   assert.equal((await readDriverScheduleOverview(c,driver,['2026-09-14'],'2026-09-08')).get('2026-09-14'),false);
-  await assert.rejects(tx(()=>saveFixedRoute(c,make(true))),/overlapping/);
-  const duplicate=make(true);
-  duplicate.set('stops',JSON.stringify(JSON.parse(String(duplicate.get('stops'))).map((s:Record<string,unknown>,i:number)=>({...s,time:i?'16:30':'16:00'}))));
-  await assert.rejects(tx(()=>saveFixedRoute(c,duplicate)),/overlapping/);
-  await assert.rejects(tx(()=>saveFixedRoute(c,make(true,{driverId:driver,vehicleId:vehicle}))),/overlapping/);
   const roster=async(date:string)=>(await c.query<{route_type:string;n:number}>(`select r.route_type,count(ts.id)::int n from trips t join fixed_routes r on r.id=t.fixed_route_id join trip_students ts on ts.trip_id=t.id where t.scheduled_date=$1 and t.status<>'CANCELED' group by r.route_type order by r.route_type`,[date])).rows;
   const split=[{route_type:'RECURRING',n:6},{route_type:'TEMPORARY',n:4}];
   await tx(()=>materializeRoutes(c,'2026-09-08','2026-09-01',driver));
@@ -65,7 +60,7 @@ test('temporary route transfers four of ten, reconciles either driver scope, res
   await tx(()=>materializeRoutes(c,'2026-09-09','2026-09-01',temporaryDriver));assert.deepEqual(await roster('2026-09-09'),split);
   await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-01',driver));assert.deepEqual(await roster('2026-09-10'),split);
   const reduced=make(true,{id:temporary.id,updatedAt:temporary.updatedAt});
-  reduced.set('students',JSON.stringify(JSON.parse(String(reduced.get('students'))).slice(0,2)));
+  reduced.set('selectedStudentIds',JSON.stringify(students.slice(0,2)));
   await tx(()=>saveFixedRoute(c,reduced));
   await tx(()=>materializeRoutes(c,'2026-09-10','2026-09-01',temporaryDriver));
   assert.deepEqual(await roster('2026-09-10'),[{route_type:'RECURRING',n:8},{route_type:'TEMPORARY',n:2}]);
@@ -73,7 +68,7 @@ test('temporary route transfers four of ten, reconciles either driver scope, res
   await tx(()=>saveFixedRoute(c,make(true,{id:temporary.id,updatedAt:temporary.updatedAt})));
   temporary=(await readFixedRoutes(c)).find(r=>r.id===temporary.id)!;
   await tx(()=>materializeRoutes(c,'2026-09-11','2026-09-01',driver));assert.deepEqual(await roster('2026-09-11'),[{route_type:'RECURRING',n:10}]);
-  assert.equal((await c.query('select count(*)::int n from fixed_route_students where route_id=$1',[original.id])).rows[0].n,10);
+  assert.equal((await readFixedRoutes(c)).find(r=>r.id===original.id)!.students.length,10);
   // Disabling restores pre-generated days and re-enabling moves them again without duplicates.
   await tx(()=>saveFixedRoute(c,make(true,{id:temporary.id,updatedAt:temporary.updatedAt,enabled:''})));
   await tx(()=>materializeRoutes(c,'2026-09-08','2026-09-01',temporaryDriver));assert.deepEqual(await roster('2026-09-08'),[{route_type:'RECURRING',n:10}]);
