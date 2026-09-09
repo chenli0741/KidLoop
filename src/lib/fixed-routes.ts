@@ -10,8 +10,8 @@ import { validServiceDate, recomputeTrip } from "./day-plans";
 const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
 export async function lockRoutes(c:PoolClient) { await c.query("select pg_advisory_xact_lock(70919009)"); }
 export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string}):Promise<FixedRoute[]> {
- return (await c.query(`select r.id,r.name,r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
- coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',to_char(s.arrival_time,'HH24:MI')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
+ return (await c.query(`select r.id,r.name,r.notes,r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
+ coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),'')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  coalesce((select jsonb_agg(jsonb_build_object('studentId',a.student_id,'pickupStopId',a.pickup_stop_id,'dropoffStopId',a.dropoff_stop_id)) from fixed_route_students a where a.route_id=r.id),'[]') as students
  from fixed_routes r where r.operating_term_id=current_operating_term()
  and ($1::uuid is null or r.driver_id=$1 or exists(select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.fixed_route_id=r.id and t.scheduled_date=$2::date and sh.driver_id=$1))
@@ -25,6 +25,8 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  const operation=await requireTerm(c);
  const str=(key:string)=>String(f.get(key)??"").trim();
  const id=str("id"), starts=str("startsOn"), ends=str("endsOn"), driver=str("driverId")||null, vehicle=str("vehicleId")||null, enabled=str("enabled")==="on";
+ const notes=str("notes");
+ if(notes.length>4000) error("线路说明过长。","Route notes are too long.");
  const routeType=str('routeType')||'RECURRING';
  if(!['RECURRING','TEMPORARY'].includes(routeType)) error('线路类型无效。','Invalid route type.');
  const weekdays=[...new Set(f.getAll("weekdays").map(Number))];
@@ -36,7 +38,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  if(!Array.isArray(stops)||stops.length<2||stops.length>30||new Set(stops.map(s=>s.id)).size!==stops.length) error("线路至少需要两个不同站点。","Add at least two distinct stops.");
  for(let i=0;i<stops.length;i++) {
   const s=stops[i];
-  if(!/^[0-9a-f-]{36}$/i.test(s.id)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)|| (i>0 && s.time<=stops[i-1].time)) error("请按先后顺序填写站点时间。","Stop times must be in increasing order.");
+  if(!/^[0-9a-f-]{36}$/i.test(s.id)||(enabled||s.time!=="") && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)|| (i>0 && stops[i-1].time!=="" && s.time<=stops[i-1].time))) error("请按先后顺序填写站点时间。","Stop times must be in increasing order.");
   if(s.schoolId&&s.programId) error("每站只能选择一个地点。","Choose one location per stop.");
   if(s.schoolId||s.programId) {
    const location=(await c.query(`select ${s.schoolId?"coalesce(short_name,name)":"name"} as name,address from ${s.schoolId?"schools":"after_school_programs"} where id=$1`,[s.schoolId||s.programId])).rows[0];
@@ -45,7 +47,8 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
   }
   if(!s.name?.trim()||!s.address?.trim()||s.name.length>160||s.address.length>500) error("请填写站点名称和地址。","Enter each stop's name and address.");
  }
- const baseName=routeName(stops);
+ const baseName=str("name") || routeName(stops);
+ if(baseName.length>160) error("线路名称过长。","Route name is too long.");
  let name=baseName, suffix=2;
  while((await c.query("select 1 from fixed_routes where operating_term_id=current_operating_term() and lower(name)=lower($1) and id<>coalesce($2::uuid,gen_random_uuid())",[name,id||null])).rowCount) name=`${baseName} (${suffix++})`;
  if(!Array.isArray(students)||students.length>200||new Set(students.map(s=>s.studentId)).size!==students.length) error("学生清单无效。","Invalid student list.");
@@ -61,7 +64,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
  if(driver&&!(await c.query("select id from drivers where id=$1 and active and status='AVAILABLE'",[driver])).rowCount) error("司机不可用。","Driver unavailable.");
  const v=vehicle?(await c.query("select capacity from vehicles where id=$1 and active and status<>'MAINTENANCE'",[vehicle])).rows[0]:null;
  if(vehicle&&!v) error("车辆不可用。","Vehicle unavailable.");
- if(v) for(let i=0;i<stops.length;i++) if(students.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>v.capacity) error("某段线路学生数超过车辆座位数。","Vehicle capacity exceeded on a route segment.");
+ if(enabled&&v) for(let i=0;i<stops.length;i++) if(students.filter(a=>stops.findIndex(s=>s.id===a.pickupStopId)<=i&&stops.findIndex(s=>s.id===a.dropoffStopId)>i).length>v.capacity) error("某段线路学生数超过车辆座位数。","Vehicle capacity exceeded on a route segment.");
  if(enabled&&(!driver||!vehicle||!students.length)) error("启用前请绑定司机、车辆并选择学生。","Assign driver, vehicle and students before enabling.");
  if(enabled&&(await c.query(`select 1 from fixed_routes r where r.operating_term_id=current_operating_term() and enabled and id<>coalesce($1::uuid,gen_random_uuid()) and starts_on<=$3::date and ends_on>=$2::date and weekdays && $4::integer[] and (
  ((driver_id=$5 or vehicle_id=$6) and (select min(arrival_time) from fixed_route_stops where route_id=r.id)<$9::time and (select max(arrival_time) from fixed_route_stops where route_id=r.id)>$8::time)
@@ -71,9 +74,10 @@ export async function saveFixedRoute(c:PoolClient,f:FormData) {
   await c.query("update fixed_routes set name=$2,starts_on=$3,ends_on=$4,weekdays=$5,driver_id=$6,vehicle_id=$7,enabled=$8,route_type=$9,updated_at=clock_timestamp() where id=$1",[id,name,starts,ends,weekdays,driver,vehicle,enabled,routeType]);
  }
  const routeId=id||(await c.query("insert into fixed_routes(name,starts_on,ends_on,weekdays,driver_id,vehicle_id,enabled,route_type) values($1,$2,$3,$4,$5,$6,$7,$8) returning id",[name,starts,ends,weekdays,driver,vehicle,enabled,routeType])).rows[0].id;
+ await c.query("update fixed_routes set notes=$2 where id=$1",[routeId,notes]);
  await c.query("delete from fixed_route_students where route_id=$1",[routeId]);
  await c.query("delete from fixed_route_stops where route_id=$1",[routeId]);
- for(const [position,s] of stops.entries()) await c.query("insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time) values($1,$2,$3,$4,$5,$6,$7,$8)",[s.id,routeId,position,s.schoolId,s.programId,s.name,s.address,s.time]);
+ for(const [position,s] of stops.entries()) await c.query("insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time) values($1,$2,$3,$4,$5,$6,$7,$8)",[s.id,routeId,position,s.schoolId,s.programId,s.name,s.address,s.time||null]);
  for(const a of students) await c.query("insert into fixed_route_students values($1,$2,$3,$4)",[routeId,a.studentId,a.pickupStopId,a.dropoffStopId]);
 }
 
