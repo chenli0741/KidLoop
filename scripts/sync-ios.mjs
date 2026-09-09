@@ -30,3 +30,5 @@ try {
 } finally {
   await rm(compatibilityProject, { recursive: true, force: true });
 }
+
+await import("./check-ios-capabilities.mjs");

@@ -24,8 +24,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>将你说出的调度要求转换成可编辑文字。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>仅在确认接到或送达学生时记录当前位置，不进行后台定位。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Record your location when you confirm a student pickup or drop-off. Location is not used to block these actions.</string>
+	<string>在确认接到或送达学生时记录当前位置；定位失败不影响操作。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>拍摄学生照片，用于接送时确认孩子身份。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -52,7 +56,7 @@
 		</dict>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Record your scheduling request and convert it to editable text.</string>
+	<string>录入你说出的调度要求，并转换成可编辑文字。</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

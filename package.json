@@ -17,11 +17,14 @@
     "test:pickup": "node --conditions=react-server --import tsx --test tests/pickup-settings.test.ts",
     "reschedule:simulate": "node --conditions=react-server --import tsx scripts/simulate-rescheduling.ts",
     "ai:usage-log": "node --env-file=.env.local --conditions=react-server --import tsx scripts/export-ai-usage-log.ts",
-    "postinstall": "node scripts/copy-pickup-runtime.mjs"
+    "postinstall": "node scripts/copy-pickup-runtime.mjs",
+    "ios:check": "node scripts/check-ios-capabilities.mjs"
   },
   "dependencies": {
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/geolocation": "^8.2.2",
     "@capacitor/ios": "^8.5.1",
     "@vercel/blob": "^2.8.0",
     "lucide-react": "^0.468.0",

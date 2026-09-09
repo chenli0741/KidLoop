@@ -15,11 +15,11 @@ export function PickupGalleryButton({locale,onImage,disabled=false}:{locale:Loca
   const controller=new AbortController();task.current=controller;setBusy(true);setError('');
   try{
    const photo=file??await pickNativePhoto('photos');if(controller.signal.aborted)return;
-   if(!photo)throw new Error('Photo library unavailable');
+   if(!photo)throw new Error('native-gallery-unavailable');
    const blob=await compressPhoto(photo);if(controller.signal.aborted)return;
    const image=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('Read failed'));reader.readAsDataURL(blob);});
    if(!controller.signal.aborted)onImage(image);
-  }catch(e){if(!controller.signal.aborted&&!pickerCanceled(e))setError(text(locale,'无法读取照片，请重新选择。','Cannot read this photo. Please choose another.'));}
+  }catch(e){if(!controller.signal.aborted&&!pickerCanceled(e)){const code=e instanceof Error?e.message:'';setError(code==='native-gallery-unavailable'?text(locale,'当前 App 相册组件不可用，请更新 App 后重试。','Photo library component unavailable. Update the app and retry.'):code==='size'?text(locale,'照片过大，请选择小于 15 MB 的照片。','Choose a photo smaller than 15 MB.'):text(locale,'照片读取失败，请重新选择 JPG 或 PNG 照片，并检查相册权限。','Could not read the photo. Try JPG or PNG and check photo-library permission.'));}}
   finally{if(!controller.signal.aborted){setBusy(false);task.current=null;}}
  }
  if(!pickupGalleryEnabled)return null;

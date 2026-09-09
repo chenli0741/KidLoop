@@ -26,10 +26,20 @@ export async function compressPhoto(file:File):Promise<Blob> {
 }
 export async function pickNativePhoto(source:'photos'|'camera'):Promise<File|null> {
   const {Capacitor}=await import('@capacitor/core');
-  if(!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('Camera'))return null;
+  if(!Capacitor.isNativePlatform())return null;
+  if(!Capacitor.isPluginAvailable('Camera'))throw new Error('native-gallery-unavailable');
   const {Camera,CameraSource,CameraResultType}=await import('@capacitor/camera');
-  const photo=await Camera.getPhoto({source:source==='camera'?CameraSource.Camera:CameraSource.Photos,resultType:CameraResultType.Uri,quality:82,width:1600,height:1600,allowEditing:false,correctOrientation:true,saveToGallery:false});
-  if(!photo.webPath)throw new Error('format');
-  const response=await fetch(photo.webPath);if(!response.ok)throw new Error('format');
-  return new File([await response.blob()],'student-photo.jpg',{type:'image/jpeg'});
+  const photo=await Camera.getPhoto({source:source==='camera'?CameraSource.Camera:CameraSource.Photos,resultType:CameraResultType.Base64,quality:82,width:1600,height:1600,allowEditing:false,correctOrientation:true,saveToGallery:false});
+  return nativePhotoFile(photo);
+}
+
+// The native plugin returns processed JPEG bytes. Avoid fetching temporary file URLs
+// from the remotely hosted WKWebView (cross-origin/custom-scheme restrictions).
+export function nativePhotoFile(photo:{base64String?:string}):File {
+  const encoded=photo.base64String;
+  if(!encoded)throw new Error('format');
+  if(encoded.length>20*1024*1024)throw new Error('size');
+  let decoded:string;try{decoded=atob(encoded);}catch{throw new Error('format');}
+  if(!decoded.length)throw new Error('format');
+  return new File([Uint8Array.from(decoded,c=>c.charCodeAt(0))],'student-photo.jpg',{type:'image/jpeg'});
 }
