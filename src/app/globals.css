@@ -607,3 +607,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .adjust-usage { margin-top:24px; color:#64726a; font-size:12px; }
 
 .account-trigger .account-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+.adjust-usage-call { margin-top:12px; padding:14px; border:1px solid #dce5df; border-radius:12px; background:#f7faf8; }
+.adjust-usage-call > p { margin:0 0 10px; overflow-wrap:anywhere; }
+.adjust-usage-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:0 0 10px; }
+.adjust-usage-metrics dt { font-size:12px; }
+.adjust-usage-metrics dd { margin:5px 0 0; color:#203a2b; font-size:16px; font-weight:700; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.adjust-usage-call .adjust-usage-detail { margin-bottom:0; font-size:11px; }
+@media (max-width:480px) {
+  .adjust-usage-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .adjust-usage-metrics > div:last-child { grid-column:1 / -1; }
+}

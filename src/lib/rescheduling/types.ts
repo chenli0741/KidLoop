@@ -87,10 +87,12 @@ export type DraftView = {
   result: PlanResult | null;
   appliedCandidate: number | null;
   usage: {
+    id?: string;
+    created_at?: string;
     kind: string;
     model: string;
     usage: Record<string, unknown> | null;
-    elapsed_ms: number;
+    elapsed_ms: number | null;
     status: string;
     estimated_usd: string | null;
   }[];

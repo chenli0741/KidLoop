@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, Square, Send, RefreshCw, Check, Plus } from "lucide-react";
 import { useLocale } from "./locale-provider";
 import { text } from "@/lib/i18n";
+import { AdjustmentUsage } from "./adjustment-usage";
 import type { DraftView, PlannedRoute } from "@/lib/rescheduling/types";
 type Catalog = Record<
   "schools" | "drivers" | "vehicles" | "students" | "routes",
@@ -549,23 +550,7 @@ export function AdjustmentWorkspace({
             )}
           </>
         )}
-        {!!draft?.usage.length && (
-          <details className="adjust-usage">
-            <summary>
-              {t("本次调用记录", "Request usage")} · {draft.usage.length}
-            </summary>
-            {draft.usage.map((u, i) => (
-              <p key={i}>
-                {u.kind === "AUDIO" ? t("语音", "Audio") : t("文字", "Text")} ·{" "}
-                {u.model} · {u.status} ·{" "}
-                {((u.elapsed_ms ?? 0) / 1000).toFixed(1)}s ·{" "}
-                {u.estimated_usd === null
-                  ? t("费用待核算", "Cost pending")
-                  : `$${u.estimated_usd}`}
-              </p>
-            ))}
-          </details>
-        )}
+        <AdjustmentUsage usage={draft?.usage ?? []} locale={locale} />
       </section>
     </div>
   );

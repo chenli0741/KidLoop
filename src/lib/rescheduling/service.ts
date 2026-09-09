@@ -23,7 +23,7 @@ export async function getDraft(
   if (!row) throw new Error("调整记录不存在 / Adjustment not found");
   row.usage = (
     await c.query<DraftView["usage"][number]>(
-      "select kind,model,usage,elapsed_ms,status,estimated_usd from reschedule_usage where request_id=$1 order by created_at",
+      "select id,created_at,kind,model,usage,elapsed_ms,status,estimated_usd from reschedule_usage where request_id=$1 order by created_at",
       [id],
     )
   ).rows;

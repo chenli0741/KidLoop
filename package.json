@@ -15,7 +15,8 @@
     "test:roles": "node --conditions=react-server --import tsx --test tests/roles.test.ts",
     "test:profiles": "node --conditions=react-server --import tsx --test tests/profile.test.ts",
     "test:pickup": "node --conditions=react-server --import tsx --test tests/pickup-settings.test.ts",
-    "reschedule:simulate": "node --conditions=react-server --import tsx scripts/simulate-rescheduling.ts"
+    "reschedule:simulate": "node --conditions=react-server --import tsx scripts/simulate-rescheduling.ts",
+    "ai:usage-log": "node --env-file=.env.local --conditions=react-server --import tsx scripts/export-ai-usage-log.ts"
   },
   "dependencies": {
     "@capacitor/camera": "^8.2.4",
