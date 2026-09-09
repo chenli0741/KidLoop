@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Record your location when you confirm a student pickup or drop-off. Location is not used to block these actions.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>拍摄学生照片，用于接送时确认孩子身份。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

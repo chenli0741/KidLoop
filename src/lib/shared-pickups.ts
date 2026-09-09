@@ -10,14 +10,15 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
   if (!trips.length) return trips;
   const rows = (await c.query(`select m.trip_id, m.pickup_stop_id,m.dropoff_stop_id,ts.id,ts.trip_id as owner_id,ts.status,
     s.id as student_id,s.name,s.photo_url,s.grade,s.age,s.classroom_name,
-    coalesce(p.name,'') as parent_name,coalesce(p.phone,'') as parent_phone,
+    case when $2::boolean then coalesce(p.name,'') else '' end as parent_name,
+    case when $2::boolean then coalesce(p.phone,'') else '' end as parent_phone,
     coalesce(dp.note,'') as parent_note,coalesce(dp.absent,false) as parent_absent,v.name as vehicle_name
     from shared_pickup_members m join trip_students ts on ts.id=m.assignment_id
     join students s on s.id=ts.student_id join trips owner on owner.id=ts.trip_id
     join driver_shifts sh on sh.id=owner.shift_id join vehicles v on v.id=sh.vehicle_id
     left join parents p on p.id=s.parent_id
     left join student_day_plans dp on dp.student_id=s.id and dp.service_date=owner.scheduled_date
-    where m.trip_id=any($1::uuid[])`,[trips.map(t=>t.id)])).rows;
+    where m.trip_id=any($1::uuid[])`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
   return trips.map(trip=>{
     const shared=rows.filter(r=>r.trip_id===trip.id);
     const ids=new Set(shared.map(r=>r.id));

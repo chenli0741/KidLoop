@@ -1,5 +1,6 @@
 "use client";
 
+import {captureOperationLocation} from "@/lib/capture-operation-location";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Check, RotateCcw, UserCheck, UserX } from "lucide-react";
@@ -24,7 +25,8 @@ export function StatusActions({ assignmentId, status, onUpdated, targetTripId }:
     setError("");
     startTransition(async () => {
       try {
-        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined, targetTripId);
+        const location = await captureOperationLocation();
+        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" ? { reason, parentNotified } : undefined, targetTripId, location);
         dialog.current?.close();
         onUpdated(result);
       } catch {

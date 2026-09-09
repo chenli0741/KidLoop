@@ -1,3 +1,4 @@
+import {normalizeOperationLocation} from './operation-location';
 import "server-only";
 import type {PoolClient} from "pg";
 import type {AuthUser, Trip} from "./types";
@@ -5,7 +6,7 @@ import {tripSegments} from "./trip-segments";
 import {requireTerm} from "./operating-terms";
 import {recomputeTrip} from "./day-plans";
 
-export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string,pickupId:string,dropoffId:string) {
+export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string,pickupId:string,dropoffId:string,location?:unknown) {
   if(!['ADMIN','DRIVER'].includes(user.role) || (user.role==='DRIVER'&&!user.driverId)) throw new Error('Unavailable');
   await c.query('select pg_advisory_xact_lock(70919009)');
   await requireTerm(c);
@@ -24,11 +25,12 @@ export async function finishTripSegment(c:PoolClient,user:AuthUser,tripId:string
   if(!current || current.routeStops?.length!==2 || current.routeStops[0].id!==pickupId || current.routeStops[1].id!==dropoffId || current.riders.some(r=>r.pickupStopId!==pickupId||r.dropoffStopId!==dropoffId)) throw new Error('Finish the current route first');
   if(!current.riders.length) throw new Error('No riders');
   if(current.riders.some(r=>!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status))) throw new Error('Resolve all pickups before finishing');
+  const snapshot=JSON.stringify(normalizeOperationLocation(location));
   for(const rider of current.riders) {
     if(['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)) continue;
     await c.query("update trip_students set status='DROPPED_OFF',dropped_off_at=clock_timestamp(),updated_at=clock_timestamp() where id=$1",[rider.id]);
-    await c.query("insert into status_history(trip_student_id,from_status,to_status,actor_id,note) values($1,$2,'DROPPED_OFF',$3,'Driver confirmed all riders dropped off via Finish route')",[rider.id,rider.status,user.id]);
+    await c.query("insert into status_history(trip_student_id,from_status,to_status,actor_id,note,operation_location) values($1,$2,'DROPPED_OFF',$3,'Driver confirmed all riders dropped off via Finish route',$4::jsonb)",[rider.id,rider.status,user.id,snapshot]);
   }
-  await c.query('insert into trip_segment_completions(trip_id,pickup_stop_id,dropoff_stop_id,actor_id) values($1,$2,$3,$4)',[tripId,pickupId,dropoffId,user.id]);
+  await c.query('insert into trip_segment_completions(trip_id,pickup_stop_id,dropoff_stop_id,actor_id,operation_location) values($1,$2,$3,$4,$5::jsonb)',[tripId,pickupId,dropoffId,user.id,snapshot]);
   await recomputeTrip(c,tripId);
 }

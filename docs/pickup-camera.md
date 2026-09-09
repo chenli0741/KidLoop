@@ -1,0 +1,31 @@
+# Driver pickup camera
+
+2026-09-08 implementation, pending physical iPhone acceptance.
+
+## Interaction
+
+Only the driver trip page enables the icon-only camera entry. It appears between route details and the pickup manifest. A dialog opens a rear-camera live preview. Capture freezes the frame and stops the video tracks. Recognized faces show candidate student names; unmatched faces remain numbered and marked Unknown. The driver can correct selections, retake or close. Only Confirm pickup writes statuses, using one transaction and one captured device location for the selected group.
+
+Candidates are this displayed trip segment's scheduled, non-absent riders. Shared assignments are claimed through the existing serialized claim path. A stale selection, already claimed child, completed segment, unauthorized trip or exceeded capacity fails the whole batch. Other drivers continue receiving the existing shared-manifest updates. No camera recognition result bypasses the final confirmation.
+
+## Processing and data
+
+YuNet detection and SFace embeddings run locally with ONNX Runtime Web WASM. This is not Apple Vision, Apple Intelligence or a native Apple recognition API. Models are served from `/models/pickup/`; runtime files are self-hosted under `/onnx/`, copied by postinstall. No external CDN is required. First use downloads approximately 50 MB. Runtime is pinned to 1.29.0; model checksums and original licenses accompany the files.
+
+The app compares the captured image to authorized student photo URLs already used in the manifest. Reference images with zero/multiple faces and Test-account avatars are excluded. Cosine >= 0.45 and a >= 0.08 margin select a candidate; duplicate assignments are cleared. Thresholds are initial settings, not field-calibrated. No identity result has been tested on production children's photos during development.
+
+Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video and discards state. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
+
+Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The UI discloses this upload. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
+
+`OPENAI_API_KEY` enables belt analysis; `OPENAI_PICKUP_VISION_MODEL` defaults to `gpt-4o-mini`. Results are VISIBLE / CHECK / UNCLEAR; a missing key or provider failure displays unavailable and does not block manual pickup confirmation. Visible means a belt was seen, not that its fit or restraint is certified. The per-process 5-second throttle prevents repeated taps but is not a distributed billing quota.
+
+## Verification
+
+- TypeScript, lint and production build.
+- Matching tests: ambiguous, weak and duplicate identity rejection; affine alignment; detection suppression.
+- Isolated local PostgreSQL: driver authorization, batch capacity rollback, competing-driver rejection, shared pickup and location-history behavior.
+- Browser smoke: real model load and blank-tensor inference; mocked camera preview/capture, no-face disabled confirmation, retake and close. No production pickup writes.
+- Still required: physical iPhone camera permissions, real vehicle lighting/angles, speed and recognition usefulness, and actual provider seatbelt output. Do not describe desktop checks as iPhone acceptance.
+
+Speech remains a separate deferred task in `docs/pending-local-speech.md`.

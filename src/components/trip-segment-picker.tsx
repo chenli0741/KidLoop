@@ -1,5 +1,6 @@
 "use client";
 
+import {captureOperationLocation} from "@/lib/capture-operation-location";
 import {useId,useRef,useState,useTransition,type ReactNode} from "react";
 import {ArrowRight,Check,CarFront} from "lucide-react";
 import {LocationMap} from "./location-map";
@@ -27,7 +28,8 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children,on
     setError('');
     startTransition(async()=>{
       try{
-        const result=await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id);
+        const location=await captureOperationLocation();
+        const result=await finishSegment(tripId,option.stops[0].id,option.stops.at(-1)!.id,location);
         confirmation.current?.close();
         setSelected(null);
         onUpdated(result);

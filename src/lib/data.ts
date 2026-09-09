@@ -193,7 +193,8 @@ export async function getTrips(date: string) {
       select (select note from status_history where trip_student_id=ts.id and to_status='EXCEPTION' order by created_at desc limit 1) as missed_pickup_note,
              ts.pickup_stop_id,ts.dropoff_stop_id,(select coalesce(short_name,name) from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
              st.classroom_name, st.grade, st.age,
-             coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone, ts.status,
+             case when $2::uuid is null then coalesce(pa.name, '') else '' end as parent_name,
+             case when $2::uuid is null then coalesce(pa.phone, '') else '' end as parent_phone, ts.status,
              coalesce(dp.note, '') as parent_note, coalesce(dp.absent, false) as parent_absent
       from trip_students ts
       join trips t on t.id = ts.trip_id

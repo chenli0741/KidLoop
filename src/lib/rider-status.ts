@@ -1,3 +1,4 @@
+import {normalizeOperationLocation} from './operation-location';
 import { claimSharedPickup } from './shared-pickups';
 import "server-only";
 import type { PoolClient } from "pg";
@@ -6,7 +7,7 @@ import { requireTerm } from "./operating-terms";
 import { recomputeTrip } from "./day-plans";
 import { missedPickupReasons, type MissedPickupDetails } from "./missed-pickup";
 
-export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string) {
+export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
   if (!["ADMIN", "DRIVER"].includes(user.role) || (user.role === "DRIVER" && !user.driverId)) throw new Error("Assignment unavailable.");
   await client.query("select pg_advisory_xact_lock(70919009)");
   await requireTerm(client);
@@ -51,7 +52,7 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   if (undo) {
     await client.query("delete from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id]);
   }
-  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, note) values ($1, $2, $3, $4, $5)", [assignmentId, rider.status, nextStatus, user.id, nextStatus === "EXCEPTION" ? `${reason!.zh} / ${reason!.en}; 已通知家长自行安排接送 / Parent notified to arrange pickup` : ""]);
+  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, note, operation_location) values ($1, $2, $3, $4, $5, $6::jsonb)", [assignmentId, rider.status, nextStatus, user.id, nextStatus === "EXCEPTION" ? `${reason!.zh} / ${reason!.en}; 已通知家长自行安排接送 / Parent notified to arrange pickup` : "", JSON.stringify(normalizeOperationLocation(location))]);
   await recomputeTrip(client, tripId);
   if(oldTripId && oldTripId!==tripId) await recomputeTrip(client,oldTripId);
   await client.query(`update trips set updated_at=clock_timestamp() where id in (select trip_id from shared_pickup_members where assignment_id=$1)`,[assignmentId]);
