@@ -13,6 +13,7 @@ import { text, type Locale } from "@/lib/i18n";
 import { tripSegments } from "@/lib/trip-segments";
 import { TripSegmentPicker } from "@/components/trip-segment-picker";
 import { applyTripExecution, type TripExecution } from "@/lib/trip-execution";
+import { TripJourneyControls } from "@/components/trip-journey-controls";
 
 export function TripCard({ trip: source, locale, interactive = true, cameraEnabled = false, showParentContact = true }: { trip: Trip; locale: Locale; cameraEnabled?: boolean; showParentContact?: boolean; interactive?: boolean }) {
   const [state, setState] = useState({ source, trip: source });
@@ -67,6 +68,8 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
       <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Trip completion")} aria-valuemin={0} aria-valuemax={trip.riders.length || 1} aria-valuenow={completed}>
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
+
+      {cameraEnabled && <TripJourneyControls tripId={trip.id} status={trip.status} locale={locale} onUpdated={onUpdated} />}
 
       {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED','COMPLETED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;

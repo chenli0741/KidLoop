@@ -319,6 +319,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .form-disclosure { display: none; }
 .trip-progress { height: 3px; background: var(--green-soft); }
 .trip-progress > span { display: block; height: 100%; background: var(--green); }
+.trip-journey-controls { display:flex; align-items:center; gap:10px; padding:12px 16px 0; }
+.trip-start-button { min-height:44px; }
 a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offset: 3px; }
 
 /* Role workspaces share business components, with independent mobile overrides. */
