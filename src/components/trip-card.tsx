@@ -67,17 +67,15 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      {cameraEnabled && <TripJourneyControls trip={trip} locale={locale} onUpdated={onUpdated} />}
-
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
-        <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} locale={locale} interactive={interactive && !trip.completedSegments?.includes(`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`)} showStops={false} onUpdated={onUpdated}/>
+        <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} journeyTrip={i===0 ? trip : undefined} locale={locale} interactive={interactive && !trip.completedSegments?.includes(`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`)} showStops={false} onUpdated={onUpdated}/>
       </section>)}
-      {!segments.length && <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>} 
+      {!segments.length && <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} journeyTrip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>} 
     </article>
   );
 }
 
-function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true}:{trip:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean}) {
+function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean}) {
   return <>
 
       {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
@@ -112,6 +110,7 @@ function TripSegmentContent({trip,locale,interactive,onUpdated,showStops=true,ca
         </div>
       </div>)}
 
+      {journeyTrip && cameraEnabled && <TripJourneyControls trip={journeyTrip} locale={locale} onUpdated={onUpdated} />}
       {cameraEnabled && interactive && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={trip} locale={locale} onUpdated={onUpdated}/>}
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
