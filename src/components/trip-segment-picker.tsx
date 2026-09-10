@@ -33,7 +33,7 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children,on
         confirmation.current?.close();
         setSelected(null);
         onUpdated(result);
-      }catch{setError(text(locale,'无法完成，请刷新后重试。','Could not finish. Refresh and retry.'));}
+      }catch{setError(text(locale,'无法完成，请刷新后重试。','Could not complete. Refresh and retry.'));}
     });
   }
   return <>
@@ -49,13 +49,13 @@ export function TripSegmentPicker({options,tripId,locale,interactive,children,on
           <span className="segment-endpoint"><time>{item.stops.at(-1)!.time}</time><strong>{item.stops.at(-1)!.name}</strong></span>
         </button>
         <div className="segment-route-maps"><LocationMap compact name={item.stops[0].name} address={item.stops[0].address}/><span/><LocationMap compact name={item.stops.at(-1)!.name} address={item.stops.at(-1)!.address}/></div>
-        {item.done && <small className="segment-done">{text(locale,'已完成','Finished')}</small>}
+        {item.done && <small className="segment-done">{text(locale,'已完成','Completed')}</small>}
       </li>)}
     </ol>
     <div id={`${id}-content`} key={option.id}>{children[index]}</div>
     {interactive && <div className="segment-finish">
-      {option.done?<span><Check size={17}/>{text(locale,'本线路已完成','Route finished')}</span>:<>
-        <button type="button" className="button primary" disabled={cannotFinish} onClick={()=>confirmation.current?.showModal()}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Finish route')}</button>
+      {option.done?<span><Check size={17}/>{text(locale,'本线路已完成','Route completed')}</span>:<>
+        <button type="button" className="button primary" disabled={cannotFinish} onClick={()=>confirmation.current?.showModal()}><Check size={17}/>{pending?text(locale,'保存中','Saving'):text(locale,'完成本线路','Complete route')}</button>
         {option.pendingPickups>0 && <small>{text(locale,`${option.pendingPickups} 名学生接人状态待处理`,`${option.pendingPickups} pickups unresolved`)}</small>}
       </>}
       {error&&<p role="alert" className="form-message error">{error}</p>}
