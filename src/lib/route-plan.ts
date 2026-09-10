@@ -67,8 +67,9 @@ export function planRoute(
       i === 0
         ? minutes(r.stops[0].time) + delta
         : configured !== undefined
-          ? minutes(stops[i - 1].time) + configured
+        ? minutes(stops[i - 1].time) + (stops[i - 1].dwellMinutes ?? 0) + configured
         : minutes(stops[i - 1].time) +
+          (stops[i - 1].dwellMinutes ?? 0) +
           minutes(r.stops[i].time) -
           minutes(r.stops[i - 1].time);
     stops[i].time = clockTime(

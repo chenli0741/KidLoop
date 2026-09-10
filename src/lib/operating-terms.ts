@@ -130,7 +130,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
         const stop = randomUUID();
         map.set(s.id, stop);
         await c.query(
-          "insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time,pickup_time) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+          "insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time,pickup_time,dwell_minutes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
           [
             stop,
             next,
@@ -141,6 +141,7 @@ export async function createOperatingTerm(c: PoolClient, f: FormData) {
             s.address,
             s.arrival_time,
             s.pickup_time,
+            s.dwell_minutes,
           ],
         );
       }

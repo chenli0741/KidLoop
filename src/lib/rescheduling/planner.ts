@@ -166,10 +166,13 @@ function merge(
         )
       )
         continue;
-      const previous = path.at(-1),
-        duration = previous
-          ? travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name)?.minutes ?? edges.get(`${place(previous)}>${place(stop)}`)
-          : 0;
+      const previous = path.at(-1);
+      let duration: number | undefined = 0;
+      if (previous) {
+        const configured = travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name)?.minutes;
+        const fallback = edges.get(`${place(previous)}>${place(stop)}`);
+        duration = (configured ?? fallback) === undefined ? undefined : (configured ?? fallback)! + (previous.dwellMinutes ?? 0);
+      }
       if (duration === undefined) continue;
       const releases = students
         .filter((s) => s.pickupStopId === stop.id)

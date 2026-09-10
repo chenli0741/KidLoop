@@ -1,4 +1,4 @@
-export type RouteStop = { id:string; name:string; address:string; schoolId:string|null; programId:string|null; time:string; pickupTime?:string };
+export type RouteStop = { id:string; name:string; address:string; schoolId:string|null; programId:string|null; time:string; pickupTime?:string; dwellMinutes?:number };
 export type RouteStudent = { studentId:string; pickupStopId:string; dropoffStopId:string };
 export type FixedRoute = {excludedStudentIds?:string[];notes?:string;id:string; name:string; routeType:'RECURRING'|'TEMPORARY'; startsOn:string; endsOn:string; weekdays:number[]; driverId:string|null; vehicleId:string|null; enabled:boolean; updatedAt:string; stops:RouteStop[]; students:RouteStudent[]};
 

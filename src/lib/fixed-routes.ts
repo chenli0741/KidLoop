@@ -12,7 +12,7 @@ const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
 export async function lockRoutes(c:PoolClient){await c.query('select pg_advisory_xact_lock(70919009)');}
 export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string}):Promise<FixedRoute[]> {
  const routes:FixedRoute[]=(await c.query(`select r.id,r.name,r.notes,r.excluded_student_ids as "excludedStudentIds",r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
- coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),''),'pickupTime',to_char(s.pickup_time,'HH24:MI')) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
+ coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),''),'pickupTime',to_char(s.pickup_time,'HH24:MI'),'dwellMinutes',s.dwell_minutes) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  '[]'::jsonb as students
  from fixed_routes r where r.operating_term_id=current_operating_term()
  and ($1::uuid is null or r.driver_id=$1 or exists(select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.fixed_route_id=r.id and t.scheduled_date=$2::date and sh.driver_id=$1))
@@ -48,6 +48,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData){
  for(let i=0;i<stops.length;i++){
   const s=stops[i];
   if(!/^[0-9a-f-]{36}$/i.test(s.id)||((enabled||s.time!=='')&&(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)||(i>0&&stops[i-1].time!==''&&s.time<=stops[i-1].time))))error('请按顺序填写站点时间。','Enter increasing stop times.');
+  s.dwellMinutes=Number(s.dwellMinutes??0);if(!Number.isInteger(s.dwellMinutes)||s.dwellMinutes<0||s.dwellMinutes>120)error('预计停留时间无效。','Invalid estimated stop time.');
   if(Boolean(s.schoolId)===Boolean(s.programId))error('请选择学校或课外班。','Choose a school or program.');
   const place=(await c.query(`select ${s.schoolId?'coalesce(short_name,name)':'name'} as name,address from ${s.schoolId?'schools':'after_school_programs'} where id=$1`,[s.schoolId||s.programId])).rows[0];
   if(!place)error('地点不存在。','Place not found.');s.name=place.name;s.address=place.address;
@@ -64,7 +65,7 @@ export async function saveFixedRoute(c:PoolClient,f:FormData){
  const routeId=id||(await c.query('insert into fixed_routes(name,starts_on,ends_on,weekdays,enabled,route_type) values($1,$2,$3,$4,false,$5) returning id',[name,starts,ends,weekdays,routeType])).rows[0].id;
  await c.query('update fixed_routes set name=$2,starts_on=$3,ends_on=$4,weekdays=$5,driver_id=$6,vehicle_id=$7,enabled=$8,route_type=$9,notes=$10,excluded_student_ids=$11,updated_at=clock_timestamp() where id=$1',[routeId,name,starts,ends,weekdays,driver,vehicle,enabled,routeType,notes,[...new Set(excluded)]]);
  await c.query('delete from fixed_route_stops where route_id=$1',[routeId]);
- for(const [position,s] of stops.entries())await c.query('insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time,pickup_time) values($1,$2,$3,$4,$5,$6,$7,$8,$9)',[s.id,routeId,position,s.schoolId,s.programId,s.name,s.address,s.time||null,s.pickupTime||null]);
+ for(const [position,s] of stops.entries())await c.query('insert into fixed_route_stops(id,route_id,position,school_id,program_id,name,address,arrival_time,pickup_time,dwell_minutes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[s.id,routeId,position,s.schoolId,s.programId,s.name,s.address,s.time||null,s.pickupTime||null,s.dwellMinutes]);
  if(!Array.isArray(policies))error('共享设置无效。','Invalid sharing settings.');
  if(routeType==='TEMPORARY'&&policies.length)error('临时接送不修改学校共享批次。','Temporary services do not change shared batches.');
  for(const b of policies){
