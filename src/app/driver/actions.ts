@@ -24,6 +24,8 @@ export async function startTrip(tripId:string, location?:unknown){
   return transaction(async c=>{
     const row=(await c.query(`select t.status from trips t join driver_shifts sh on sh.id=t.shift_id where t.id=$1 and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id=$2) for update`,[tripId,user.role==='DRIVER'?user.driverId:null])).rows[0];
     if(!row || row.status!=='PUBLISHED') throw new Error('Trip is not ready to start.');
+    const pending=(await c.query("select 1 from trip_students where trip_id=$1 and status='SCHEDULED'",[tripId])).rowCount;
+    if(pending) throw new Error('Resolve all pickups before starting.');
     await c.query("update trips set status='IN_PROGRESS',updated_at=clock_timestamp() where id=$1",[tripId]);
     await c.query("insert into trip_events(trip_id,event_type,actor_id,operation_location) values($1,'STARTED',$2,$3::jsonb)",[tripId,user.id,JSON.stringify(normalizeOperationLocation(location))]);
     return readTripExecution(c,tripId);

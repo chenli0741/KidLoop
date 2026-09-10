@@ -69,7 +69,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
         <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
       </div>
 
-      {cameraEnabled && <TripJourneyControls tripId={trip.id} status={trip.status} locale={locale} onUpdated={onUpdated} />}
+      {cameraEnabled && <TripJourneyControls trip={trip} locale={locale} onUpdated={onUpdated} />}
 
       {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED','COMPLETED'].includes(trip.status)} options={segments.map(segment=>{
         const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
