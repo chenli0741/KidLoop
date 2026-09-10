@@ -19,12 +19,14 @@ export function RouteFields({ rules, initial, locale }: { rules: PickupSetting[]
   </>;
 }
 export function ExceptionFields({ initial, locale }: { initial?: PickupSetting; locale: Locale }) {
-  const [type,setType] = useState(initial?.gradeTimes?.length ? 'grades' : initial?.pickupTime || !initial ? "time" : "closed");
-  const [groups,setGroups]=useState(initial?.gradeTimes?.length?initial.gradeTimes:[{grades:[] as string[],time:''}]);
+  const initialGroups = initial?.gradeTimes?.length ? initial.gradeTimes : initial?.pickupTime ? [{grades:[...PICKUP_GRADES],time:initial.pickupTime}] : [{grades:[] as string[],time:''}];
+  const [closed,setClosed] = useState(!initial && false || !!initial && !initial.pickupTime && !initial.gradeTimes?.length);
+  const [groups,setGroups]=useState(initialGroups);
   return <>
-    <label className="full"><span>{text(locale,"日历日程类型","Calendar schedule type")}</span><select name="exceptionType" value={type} onChange={e=>setType(e.target.value)}><option value="time">{text(locale,"提前放学：全校同一时间","Early dismissal: all grades")}</option><option value="grades">{text(locale,"提前放学：按年级设置","Early dismissal: by grade")}</option><option value="closed">{text(locale,"放假／不接送","Holiday / no pickup")}</option></select></label>
-    {type==="time" && <label className="full"><span>{text(locale,"日程放学时间","Dismissal time in this schedule")}</span><input type="time" name="pickupTime" defaultValue={initial?.pickupTime ?? ""} required /></label>}
-    {type==='grades' && <>
+    <input type="hidden" name="exceptionType" value={closed ? "closed" : "grades"}/>
+    <label className="record-checkbox full"><input type="checkbox" name="calendarClosed" checked={closed} onChange={e=>setClosed(e.target.checked)} />{text(locale,"当天放假／不接送","No school / no pickup on these dates")}</label>
+    {!closed && <>
+      <p className="form-hint full">{text(locale,"填写这段日程中各年级的实际放学时间；相同时间的年级可以合并。","Enter the actual dismissal times for this schedule; grades sharing a time can be grouped.")}</p>
       <input type="hidden" name="gradeTimes" value={JSON.stringify(groups)}/>
       {groups.map((group,index)=><div className="special-time-group full" key={index}>
         <fieldset className="pickup-checks"><legend>{text(locale,`第 ${index+1} 组年级`,`Grade group ${index+1}`)}</legend>{PICKUP_GRADES.map(grade=><label key={grade}><input type="checkbox" checked={group.grades.includes(grade)} disabled={!group.grades.includes(grade)&&groups.some(g=>g.grades.includes(grade))} onChange={e=>setGroups(prev=>prev.map((g,i)=>i===index?{...g,grades:e.target.checked?[...g.grades,grade]:g.grades.filter(v=>v!==grade)}:g))}/><span>{grade}</span></label>)}</fieldset>

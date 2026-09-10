@@ -20,7 +20,7 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, lo
   const labels = {
     holiday: text(locale, "放假，不接送", "Holiday, no pickup"),
     pickup: text(locale, "上学，需要接送", "School day, pickup needed"),
-    adjusted: text(locale, "上学，接送时间调整", "School day, pickup time changed"),
+    adjusted: text(locale, "上学，使用日程时间", "School day, scheduled times apply"),
     weekend: text(locale, "周末休息，不接送", "Weekend, no pickup"),
     "outside-term": text(locale, "学期外，不接送", "Outside term, no pickup"),
     unconfigured: text(locale, "学校日历待设置", "School calendar not configured"),
@@ -42,7 +42,7 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, lo
       <button type="button" className="icon-button" aria-label={text(locale,"下个月","Next month")} onClick={()=>move(1)}><ChevronRight size={18}/></button>
       <button type="button" className="button secondary compact" onClick={()=>{setMonth(today.slice(0,7));setSelected(today);}}>{text(locale,"今天","Today")}</button>
     </div>
-    <div className="calendar-legend"><span className="calendar-pickup">{text(locale,"上学需接送","Pickup needed")}</span><span className="calendar-holiday">{text(locale,"放假","Holiday")}</span><span className="calendar-special">{text(locale,"时间调整","Time change")}</span></div>
+    <div className="calendar-legend"><span className="calendar-pickup">{text(locale,"上学需接送","Pickup needed")}</span><span className="calendar-holiday">{text(locale,"放假","Holiday")}</span><span className="calendar-special">{text(locale,"日程时间","Scheduled times")}</span></div>
     <div className="school-month-grid">
       {(locale === "zh" ? ["一","二","三","四","五","六","日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]).map(w=><div className="calendar-weekday" key={w}>{w}</div>)}
       {Array.from({length:offset},(_,i)=><div key={`blank-${i}`} />)}
