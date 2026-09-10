@@ -102,8 +102,8 @@ export default async function TermsPage({
             ["school_id", "starts_on", "ends_on"],
           ],
           [
-            "school_calendar_exceptions",
-            "假期与特殊日期",
+            "school_calendar_schedules",
+            "学校日历日程",
             "Holidays",
             ["school_id", "name", "starts_on", "ends_on", "pickup_time"],
           ],

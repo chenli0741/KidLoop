@@ -9,7 +9,7 @@ export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end
  const [routes,roster,terms,exceptions,drivers,vehicles,absences,existing]=await Promise.all([
   readFixedRoutes(c),readRosterData(c),
   c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn" from school_terms where operating_term_id=current_operating_term() order by id`),
-  c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,'HH24:MI') as "pickupTime",grade_times as "gradeTimes" from school_calendar_exceptions where operating_term_id=current_operating_term() and starts_on<=$2 and ends_on>=$1 order by id`,[start,end]),
+  c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,'HH24:MI') as "pickupTime",grade_times as "gradeTimes" from school_calendar_schedules where operating_term_id=current_operating_term() and starts_on<=$2 and ends_on>=$1 order by id`,[start,end]),
   c.query('select id,active,status from drivers order by id'),c.query('select id,active,status,capacity from vehicles order by id'),
   c.query(`select service_date::text as date,student_id as "studentId" from student_day_plans where service_date between $1 and $2 and absent order by service_date,student_id`,[start,end]),
   c.query(`select t.scheduled_date::text as date,t.fixed_route_id as "routeId",t.id as "tripId",sh.driver_id as "driverId",sh.vehicle_id as "vehicleId",to_char(sh.start_time,'HH24:MI') as start,to_char(sh.end_time,'HH24:MI') as end,

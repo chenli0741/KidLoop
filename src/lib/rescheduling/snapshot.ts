@@ -79,7 +79,7 @@ export async function readSnapshot(
   const facts = (
     await c.query(
       `select
-    (select coalesce(jsonb_agg(to_jsonb(x) order by x.id),'[]') from school_calendar_exceptions x where operating_term_id=current_operating_term()) as exceptions,
+    (select coalesce(jsonb_agg(to_jsonb(x) order by x.id),'[]') from school_calendar_schedules x where operating_term_id=current_operating_term()) as exceptions,
     (select coalesce(jsonb_agg(to_jsonb(x) order by x.id),'[]') from school_pickup_rules x where operating_term_id=current_operating_term()) as rules,
     (select coalesce(jsonb_agg(to_jsonb(x) order by x.id),'[]') from school_terms x where operating_term_id=current_operating_term()) as terms,
     (select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'address',address,'cutoff',calendar_archived_through) order by id),'[]') from schools) as schools,

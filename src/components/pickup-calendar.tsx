@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { calendarDays } from "@/lib/pickup-calendar";
 import type { PickupSetting } from "@/lib/pickup-types";
+import { formatGradeGroup } from "@/lib/pickup-types";
 import { text, type Locale } from "@/lib/i18n";
 
 export function PickupCalendar({ today, schoolName, terms, exceptions, rules, locale, archivedThrough = null }: {
@@ -58,8 +59,8 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, lo
       <h3>{schoolName}</h3>
       <p className="calendar-school-status">{labels[day.status]}</p>
       {day.term && <p>{day.term.name} · {day.term.startsOn} — {day.term.endsOn}</p>}
-      {day.exception && <p className={day.closed ? "calendar-holiday" : day.status === "adjusted" ? "calendar-special" : ""}>{day.exception.name}{day.status === "adjusted" && (day.exception.gradeTimes?.length ? ` · ${text(locale,'按年级临时改时','Grade-specific time change')}` : ` · ${text(locale,"接送时间调整为","Pickup time changed to")} ${day.exception.pickupTime}`)}</p>}
-      {day.schoolTimes.length>0 && <><h4>{text(locale,"学校接送时间","School pickup times")}</h4>{day.schoolTimes.map(t=><div className="calendar-pickup-detail" key={t.id}><strong>{t.time}</strong><span>{text(locale,"年级","Grades")} {t.grades.join("、")}</span></div>)}</>}
+      {day.exception && <p className={day.closed ? "calendar-holiday" : day.status === "adjusted" ? "calendar-special" : ""}>{day.exception.name}{day.status === "adjusted" && (day.exception.gradeTimes?.length ? ` · ${text(locale,'按年级设置放学时间','Dismissal times by grade')}` : ` · ${text(locale,"放学时间","Dismissal time")} ${day.exception.pickupTime}`)}</p>}
+      {day.schoolTimes.length>0 && <><h4>{text(locale,"学校接送时间","School pickup times")}</h4>{day.schoolTimes.map(t=><div className="calendar-pickup-detail" key={t.id}><strong>{t.time}</strong><span>{text(locale,"年级","Grades")} {formatGradeGroup(t.grades)}</span></div>)}</>}
     </div>
     </dialog>
     {!terms.length && <p className="form-hint">{text(locale,"尚未设置学期；请在学校规则中添加学期和假期，日历会同步显示。","Add terms and holidays in School rules to populate this calendar.")}</p>}

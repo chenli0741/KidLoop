@@ -53,7 +53,7 @@ export async function savePickupSetting(c: PoolClient, f: FormData) {
   const locked = await c.query('select calendar_archived_through::text as cutoff from schools where id=$1 for update',[school]);
   if (!locked.rowCount) fail("学校不存在。", "School not found.");
   const cutoff: string | null = locked.rows[0].cutoff;
-  const tables: Record<string,string> = {term:"school_terms",exception:"school_calendar_exceptions",rule:"school_pickup_rules",route:"pickup_routes"};
+  const tables: Record<string,string> = {term:"school_terms",exception:"school_calendar_schedules",rule:"school_pickup_rules",route:"pickup_routes"};
   const table = tables[kind];
   if (!table) fail("设置类型无效。", "Invalid setting type.");
   if (id) {
@@ -112,7 +112,7 @@ export const pickupPreviewSql = `
  join school_pickup_rules p on p.school_id=t.school_id
  join pickup_routes r on r.rule_id=p.id and extract(isodow from d)::integer=any(r.weekdays)
  join after_school_programs a on a.id=r.program_id
- left join school_calendar_exceptions e on e.school_id=t.school_id and d::date between e.starts_on and e.ends_on
+ left join school_calendar_schedules e on e.school_id=t.school_id and d::date between e.starts_on and e.ends_on
  cross join lateral (select school_special_pickup_time(e.grade_times,g.grade,e.pickup_time,p.pickup_time) as pickup_time,
    array_agg(g.grade order by g.position) as grades from unnest(p.grades) with ordinality as g(grade,position)
    group by school_special_pickup_time(e.grade_times,g.grade,e.pickup_time,p.pickup_time)) adjusted
@@ -130,10 +130,10 @@ export async function archiveSchoolCalendar(c: PoolClient, f: FormData, today: s
   if (term.end >= today) fail("只能存档已经结束的学期。", "Only ended terms can be archived.");
   if (locked.rows[0].cutoff && term.end <= locked.rows[0].cutoff) fail("该学期已存档。", "Term is already archived.");
   // Keep the historical segment and a separately editable future segment.
-  await c.query(`insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time,grade_times)
-    select school_id,name,$2::date+1,ends_on,pickup_time,grade_times from school_calendar_exceptions
+  await c.query(`insert into school_calendar_schedules(school_id,name,starts_on,ends_on,pickup_time,grade_times)
+    select school_id,name,$2::date+1,ends_on,pickup_time,grade_times from school_calendar_schedules
     where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
-  await c.query(`update school_calendar_exceptions set ends_on=$2,updated_at=clock_timestamp()
+  await c.query(`update school_calendar_schedules set ends_on=$2,updated_at=clock_timestamp()
     where school_id=$1 and starts_on <= $2::date and ends_on > $2::date`, [school, term.end]);
   await c.query('update schools set calendar_archived_through=$2,calendar_archived_at=clock_timestamp() where id=$1', [school, term.end]);
 }

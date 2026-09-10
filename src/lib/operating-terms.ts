@@ -42,7 +42,7 @@ export async function initializeSchools(c: PoolClient, t: OperatingTerm) {
     if (!added.rowCount) continue;
     for (const h of federalHolidays(t.startsOn, t.endsOn))
       await c.query(
-        "insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,operating_term_id) values($1,$2,$3,$3,$4)",
+        "insert into school_calendar_schedules(school_id,name,starts_on,ends_on,operating_term_id) values($1,$2,$3,$3,$4)",
         [s.id, h.name, h.date, t.id],
       );
   }
@@ -171,7 +171,7 @@ export async function archiveOperatingTerm(
   for (const table of [
     "school_terms",
     "school_pickup_rules",
-    "school_calendar_exceptions",
+    "school_calendar_schedules",
     "fixed_routes",
     "school_pickup_batches",
     "trips",

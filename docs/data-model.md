@@ -16,7 +16,7 @@
 | `vehicles` | Vehicle name, plate, seat capacity, and operational status. |
 | `drivers` | Driver identity, phone, and availability status. |
 | `school_terms` | School term date ranges. |
-| `school_calendar_exceptions` | School closures and special pickup times. |
+| `school_calendar_schedules` | Planned school calendar entries, including holidays and grade-specific dismissal times. |
 | `school_pickup_rules` | Multiple grades sharing weekdays and a pickup time. |
 | `fixed_routes` | Route dates, weekdays, driver/vehicle, enabled state and excluded student IDs. |
 | `fixed_route_stops` | Ordered school/program locations, arrival times and dismissal batch. |
@@ -34,7 +34,7 @@
 ## Main relationships
 
 ```text
-schools ──< school_terms / school_calendar_exceptions / school_pickup_rules
+schools ──< school_terms / school_calendar_schedules / school_pickup_rules
 schools ──< classrooms ──< students >── parents
 fixed_routes >── drivers / vehicles
       |──< fixed_route_stops >── schools / after_school_programs

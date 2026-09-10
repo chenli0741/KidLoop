@@ -81,7 +81,7 @@ async function applyCalendar(
     const old = (
       await c.query(
         `select id,name,starts_on::text as start,ends_on::text as end,pickup_time::text as time,grade_times as groups,updated_at::text as version
-      from school_calendar_exceptions where operating_term_id=current_operating_term() and school_id=$1 and $2::date between starts_on and ends_on for update`,
+      from school_calendar_schedules where operating_term_id=current_operating_term() and school_id=$1 and $2::date between starts_on and ends_on for update`,
         [schoolId, day],
       )
     ).rows[0];
@@ -96,12 +96,12 @@ async function applyCalendar(
     for (const change of changes)
       for (const grade of change.grades) overrides.set(grade, change.time);
     if (old) {
-      await c.query("delete from school_calendar_exceptions where id=$1", [
+      await c.query("delete from school_calendar_schedules where id=$1", [
         old.id,
       ]);
       if (old.start < day)
         await c.query(
-          `insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time,grade_times) values($1,$2,$3,$4::date-1,$5,$6)`,
+          `insert into school_calendar_schedules(school_id,name,starts_on,ends_on,pickup_time,grade_times) values($1,$2,$3,$4::date-1,$5,$6)`,
           [
             schoolId,
             old.name,
@@ -113,7 +113,7 @@ async function applyCalendar(
         );
       if (old.end > day)
         await c.query(
-          `insert into school_calendar_exceptions(school_id,name,starts_on,ends_on,pickup_time,grade_times) values($1,$2,$3::date+1,$4,$5,$6)`,
+          `insert into school_calendar_schedules(school_id,name,starts_on,ends_on,pickup_time,grade_times) values($1,$2,$3::date+1,$4,$5,$6)`,
           [
             schoolId,
             old.name,
