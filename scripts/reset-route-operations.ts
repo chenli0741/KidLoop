@@ -7,7 +7,7 @@ import {readTrialRange} from '../src/lib/schedule-trial-data';
 import {calendarMonth} from '../src/lib/workweek';
 async function main(){
  const apply=process.argv.includes('--apply'),date=todayInOperationsTimeZone(),c=await db.connect();
- const core=['students','schools','after_school_programs','parents','drivers','vehicles','app_users','user_students','student_photos','school_terms','school_pickup_rules','school_calendar_exceptions','student_day_plans'];
+ const core=['students','schools','after_school_programs','parents','drivers','vehicles','app_users','user_students','student_photos','school_terms','school_pickup_rules','school_calendar_schedules','student_day_plans'];
  const fingerprint=async()=>{
   const hash=createHash('sha256');for(const table of core)hash.update(JSON.stringify((await c.query(`select to_jsonb(t) as row from ${table} t order by to_jsonb(t)::text`)).rows));return hash.digest('hex');
  };
