@@ -58,7 +58,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
       <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"学校","School")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
       {tab==="school" && <>
         {section("term",text(locale,"学期日历","School terms"),text(locale,"默认使用运营学期日期；仅在本校不同的情况下编辑。","Dates default to the operating term. Edit only school-specific differences."),terms)}
-        {section("exception",text(locale,"学校日历日程","School calendar schedule"),text(locale,"按日期或日期范围记录上课、提前放学和放假；年级时间直接显示在日程中。未覆盖的年级沿用常规规则。","Record school days, early dismissal and holidays by date or range; show grade times directly in each schedule. Grades not covered use the regular rules."),exceptions)}
+        {section("exception",text(locale,"学校日历日程","School calendar schedule"),text(locale,"按日期或日期范围记录学校正式安排；年级实际时间直接显示在日程中。未覆盖的年级沿用常规规则。","Record formal school calendar schedules by date or range; show actual grade times directly in each schedule. Grades not covered use the regular rules."),exceptions)}
         {section("rule",text(locale,"年级接送时间","Grade pickup times"),text(locale,"相同时间的年级可合并设置；周三等不同时间另建一条规则。","Group grades sharing a time. Add a separate rule for weekdays with different times."),rules)}
       </>}
       {tab==="preview" && school && <PickupCalendar key={`${school.id}:${cutoff}`} archivedThrough={cutoff} today={today} schoolName={school.name} terms={terms} exceptions={exceptions} rules={rules} locale={locale} />}

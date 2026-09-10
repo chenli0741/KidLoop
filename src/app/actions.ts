@@ -43,6 +43,26 @@ export async function deleteTravelTime(_: FormState, formData: FormData): Promis
   return runMutation(async () => { await query("update travel_time_profiles set active=false,updated_at=now() where id=$1", [required(formData, "id")]); }, ["/resources"], { zh: "地点间时间已停用。", en: "Travel time deactivated." });
 }
 
+export async function updateStudentStatusReason(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const id = required(formData, "id");
+    const roles = formData.getAll("roles").filter((value): value is string => ["ADMIN", "DRIVER", "PARENT"].includes(String(value))).map(String);
+    if (!roles.length) throw new Error("Select at least one role.");
+    await query("update student_status_reasons set roles=$2::text[],updated_at=now() where id=$1", [id, roles]);
+  }, ["/resources"], { zh: "原因权限已保存。", en: "Reason roles saved." });
+}
+
+export async function createStudentStatusReason(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const id = required(formData, "id").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    const nameZh = required(formData, "nameZh");
+    const nameEn = required(formData, "nameEn");
+    const roles = formData.getAll("roles").filter((value): value is string => ["ADMIN", "DRIVER", "PARENT"].includes(String(value))).map(String);
+    if (!/^[A-Z][A-Z0-9_]{1,39}$/.test(id) || !roles.length) throw new Error("Invalid reason.");
+    await query("insert into student_status_reasons(id,name_zh,name_en,roles) values($1,$2,$3,$4::text[])", [id, nameZh, nameEn, roles]);
+  }, ["/resources?tab=reasons"], { zh: "接送原因已添加。", en: "Student status reason added." });
+}
+
 export async function setLocale(formData: FormData) {
   const user = await requireUser();
   if (isTestAccount(user)) return;

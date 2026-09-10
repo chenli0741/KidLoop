@@ -26,6 +26,7 @@ export type Resource = {
   status: string;
   capacity?: number;
 };
+export type TravelTime = { fromName: string; toName: string; minutes: number };
 export type Task = {
   routeId: string | null;
   tripId: string;
@@ -43,6 +44,7 @@ export type Snapshot = {
   students: Rider[];
   drivers: Resource[];
   vehicles: Resource[];
+  travelTimes: TravelTime[];
   days: {
     date: string;
     matches: PickupMatch[];

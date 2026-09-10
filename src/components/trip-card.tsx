@@ -127,7 +127,6 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
             </div>
             <div className="rider-primary">
               <strong>{rider.name}</strong>
-              {trip.routeStops && <span>{trip.routeStops.find(s=>s.id===rider.pickupStopId)?.name} → {trip.routeStops.find(s=>s.id===rider.dropoffStopId)?.name}</span>}
               <span>{rider.classroomName} · {text(locale, "年级", "Grade")} {rider.grade || text(locale, "待定", "pending")} · {text(locale, "年龄", "Age")} {rider.age ?? text(locale, "待定", "pending")}</span>
             </div>
             {showParentContact && <div className="rider-contact">

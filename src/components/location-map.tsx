@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { MapPin, Map, X } from "lucide-react";
+import { Navigation, Map, X } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 import { addressMapUrl, pickupMapUrl } from "@/lib/map-url";
@@ -15,7 +15,7 @@ export function LocationMap({ name, address, url, compact = false }: Props) {
   const label = address ? text(locale, "地址地图", "Address map") : text(locale, "接送示意图", "Pickup diagram");
   if (!source) return <small className="map-pending">{text(locale, "接送示意图待补充", "Pickup diagram pending")}</small>;
   return <>
-    <button type="button" className={compact ? "icon-button segment-map" : "map-link"} aria-label={compact ? `${name} · ${label}` : undefined} title={compact ? `${name} · ${label}` : undefined} onClick={() => setOpen(true)}>{address ? <MapPin size={compact ? 17 : 14} /> : <Map size={compact ? 17 : 14} />}{!compact && label}</button>
+    <button type="button" className={compact ? "icon-button segment-map" : "map-link"} aria-label={compact ? `${name} · ${label}` : undefined} title={compact ? `${name} · ${label}` : undefined} onClick={() => setOpen(true)}>{compact ? <Navigation size={17} /> : address ? <Navigation size={14} /> : <Map size={14} />}{!compact && label}</button>
     {open && <MapDialog title={`${name} · ${label}`} source={source} address={address} close={() => setOpen(false)} />}
   </>;
 }

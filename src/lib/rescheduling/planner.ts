@@ -101,12 +101,13 @@ const samePlan = (a: PlannedRoute, b: PlannedRoute) =>
 const asPlan = (
   r: FixedRoute,
   matches: Snapshot["days"][number]["matches"],
+  travelTimes: Snapshot["travelTimes"],
 ): PlannedRoute => ({
   sourceIds: [r.id],
   name: r.name,
   driverId: r.driverId!,
   vehicleId: r.vehicleId!,
-  ...planRoute(r, matches),
+  ...planRoute(r, matches, travelTimes),
 });
 const place = (s: RouteStop) =>
   s.schoolId
@@ -121,6 +122,7 @@ function merge(
   b: PlannedRoute,
   routes: FixedRoute[],
   matches: Snapshot["days"][number]["matches"],
+  travelTimes: Snapshot["travelTimes"],
 ): PlannedRoute | null {
   const nodes = new Map<string, RouteStop>();
   for (const s of [...a.stops, ...b.stops])
@@ -166,7 +168,7 @@ function merge(
         continue;
       const previous = path.at(-1),
         duration = previous
-          ? edges.get(`${place(previous)}>${place(stop)}`)
+          ? travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name)?.minutes ?? edges.get(`${place(previous)}>${place(stop)}`)
           : 0;
       if (duration === undefined) continue;
       const releases = students
@@ -199,7 +201,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     candidates: [],
     conflicts: [],
     warnings: [
-      "按现有模板时间间隔试算，未验证实际路况和任务间转场耗时 / Uses existing template intervals; live traffic and transfer travel are not verified.",
+      "优先使用已配置的地点间行驶时间；未配置的相邻地点沿用线路模板间隔，均不代表实时路况 / Uses configured point-to-point travel times first; template intervals are used only when missing and do not represent live traffic.",
     ],
     examined: 0,
   };
@@ -227,8 +229,8 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
       blockers.flatMap((t) => t.students.map((s) => s.studentId)),
     );
     for (const r of immutable) {
-      const before = asPlan(r, day.matches),
-        after = asPlan(r, changedMatches);
+      const before = asPlan(r, day.matches, snapshot.travelTimes),
+        after = asPlan(r, changedMatches, snapshot.travelTimes);
       // A dismissal change still affects a protected student when another grade
       // keeps the shared stop at the same latest pickup time.
       const changesProtectedDismissal = before.students.some((student) => {
@@ -283,7 +285,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     const temporaryStudents = new Set(
       active
         .filter((r) => r.routeType === "TEMPORARY")
-        .flatMap((r) => asPlan(r, matches).students.map((s) => s.studentId)),
+        .flatMap((r) => asPlan(r, matches, snapshot.travelTimes).students.map((s) => s.studentId)),
     );
     const routeMatches = (r: FixedRoute, list: typeof matches) =>
       list.filter(
@@ -292,10 +294,10 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
           (r.routeType === "TEMPORARY" || !temporaryStudents.has(m.student_id)),
       );
     const before = originals
-      .map((r) => asPlan(r, routeMatches(r, day.matches)))
+      .map((r) => asPlan(r, routeMatches(r, day.matches), snapshot.travelTimes))
       .filter((r) => r.students.length);
     const base = originals
-      .map((r) => asPlan(r, routeMatches(r, matches)))
+      .map((r) => asPlan(r, routeMatches(r, matches), snapshot.travelTimes))
       .filter((r) => r.students.length);
     if (base.length > 30) {
       result.conflicts.push(
@@ -326,7 +328,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         const stops = source.stops.slice(first, last + 1);
         split.push({
           ...p,
-          ...planRoute({ ...source, students, stops }, matches),
+          ...planRoute({ ...source, students, stops }, matches, snapshot.travelTimes),
         });
       }
     }
@@ -334,7 +336,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     // Try bounded pairwise combinations, including cross-school paths with known template edges.
     for (let i = 0; i < split.length && variants.length < 16; i++)
       for (let j = i + 1; j < split.length && variants.length < 16; j++) {
-        const joined = merge(split[i], split[j], snapshot.routes, matches);
+        const joined = merge(split[i], split[j], snapshot.routes, matches, snapshot.travelTimes);
         if (joined)
           variants.push([
             ...split.filter((_, k) => k !== i && k !== j),
