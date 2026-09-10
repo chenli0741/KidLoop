@@ -10,11 +10,10 @@ import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { text, type Locale } from "@/lib/i18n";
-import { tripSegments } from "@/lib/trip-segments";
 import { applyTripExecution, type TripExecution } from "@/lib/trip-execution";
 import { TripJourneyControls } from "@/components/trip-journey-controls";
 
-export function TripCard({ trip: source, locale, interactive = true, cameraEnabled = false, showParentContact = true }: { trip: Trip; locale: Locale; cameraEnabled?: boolean; showParentContact?: boolean; interactive?: boolean }) {
+export function TripCard({ trip: source, locale, interactive = true, cameraEnabled = false, showParentContact = true, role = "ADMIN" }: { trip: Trip; locale: Locale; cameraEnabled?: boolean; showParentContact?: boolean; interactive?: boolean; role?: "ADMIN" | "DRIVER" }) {
   const [state, setState] = useState({ source, trip: source });
   let trip = state.trip;
   if (state.source !== source) {
@@ -22,6 +21,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
     setState({ source, trip });
   }
   const refreshEpoch = useRef(0);
+  const [selectedStopIndex, setSelectedStopIndex] = useState<number | null>(null);
   const [syncFailed,setSyncFailed]=useState(false);
   useEffect(()=>{
     if(!source.hasSharedPickups)return;
@@ -45,7 +45,6 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
   }
   const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   const completed = countedRiders.filter((rider) => rider.status === 'DROPPED_OFF').length;
-  const segments = tripSegments(trip);
 
   return (
     <article className="trip-card">
@@ -53,7 +52,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
       <header className="trip-header">
         <div>
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
-          <h3>{segments.length > 1 ? text(locale, "接送行程", "Pickup trips") : segments[0].routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
+        <h3>{trip.routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
         </div>
         <StatusBadge status={trip.status} />
       </header>
@@ -68,19 +67,21 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
         <span style={{ width: `${countedRiders.length ? completed / countedRiders.length * 100 : 0}%` }} />
       </div>
 
-      {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
-        <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} journeyTrip={i===0 ? trip : undefined} locale={locale} interactive={interactive && !trip.completedSegments?.includes(`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`)} showStops={false} onUpdated={onUpdated}/>
-      </section>)}
-      {!segments.length && <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} journeyTrip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>} 
+      <section className="trip-segment">
+        <TripSegmentContent role={role} selectedStopIndex={selectedStopIndex ?? trip.currentStopIndex ?? 0} onSelectStop={setSelectedStopIndex} showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} journeyTrip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>
+      </section>
     </article>
   );
 }
 
-function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean}) {
-  const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
+function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true,role,selectedStopIndex,onSelectStop}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean;role:"ADMIN"|"DRIVER";selectedStopIndex?:number;onSelectStop?:(index:number)=>void}) {
+  const currentIndex = trip.currentStopIndex ?? 0;
+  const currentStop = trip.routeStops?.[selectedStopIndex ?? currentIndex];
+  const visibleRiders = currentStop ? trip.riders.filter(rider => currentStop.schoolId ? rider.pickupStopId === currentStop.id : rider.dropoffStopId === currentStop.id) : trip.riders;
+  const countedRiders = visibleRiders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   return <>
 
-      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
+      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li className={`${i === currentIndex ? "is-current " : ""}${i === (selectedStopIndex ?? currentIndex) ? "is-selected" : ""}`} key={stop.id}><button type="button" className="fixed-stop-select" disabled={!onSelectStop} onClick={() => onSelectStop?.(i)}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes" onClick={event => event.stopPropagation()}><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></button></li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
           <span className="route-dot pickup" />
           <div>
@@ -113,13 +114,13 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
       </div>)}
 
       {journeyTrip && cameraEnabled && <TripJourneyControls trip={journeyTrip} locale={locale} onUpdated={onUpdated} />}
-      {cameraEnabled && interactive && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={trip} locale={locale} onUpdated={onUpdated}/>}
+      {cameraEnabled && interactive && selectedStopIndex === currentIndex && currentStop?.schoolId && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={{...trip, riders: visibleRiders}} locale={locale} onUpdated={onUpdated}/>}
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
         <span>{trip.hasSharedPickups ? text(locale,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} 人本车已接 · ${trip.capacity} 座 · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} 人待接`,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} picked up here · ${trip.capacity} seats · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} pending`) : trip.routeName ? text(locale, `Pickup ${countedRiders.length} 人 · ${trip.capacity} 座`, `Pickup ${countedRiders.length} · ${trip.capacity} seats`) : text(locale, `Pickup ${countedRiders.length}/${trip.capacity} 个座位`, `Pickup ${countedRiders.length} of ${trip.capacity} seats`)}</span>
       </div>
       <div className="manifest-list">
-        {[...trip.riders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
+        {[...visibleRiders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
           <div className="rider-row" style={rider.otherVehicle ? {opacity:0.55,background:"#f2f3f3"}:undefined} key={rider.id}>
             <div className="student-photo">
               {rider.photoUrl ? <StudentPhotoPreview src={rider.photoUrl} name={rider.name} locale={locale} sizes="80px"/> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
@@ -134,7 +135,7 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>}
             {rider.otherVehicle ? <span>{text(locale,`已由 ${rider.otherVehicle} ${["ABSENT","EXCEPTION"].includes(rider.status)?"处理":"接走"}`,`${["ABSENT","EXCEPTION"].includes(rider.status)?"Handled":"Picked up"} by ${rider.otherVehicle}`)}</span> : <StatusBadge status={rider.status} />}
-            {interactive && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
+            {interactive && selectedStopIndex === currentIndex && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions role={role} targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>

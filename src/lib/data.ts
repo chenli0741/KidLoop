@@ -161,13 +161,14 @@ export async function getTrips(date: string) {
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
-      execution_version: string; completed_segments: string[]; route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
+      execution_version: string; completed_segments: string[]; current_stop_index:number; progress_state:"AT_STOP"|"IN_TRANSIT"; route_name: string | null; route_stops: RouteStop[] | null; id: string; scheduled_date: string; departure_time: string; status: Trip["status"];
       driver_name: string; driver_phone: string; vehicle_name: string; vehicle_plate: string; capacity: number;
       school_name: string; school_address: string; pickup_map_url: string | null;
       pickup_instructions: string; dismissal_time: string | null; program_name: string;
       program_address: string; dropoff_info: string; program_requirements: string;
     }>(`
       select to_char(t.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US') as execution_version,
+             t.current_stop_index,t.progress_state,
              array(select pickup_stop_id::text||':'||dropoff_stop_id::text from trip_segment_completions where trip_id=t.id) as completed_segments,
              t.route_name,t.route_stops,t.id, t.scheduled_date::text, t.departure_time::text, t.status,
              d.name as driver_name, d.phone as driver_phone,
@@ -234,6 +235,8 @@ export async function getTrips(date: string) {
   return addSharedRiders(db, tripResult.rows.map((row): Trip => ({
     id: row.id,
     executionVersion: row.execution_version,
+    currentStopIndex: row.current_stop_index,
+    progressState: row.progress_state,
     routeName: row.route_name, routeStops:row.route_stops, completedSegments:row.completed_segments,
     scheduledDate: row.scheduled_date,
     departureTime: row.departure_time,

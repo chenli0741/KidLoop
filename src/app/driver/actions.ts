@@ -1,19 +1,9 @@
 "use server";
 import {requireUser} from "@/lib/auth";
 import {transaction} from "@/lib/db";
-import {finishTripSegment} from "@/lib/finish-trip-segment";
 import {readTripExecution} from "@/lib/read-trip-execution";
 import {normalizeOperationLocation} from "@/lib/operation-location";
-import {tripSegments} from "@/lib/trip-segments";
-import type {Trip} from "@/lib/types";
-
-export async function finishSegment(tripId:string,pickupId:string,dropoffId:string,location?:unknown) {
-  const user=await requireUser(['ADMIN','DRIVER']);
-  return transaction(async c=>{
-    await finishTripSegment(c,user,tripId,pickupId,dropoffId,location);
-    return readTripExecution(c,tripId);
-  });
-}
+import type {RouteStop} from "@/lib/fixed-route-types";
 
 export async function confirmPhotoPickup(tripId:string,ids:string[],location?:unknown){
  const user=await requireUser(['DRIVER']);
@@ -21,28 +11,43 @@ export async function confirmPhotoPickup(tripId:string,ids:string[],location?:un
  return transaction(c=>confirmCameraPickup(c,user,tripId,ids,location));
 }
 
-export async function startTrip(tripId:string, location?:unknown){
-  const user=await requireUser(['DRIVER','ADMIN']);
-  return transaction(async c=>{
-    const row=(await c.query(`select t.status from trips t join driver_shifts sh on sh.id=t.shift_id where t.id=$1 and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id=$2) for update`,[tripId,user.role==='DRIVER'?user.driverId:null])).rows[0];
-    if(!row || row.status!=='PUBLISHED') throw new Error('Trip is not ready to start.');
-    const pending=(await c.query("select 1 from trip_students where trip_id=$1 and status='SCHEDULED'",[tripId])).rowCount;
-    if(pending) throw new Error('Resolve all pickups before starting.');
-    await c.query("update trips set status='IN_PROGRESS',updated_at=clock_timestamp() where id=$1",[tripId]);
-    await c.query("insert into trip_events(trip_id,event_type,actor_id,operation_location) values($1,'STARTED',$2,$3::jsonb)",[tripId,user.id,JSON.stringify(normalizeOperationLocation(location))]);
-    return readTripExecution(c,tripId);
-  });
-}
+export async function startTrip(tripId:string, location?:unknown){ return advanceTripStop(tripId, 'GO', location); }
+export async function completeTrip(tripId:string, location?:unknown){ return advanceTripStop(tripId, 'GO', location); }
 
-export async function completeTrip(tripId:string, location?:unknown){
+export async function advanceTripStop(tripId:string, action:'GO'|'ARRIVE'|'DROP_OFF', location?:unknown){
   const user=await requireUser(['DRIVER','ADMIN']);
   return transaction(async c=>{
-    const row=(await c.query(`select t.id,t.status,t.route_stops from trips t join driver_shifts sh on sh.id=t.shift_id where t.id=$1 and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id=$2) for update`,[tripId,user.role==='DRIVER'?user.driverId:null])).rows[0];
-    if(!row || !['IN_PROGRESS','PUBLISHED'].includes(row.status)) throw new Error('Trip is not active.');
-    const riders=(await c.query('select id,status,pickup_stop_id as "pickupStopId",dropoff_stop_id as "dropoffStopId" from trip_students where trip_id=$1',[tripId])).rows;
-    if(riders.some(r=>r.status==='SCHEDULED')) throw new Error('Resolve all pickups before completing.');
-    const segments=tripSegments({routeStops:row.route_stops,riders} as Trip);
-    for(const segment of segments) if(segment.routeStops?.length===2 && segment.riders.length) await finishTripSegment(c,user,tripId,segment.routeStops[0].id,segment.routeStops[1].id,location);
+    const row=(await c.query<{route_stops:RouteStop[]|null;current_stop_index:number;progress_state:'AT_STOP'|'IN_TRANSIT'}>(`select t.route_stops,t.current_stop_index,t.progress_state from trips t join driver_shifts sh on sh.id=t.shift_id where t.id=$1 and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id=$2) for update`,[tripId,user.role==='DRIVER'?user.driverId:null])).rows[0];
+    if(!row || !row.route_stops?.length) throw new Error('Trip stops are unavailable.');
+    const index=row.current_stop_index, stop=row.route_stops[index];
+    if(!stop) throw new Error('Trip is already complete.');
+    const snapshot=JSON.stringify(normalizeOperationLocation(location));
+    if(action==='ARRIVE') {
+      if(row.progress_state!=='IN_TRANSIT') throw new Error('Trip is not in transit.');
+      const next=Math.min(index+1,row.route_stops.length-1);
+      await c.query("update trips set current_stop_index=$2,progress_state='AT_STOP',status='IN_PROGRESS',updated_at=clock_timestamp() where id=$1",[tripId,next]);
+      await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,operation_location) values($1,$2,'ARRIVED',$3,$4::jsonb)",[tripId,next,user.id,snapshot]);
+      return readTripExecution(c,tripId);
+    }
+    if(row.progress_state!=='AT_STOP') throw new Error('Arrive at the current stop first.');
+    const riders=(await c.query<{id:string;status:string;pickup_stop_id:string|null;dropoff_stop_id:string|null}>("select id,status,pickup_stop_id,dropoff_stop_id from trip_students where trip_id=$1 for update",[tripId])).rows;
+    const atPickup=riders.filter(r=>r.pickup_stop_id===stop.id);
+    const atDropoff=riders.filter(r=>r.dropoff_stop_id===stop.id);
+    if(action==='DROP_OFF') {
+      if(!stop.programId) throw new Error('This stop does not accept drop-off.');
+      for(const rider of atDropoff.filter(r=>r.status==='PICKED_UP')) {
+        await c.query("update trip_students set status='DROPPED_OFF',dropped_off_at=clock_timestamp(),updated_at=clock_timestamp() where id=$1",[rider.id]);
+        await c.query("insert into status_history(trip_student_id,from_status,to_status,actor_id,note,operation_location) values($1,$2,'DROPPED_OFF',$3,'Drop off at current stop',$4::jsonb)",[rider.id,rider.status,user.id,snapshot]);
+      }
+      await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,operation_location) values($1,$2,'DROP_OFF',$3,$4::jsonb)",[tripId,index,user.id,snapshot]);
+      await c.query("update trips set updated_at=clock_timestamp() where id=$1",[tripId]);
+      return readTripExecution(c,tripId);
+    }
+    if(stop.schoolId && atPickup.some(r=>r.status==='SCHEDULED')) throw new Error('Resolve all students at this school first.');
+    if(stop.programId && atDropoff.some(r=>r.status==='PICKED_UP')) throw new Error('Drop off all students at this stop first.');
+    if(index===row.route_stops.length-1) await c.query("update trips set status='COMPLETED',progress_state='AT_STOP',updated_at=clock_timestamp() where id=$1",[tripId]);
+    else await c.query("update trips set status='IN_PROGRESS',progress_state='IN_TRANSIT',updated_at=clock_timestamp() where id=$1",[tripId]);
+    await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,operation_location) values($1,$2,'GO',$3,$4::jsonb)",[tripId,index,user.id,snapshot]);
     return readTripExecution(c,tripId);
   });
 }

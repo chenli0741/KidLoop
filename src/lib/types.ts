@@ -106,6 +106,8 @@ export type Trip = {
   hasSharedPickups?: boolean;
   executionVersion?: string;
   completedSegments?: string[];
+  currentStopIndex?: number;
+  progressState?: "AT_STOP" | "IN_TRANSIT";
   routeName?:string|null; routeStops?:import("./fixed-route-types").RouteStop[]|null;
   id: string;
   scheduledDate: string;

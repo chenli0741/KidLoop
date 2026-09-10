@@ -507,6 +507,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-trip-stops strong { display: block; font-size: 14px; }
 .fixed-trip-stops small { color: var(--green); font-size: 12px; }
 .fixed-stop-number { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 12px; }
+.fixed-stop-select { display: flex; width: 100%; align-items: flex-start; gap: 10px; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; cursor: pointer; }
+.fixed-trip-stops li.is-current { border-radius: 10px; background: #eef8f3; }
+.fixed-trip-stops li.is-selected { box-shadow: 0 0 0 2px rgba(20,115,82,.18); }
 .term-workspace { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:16px; margin-bottom:20px; background:var(--green-soft); border-radius:14px; }
 .term-workspace p { margin:6px 0 0; font-size:13px; color:var(--muted); }
 

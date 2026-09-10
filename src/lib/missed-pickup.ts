@@ -5,4 +5,6 @@ export const missedPickupReasons = [
   { id: "OTHER", zh: "其他原因", en: "Other reason" },
 ] as const;
 
-export type MissedPickupDetails = { reason: string; parentNotified: boolean };
+export type MissedPickupDetails = { reason: string; parentNotified?: boolean };
+
+export type StudentStatusReason = { id: string; zh: string; en: string };

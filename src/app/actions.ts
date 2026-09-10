@@ -19,6 +19,15 @@ import { schoolNames, updateSchoolNames } from "@/lib/school-management";
 import { isTestAccount } from '@/lib/test-account';
 import { pickupMapUrl } from "@/lib/map-url";
 
+export async function listStudentStatusReasons() {
+  const user = await requireUser(["ADMIN", "DRIVER", "PARENT"]);
+  const result = await query<{ id: string; name_zh: string; name_en: string }>(
+    "select id,name_zh,name_en from student_status_reasons where active and $1 = any(roles) order by id",
+    [user.role],
+  );
+  return result.rows.map(row => ({ id: row.id, zh: row.name_zh, en: row.name_en }));
+}
+
 export async function setLocale(formData: FormData) {
   const user = await requireUser();
   if (isTestAccount(user)) return;

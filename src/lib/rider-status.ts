@@ -5,7 +5,7 @@ import type { PoolClient } from "pg";
 import type { AuthUser, RiderStatus } from "./types";
 import { requireTerm } from "./operating-terms";
 import { recomputeTrip } from "./day-plans";
-import { missedPickupReasons, type MissedPickupDetails } from "./missed-pickup";
+import type { MissedPickupDetails } from "./missed-pickup";
 
 export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
   if (!["ADMIN", "DRIVER"].includes(user.role) || (user.role === "DRIVER" && !user.driverId)) throw new Error("Assignment unavailable.");
@@ -27,12 +27,16 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   const { student_id: studentId, trip_id: tripId } = target.rows[0];
   // Match parent-plan and route-completion lock order.
   await client.query("select id from students where id = $1 for update", [studentId]);
-  const trip = await client.query<{ status: string }>("select status from trips where id = $1 for update", [tripId]);
+  const trip = await client.query<{ status: string; current_stop_index: number; progress_state: string; route_stops: Array<{id:string;schoolId:string|null;programId:string|null}> | null }>("select status,current_stop_index,progress_state,route_stops from trips where id = $1 for update", [tripId]);
   const current = await client.query<{ trip_id:string; status: RiderStatus; parent_absence: boolean; pickup_stop_id: string; dropoff_stop_id: string }>(
     "select trip_id, status, parent_absence, pickup_stop_id, dropoff_stop_id from trip_students where id = $1 for update", [assignmentId],
   );
   const rider = current.rows[0];
   if(!rider || rider.trip_id!==tripId)throw new Error('Assignment changed. Refresh before updating.');
+  if (user.role === "DRIVER" && nextStatus !== "DROPPED_OFF") {
+    const currentStop = trip.rows[0].route_stops?.[trip.rows[0].current_stop_index];
+    if (trip.rows[0].progress_state !== "AT_STOP" || !currentStop || currentStop.id !== rider.pickup_stop_id) throw new Error("Handle the current stop first.");
+  }
   const undo = rider.status === "DROPPED_OFF" && nextStatus === "PICKED_UP";
   if (["DRAFT", "CANCELED", "COMPLETED"].includes(trip.rows[0].status)) throw new Error("Trip is not active.");
   if ((await client.query("select 1 from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id])).rowCount) throw new Error("Segment already completed.");
@@ -42,8 +46,13 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
     DROPPED_OFF: ["PICKED_UP"], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
   if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
-  const reason = missedPickupReasons.find(item => item.id === details?.reason);
-  if (nextStatus === "EXCEPTION" && (!reason || details?.parentNotified !== true)) throw new Error("Select a reason and confirm parent notified.");
+  const reasonId = details?.reason?.trim() || null;
+  if ((nextStatus === "EXCEPTION" || nextStatus === "ABSENT") && !reasonId) throw new Error("Select a reason.");
+  const reason = reasonId ? await client.query<{id:string}>(
+    "select id from student_status_reasons where id=$1 and active and $2 = any(roles)",
+    [reasonId, user.role],
+  ) : { rowCount: 0 } as { rowCount: number };
+  if ((nextStatus === "EXCEPTION" || nextStatus === "ABSENT") && !reason.rowCount) throw new Error("Select a reason available to your role.");
   await client.query(`
     update trip_students set status = $2,
       picked_up_at = case when $2 = 'SCHEDULED' then null when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
@@ -53,7 +62,7 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   if (undo) {
     await client.query("delete from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id]);
   }
-  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, note, operation_location) values ($1, $2, $3, $4, $5, $6::jsonb)", [assignmentId, rider.status, nextStatus, user.id, nextStatus === "EXCEPTION" ? `${reason!.zh} / ${reason!.en}; 已通知家长自行安排接送 / Parent notified to arrange pickup` : "", JSON.stringify(normalizeOperationLocation(location))]);
+  await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, reason_id, note, operation_location) values ($1, $2, $3, $4, $5, $6, $7::jsonb)", [assignmentId, rider.status, nextStatus, user.id, reasonId, nextStatus === "EXCEPTION" ? "Driver recorded a special reason" : nextStatus === "ABSENT" ? "Admin recorded an absence" : "", JSON.stringify(normalizeOperationLocation(location))]);
   await recomputeTrip(client, tripId);
   if(oldTripId && oldTripId!==tripId) await recomputeTrip(client,oldTripId);
   await client.query(`update trips set updated_at=clock_timestamp() where id in (select trip_id from shared_pickup_members where assignment_id=$1)`,[assignmentId]);
