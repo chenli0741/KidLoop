@@ -1,0 +1,36 @@
+{
+  "tool": "built-in image_gen",
+  "size": "1284x2778",
+  "items": [
+    {
+      "name": "01-operations",
+      "source": "/Users/chenli/Desktop/Simulator Screenshot - iPhone 17 Pro - 2026-09-08 at 23.27.05.png",
+      "headline": "Every ride.\nOne clear view.",
+      "subtitle": "Manage daily school transport."
+    },
+    {
+      "name": "02-schools",
+      "source": "/Users/chenli/Desktop/Simulator Screenshot - iPhone 17 Pro - 2026-09-08 at 23.27.29.png",
+      "headline": "School schedules.\nAll in sync.",
+      "subtitle": "Plan terms, holidays and special dates."
+    },
+    {
+      "name": "03-students",
+      "source": "/Users/chenli/Desktop/Simulator Screenshot - iPhone 17 Pro - 2026-09-08 at 23.28.21.png",
+      "headline": "Every student.\nBetter organized.",
+      "subtitle": "Keep rider details in one place."
+    },
+    {
+      "name": "04-fleet",
+      "source": "/Users/chenli/Desktop/Simulator Screenshot - iPhone 17 Pro - 2026-09-08 at 23.28.34.png",
+      "headline": "Your fleet.\nReady for the day.",
+      "subtitle": "Manage vehicles and seat capacity."
+    },
+    {
+      "name": "05-pickup",
+      "source": "/Users/chenli/Desktop/Simulator Screenshot - iPhone 17 Pro - 2026-09-08 at 23.28.54.png",
+      "headline": "Every pickup.\nClearly recorded.",
+      "subtitle": "View riders and update pickup status."
+    }
+  ]
+}
