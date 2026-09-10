@@ -43,7 +43,8 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
     refreshEpoch.current++;
     setState(previous => ({ ...previous, trip: applyTripExecution(previous.trip, update) }));
   }
-  const completed = trip.riders.filter((rider) => !rider.otherVehicle && ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
+  const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
+  const completed = countedRiders.filter((rider) => rider.status === 'DROPPED_OFF').length;
   const segments = tripSegments(trip);
 
   return (
@@ -60,11 +61,11 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
       <div className="trip-meta">
         <span><BusFront size={16} /> {trip.vehicleName} · {trip.vehiclePlate}</span>
         <span><UsersRound size={16} /> {trip.driverName} · {trip.driverPhone}</span>
-        <span><Clock3 size={16} /> {completed}/{trip.riders.length} {text(locale, "已完成", "complete")}</span>
+        <span><Clock3 size={16} /> {completed}/{countedRiders.length} {text(locale, "已完成", "complete")}</span>
       </div>
 
-      <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Trip completion")} aria-valuemin={0} aria-valuemax={trip.riders.length || 1} aria-valuenow={completed}>
-        <span style={{ width: `${trip.riders.length ? completed / trip.riders.length * 100 : 0}%` }} />
+      <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Trip completion")} aria-valuemin={0} aria-valuemax={countedRiders.length || 1} aria-valuenow={completed}>
+        <span style={{ width: `${countedRiders.length ? completed / countedRiders.length * 100 : 0}%` }} />
       </div>
 
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
@@ -76,6 +77,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
 }
 
 function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean}) {
+  const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   return <>
 
       {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li key={stop.id}><span className="fixed-stop-number">{i+1}</span><div><small>{stop.time}</small><strong>{stop.name}</strong><details className="route-notes"><summary>{text(locale,"地址与地图","Address & map")}</summary><p>{stop.address}</p><LocationMap name={stop.name} address={stop.address}/></details></div></li>)}</ol> : <div className="route-strip">
@@ -114,7 +116,7 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
       {cameraEnabled && interactive && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={trip} locale={locale} onUpdated={onUpdated}/>}
       <div className="manifest-header">
         <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
-        <span>{trip.hasSharedPickups ? text(locale,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} 人本车已接 · ${trip.capacity} 座 · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} 人待接`,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} picked up here · ${trip.capacity} seats · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} pending`) : trip.routeName ? text(locale, `${trip.riders.length} 名学生 · ${trip.capacity} 座`, `${trip.riders.length} riders · ${trip.capacity} seats`) : text(locale, `${trip.riders.length}/${trip.capacity} 个座位`, `${trip.riders.length} of ${trip.capacity} seats`)}</span>
+        <span>{trip.hasSharedPickups ? text(locale,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} 人本车已接 · ${trip.capacity} 座 · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} 人待接`,`${trip.riders.filter(r=>!r.otherVehicle&&r.status==='PICKED_UP').length} picked up here · ${trip.capacity} seats · ${trip.riders.filter(r=>r.status==='SCHEDULED').length} pending`) : trip.routeName ? text(locale, `${countedRiders.length} 名学生 · ${trip.capacity} 座`, `${countedRiders.length} riders · ${trip.capacity} seats`) : text(locale, `${countedRiders.length}/${trip.capacity} 个座位`, `${countedRiders.length} of ${trip.capacity} seats`)}</span>
       </div>
       <div className="manifest-list">
         {[...trip.riders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
