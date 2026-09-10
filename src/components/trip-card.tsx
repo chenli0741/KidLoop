@@ -11,7 +11,6 @@ import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { text, type Locale } from "@/lib/i18n";
 import { tripSegments } from "@/lib/trip-segments";
-import { TripSegmentPicker } from "@/components/trip-segment-picker";
 import { applyTripExecution, type TripExecution } from "@/lib/trip-execution";
 import { TripJourneyControls } from "@/components/trip-journey-controls";
 
@@ -46,7 +45,6 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
   }
   const completed = trip.riders.filter((rider) => !rider.otherVehicle && ['DROPPED_OFF','ABSENT','EXCEPTION'].includes(rider.status)).length;
   const segments = tripSegments(trip);
-  const paired = segments.every(s=>s.routeStops?.length===2 && s.riders.length>0 && s.riders.every(r=>r.pickupStopId===s.routeStops![0].id && r.dropoffStopId===s.routeStops![1].id));
 
   return (
     <article className="trip-card">
@@ -71,14 +69,10 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
 
       {cameraEnabled && <TripJourneyControls trip={trip} locale={locale} onUpdated={onUpdated} />}
 
-      {paired ? <TripSegmentPicker key={`${trip.id}:${trip.completedSegments?.join(',')}`} tripId={trip.id} locale={locale} onUpdated={onUpdated} interactive={interactive && !['DRAFT','CANCELED','COMPLETED'].includes(trip.status)} options={segments.map(segment=>{
-        const id=`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`;
-        return {id,stops:segment.routeStops!,done:trip.completedSegments?.includes(id)??false,pendingPickups:segment.riders.filter(r=>!r.otherVehicle&&!['PICKED_UP','DROPPED_OFF','ABSENT','EXCEPTION'].includes(r.status)).length};
-      })}>
       {segments.map((segment,i)=><section className="trip-segment" key={`${segment.routeStops?.[0]?.id ?? trip.id}:${segment.routeStops?.at(-1)?.id ?? i}`}>
         <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={segment} locale={locale} interactive={interactive && !trip.completedSegments?.includes(`${segment.routeStops![0].id}:${segment.routeStops!.at(-1)!.id}`)} showStops={false} onUpdated={onUpdated}/>
       </section>)}
-      </TripSegmentPicker> : <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>}
+      {!segments.length && <TripSegmentContent showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>} 
     </article>
   );
 }
