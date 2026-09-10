@@ -4,17 +4,17 @@
 
 ## Interaction
 
-Only the driver trip page enables the icon-only camera entry. It appears between route details and the pickup manifest. A dialog opens a rear-camera live preview. Capture freezes the frame and stops the video tracks. Recognized faces show candidate student names; unmatched faces remain numbered and marked Unknown. The driver can correct selections, retake or close. Only Confirm pickup writes statuses, using one transaction and one captured device location for the selected group.
+Only the driver trip page enables the icon-only camera entry. It appears between route details and the pickup manifest. A dialog opens a rear-camera live preview. Capture freezes the frame and stops the video tracks. Recognized faces show candidate student names; unmatched faces remain numbered and marked Unknown. Recognized eligible riders are checked by default and can be unchecked. Unknown faces have no manual identity selector and do not block confirmation. Retake and close remain available. Confirm pickup shows the selected count; when no pending riders are selected, Done closes without changing any status. Only Confirm pickup writes statuses, using one transaction and one captured device location for the selected group.
 
 Recognition references include all riders in the displayed trip segment; only scheduled, non-absent, unclaimed riders can be confirmed for pickup. Shared assignments are claimed through the existing serialized claim path. A stale selection, already claimed child, completed segment, unauthorized trip or exceeded capacity fails the whole batch. Other drivers continue receiving the existing shared-manifest updates. No camera recognition result bypasses the final confirmation.
 
 ## Processing and data
 
-YuNet detection and SFace embeddings run locally with ONNX Runtime Web WASM. This is not Apple Vision, Apple Intelligence or a native Apple recognition API. Models are served from `/models/pickup/`; runtime files are self-hosted under `/onnx/`, copied by postinstall. No external CDN is required. First use downloads approximately 50 MB. Runtime is pinned to 1.29.0; model checksums and original licenses accompany the files.
+YuNet detection and SFace embeddings run locally with ONNX Runtime Web WASM in a dedicated, per-scan Web Worker. This is not Apple Vision, Apple Intelligence or a native Apple recognition API. Models are served from `/models/pickup/`; runtime files are self-hosted under `/onnx/`, copied by postinstall. No external CDN is required. First use downloads approximately 50 MB. Runtime is pinned to 1.29.0; model checksums and original licenses accompany the files.
 
-The app compares the captured image to authorized student photo URLs already used in the manifest. Reference images with zero/multiple faces and Test-account avatars are excluded. Cosine >= 0.45 and a >= 0.08 margin select a candidate; duplicate assignments are cleared. Thresholds are initial settings, not field-calibrated. No identity result has been tested on production children's photos during development.
+The app compares the captured image to authorized student photo URLs already used in the manifest. Reference images with zero/multiple faces and Test-account avatars are excluded. Cosine >= 0.40 and a >= 0.05 margin select a candidate; duplicate assignments are cleared. The looser threshold is intended for small, shadowed or partial-profile faces in a vehicle, while the margin still rejects ambiguous candidates. Thresholds are initial settings, not field-calibrated. No identity result has been tested on production children's photos during development.
 
-Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video and discards state. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
+Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video, terminates the worker and discards state. Input/output tensors and decoded reference images are released after use; the worker and its WASM heap are discarded after completion. A 60-second scan deadline terminates stalled work while keeping the dialog usable. Reference image loads time out after 8 seconds; the optional belt request times out after 15 seconds without blocking pickup. No-face scans skip the larger SFace model. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
 
 Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The explanatory paragraph was removed from the camera dialog at user request; processing behavior is unchanged. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
 
@@ -25,7 +25,7 @@ Seatbelt assistance sends the frame and numbered normalized face boxes (no names
 - TypeScript, lint and production build.
 - Matching tests: ambiguous, weak and duplicate identity rejection; affine alignment; detection suppression.
 - Isolated local PostgreSQL: driver authorization, batch capacity rollback, competing-driver rejection, shared pickup and location-history behavior.
-- Browser smoke: real model load and blank-tensor inference; mocked camera preview/capture, no-face disabled confirmation, retake and close. No production pickup writes.
+- Browser smoke: real model load and blank-tensor inference; mocked camera preview/capture, no-face Done without writes, retake and close. No production pickup writes.
 - Still required: physical iPhone camera permissions, real vehicle lighting/angles, speed and recognition usefulness, and actual provider seatbelt output. Do not describe desktop checks as iPhone acceptance.
 
 Speech remains a separate deferred task in `docs/pending-local-speech.md`.
@@ -43,3 +43,9 @@ Native selection now requests JPEG Base64 content from the camera bridge instead
 ### Recognition candidate scope correction
 
 Recognition now uses every rider in the displayed segment, including picked-up and dropped-off riders. Previously the detector ran but reference matching received an empty list whenever no scheduled riders remained. Identity labels and eligible pickup selection are now separate: non-pending riders can be labeled but cannot be submitted again. Final server-side status/ownership/capacity checks remain unchanged. Missing photos, demo avatars, load failures, no reference face, multiple reference faces and processing failures are reported separately, alongside matched-face and usable-reference counts.
+
+## 2026-09-09 waiting and confirmation correction
+
+The reported 14:41 error screen does not establish its device-side cause. Production requests around the screenshot returned HTTP 200; the error log contained PostgreSQL deprecation warnings, not a failed camera API request. Previous recognition ran on the page thread and lacked a scan deadline and explicit per-inference tensor disposal. The new worker isolation, timeout and resource cleanup address those verified weaknesses; physical iPhone reproduction is still pending.
+
+Chrome and WebKit passed actual YuNet worker loading and no-face processing, plus deterministic partial-recognition confirmation against an isolated database. One matched and one unknown face allowed confirming only the matched child. No production pickup statuses were changed by verification. Worker success, cancellation, deadline and pre-canceled requests are covered by regression tests. Completed/absent/already claimed riders remain protected by existing server checks.

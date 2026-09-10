@@ -39,9 +39,9 @@ export default async function RoutesPage() {
       <div className="section-heading"><h2>{text(locale, "接送线路", "Routes")}</h2><RosterCreateDialog title={text(locale, "添加线路", "Add route")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>
       {!routes.length && <p>{text(locale, "暂无线路。", "No routes.")}</p>}
       {routes.map(route => <article className="pickup-record" key={route.id}>
-        <div><h3>{route.name} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
+        <div><h3>{route.name} · {text(locale,`已选 ${route.students.length} 人`,`${route.students.length} selected`)} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
           <p>{route.routeType==='TEMPORARY'?text(locale,'临时行程','Temporary trip'):text(locale,'固定线路','Recurring route')} · {route.startsOn} — {route.endsOn} · {weekdays(route.weekdays)}</p>
-          <p>{drivers.find(d => d.id === route.driverId)?.name ?? text(locale, "司机待绑定", "Driver unassigned")} · {vehicles.find(v => v.id === route.vehicleId)?.name ?? text(locale, "车辆待绑定", "Vehicle unassigned")} · {route.students.length} {text(locale, "名学生", "riders")}</p>
+          <p>{drivers.find(d => d.id === route.driverId)?.name ?? text(locale, "司机待绑定", "Driver unassigned")} · {vehicles.find(v => v.id === route.vehicleId)?.name ?? text(locale, "车辆待绑定", "Vehicle unassigned")}</p>
           <p style={{whiteSpace:"pre-line"}}>{route.notes}</p>
           <ol>{route.stops.map(stop => <li key={stop.id}>{stop.time || text(locale,"时间待确认","Time pending")} · {stop.name}</li>)}</ol>
         </div>

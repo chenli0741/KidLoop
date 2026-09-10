@@ -1,6 +1,11 @@
 export type Point={x:number;y:number};
 export type FaceBox={x:number;y:number;width:number;height:number;landmarks:Point[];score:number};
 export type FaceMatch={face:FaceBox;assignmentId?:string;similarity?:number};
+// Tuned for varied in-car lighting and partial profiles. The margin still
+// rejects ambiguous candidates, while the lower score accepts more genuine
+// matches from small or shadowed faces.
+export const MATCH_MIN_SIMILARITY=0.40;
+export const MATCH_MIN_MARGIN=0.05;
 export function cosine(a:ArrayLike<number>,b:ArrayLike<number>){
  if(a.length!==b.length||!a.length)return -1;
  let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]*a[i];bb+=b[i]*b[i];}
@@ -10,7 +15,7 @@ export function matchFaces(faces:{face:FaceBox;embedding:ArrayLike<number>}[],re
  const results=faces.map(({face,embedding})=>{
   const scores=references.map(r=>({id:r.assignmentId,score:cosine(embedding,r.embedding)})).sort((a,b)=>b.score-a.score);
   const best=scores[0];
-  return {face,similarity:best?.score,assignmentId:best&&best.score>=0.45&&best.score-(scores[1]?.score??-1)>=0.08?best.id:undefined};
+  return {face,similarity:best?.score,assignmentId:best&&best.score>=MATCH_MIN_SIMILARITY&&best.score-(scores[1]?.score??-1)>=MATCH_MIN_MARGIN?best.id:undefined};
  });
  // Ambiguous duplicate identity is never silently assigned to either face.
  const counts=new Map<string,number>();for(const r of results)if(r.assignmentId)counts.set(r.assignmentId,(counts.get(r.assignmentId)??0)+1);

@@ -8,5 +8,7 @@
 .box {position:absolute;border:2px solid #45e8b7;background:transparent;min-width:0;min-height:0;padding:0;color:white}
 .box span {position:absolute;bottom:100%;left:-2px;background:#154b3f;padding:4px;font-size:12px;line-height:1.2;white-space:nowrap}
 .box[data-unknown=true] {border-color:#ffc25e}.box[data-unknown=true] span {background:#774d06}
-.row {display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}.row select {flex:1;min-width:160px;padding:10px}.row small {width:100%}
+.row {display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}.row label {display:flex;align-items:center;gap:8px;min-height:44px}.row input {width:20px;height:20px}.row small {width:100%}
 .tools {justify-content:center;margin-top:16px}.tools button:disabled {opacity:.4}.notice {font-size:13px;line-height:1.5}.error {color:#9d302d}
+
+.tools .confirm {display:flex;gap:8px;border-radius:14px;padding:12px 16px;background:#176b52;color:white;font-weight:600}

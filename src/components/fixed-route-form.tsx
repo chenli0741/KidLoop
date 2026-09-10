@@ -48,11 +48,11 @@ export function FixedRouteForm({operatingTermId,termStart,termEnd,initial,school
    </div>)}
    <button type="button" className="button secondary" onClick={()=>setStops(prev=>[...prev,{id:crypto.randomUUID(),name:'',address:'',schoolId:null,programId:null,time:prev.length?'':start}])}>{text(locale,'＋ 添加站点','+ Add stop')}</button>
   </div>
-  <fieldset className="full fixed-riders"><legend>{text(locale,'自动接送名单','Automatic rider list')}</legend>
+  <fieldset className="full fixed-riders"><legend>{text(locale,'自动接送名单','Automatic rider list')} · <span aria-live="polite">{text(locale,`已选 ${selected.size} 人`,`${selected.size} selected`)}</span></legend>
    {stops.filter(s=>s.schoolId).map(stop=>{
     const shared=routeType!=='TEMPORARY'&&days.every(day=>current.some(b=>b.schoolId===stop.schoolId&&b.pickupTime===batchTime(stop,rules,day)&&b.weekday===day&&b.shared));
     const riders=candidates.filter(a=>a.pickupStopId===stop.id);
-    return <div key={stop.id}><h3>{stop.name} · {batchTime(stop,rules,days[0])}</h3>{routeType!=='TEMPORARY'&&<label className="settings-checkbox"><input type="checkbox" checked={shared} onChange={e=>policy(stop,e.target.checked)}/><span>{text(locale,'这拨接送共享名单','Share this school pickup batch')}</span></label>}
+    return <div key={stop.id}><h3>{stop.name} · {batchTime(stop,rules,days[0])} · <span aria-live="polite">{text(locale,`已选 ${riders.filter(a=>selected.has(a.studentId)).length} 人`,`${riders.filter(a=>selected.has(a.studentId)).length} selected`)}</span></h3>{routeType!=='TEMPORARY'&&<label className="settings-checkbox"><input type="checkbox" checked={shared} onChange={e=>policy(stop,e.target.checked)}/><span>{text(locale,'这拨接送共享名单','Share this school pickup batch')}</span></label>}
      {shared&&<p className="form-hint">{text(locale,'参与这拨接送的线路使用同一份名单。','Participating routes use this same roster.')}</p>}
      {riders.map(a=>{const child=students.find(s=>s.id===a.studentId)!;return <label className="settings-checkbox fixed-rider" key={a.studentId}><input type="checkbox" checked={selected.has(a.studentId)} onChange={e=>{if(shared)policy(stop,true,a.studentId,e.target.checked);else setExcluded(prev=>e.target.checked?prev.filter(id=>id!==a.studentId):[...new Set([...prev,a.studentId])]);}}/><span>{child.name} · {child.grade}</span></label>;})}
      {!riders.length&&<p>{text(locale,'此时段暂无匹配学生。','No matching students in this batch.')}</p>}
