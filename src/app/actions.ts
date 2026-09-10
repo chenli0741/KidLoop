@@ -28,6 +28,21 @@ export async function listStudentStatusReasons() {
   return result.rows.map(row => ({ id: row.id, zh: row.name_zh, en: row.name_en }));
 }
 
+export async function createTravelTime(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const from = required(formData, "fromName");
+    const to = required(formData, "toName");
+    const minutes = positiveInteger(formData, "estimatedMinutes");
+    const buffer = Number(optional(formData, "bufferMinutes") || 0);
+    if (from === to || !Number.isInteger(buffer) || buffer < 0 || buffer > 120) throw new Error("Invalid travel time.");
+    await query(`insert into travel_time_profiles(from_name,to_name,estimated_minutes,buffer_minutes,notes) values($1,$2,$3,$4,$5) on conflict(from_name,to_name) do update set estimated_minutes=excluded.estimated_minutes,buffer_minutes=excluded.buffer_minutes,notes=excluded.notes,active=true,updated_at=now()`, [from, to, minutes, buffer, optional(formData, "notes")]);
+  }, ["/resources"], { zh: "地点间时间已保存。", en: "Travel time saved." });
+}
+
+export async function deleteTravelTime(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => { await query("update travel_time_profiles set active=false,updated_at=now() where id=$1", [required(formData, "id")]); }, ["/resources"], { zh: "地点间时间已停用。", en: "Travel time deactivated." });
+}
+
 export async function setLocale(formData: FormData) {
   const user = await requireUser();
   if (isTestAccount(user)) return;

@@ -6,7 +6,7 @@ import {readRosterData} from './roster-data';
 import {trialDay,type TrialInput,type TrialDay} from './schedule-trial';
 
 export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end:string):Promise<TrialInput>{
- const [routes,roster,terms,exceptions,drivers,vehicles,absences,existing]=await Promise.all([
+ const [routes,roster,terms,exceptions,drivers,vehicles,absences,existing,travelTimes]=await Promise.all([
   readFixedRoutes(c),readRosterData(c),
   c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn" from school_terms where operating_term_id=current_operating_term() order by id`),
   c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,'HH24:MI') as "pickupTime",grade_times as "gradeTimes" from school_calendar_schedules where operating_term_id=current_operating_term() and starts_on<=$2 and ends_on>=$1 order by id`,[start,end]),
@@ -15,9 +15,10 @@ export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end
   c.query(`select t.scheduled_date::text as date,t.fixed_route_id as "routeId",t.id as "tripId",sh.driver_id as "driverId",sh.vehicle_id as "vehicleId",to_char(sh.start_time,'HH24:MI') as start,to_char(sh.end_time,'HH24:MI') as end,
    (t.status in ('IN_PROGRESS','COMPLETED','NEEDS_ATTENTION') or exists(select 1 from trip_segment_completions f where f.trip_id=t.id) or exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))) as started,
    coalesce((select array_agg(ts.student_id order by ts.student_id) from trip_students ts where ts.trip_id=t.id),'{}'::uuid[]) as students
-   from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term() and t.scheduled_date between $1 and $2 and t.status<>'CANCELED' order by t.id`,[start,end])
+   from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term() and t.scheduled_date between $1 and $2 and t.status<>'CANCELED' order by t.id`,[start,end]),
+  c.query(`select from_name as "fromName",to_name as "toName",estimated_minutes + buffer_minutes as minutes from travel_time_profiles where active`)
  ]);
- return {routes,...roster,terms:terms.rows,exceptions:exceptions.rows,drivers:drivers.rows,vehicles:vehicles.rows,absences:absences.rows,existing:existing.rows};
+ return {routes,...roster,terms:terms.rows,exceptions:exceptions.rows,drivers:drivers.rows,vehicles:vehicles.rows,absences:absences.rows,travelTimes:travelTimes.rows,existing:existing.rows};
 }
 export type TrialSummary={date:string;hasTrips:boolean;issueCount:number;holiday:boolean;checked:boolean;driverIds:string[]};
 export async function readTrialRange(c:Pick<PoolClient,'query'>,dates:string[],details=false):Promise<{summaries:TrialSummary[];days:TrialDay[]}> {
