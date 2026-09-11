@@ -518,8 +518,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-stop-address { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .fixed-stop-select > .segment-map { flex: 0 0 44px; width: 44px; height: 44px; margin: 0; align-self: center; display: inline-grid; place-items: center; }
 .fixed-trip-stops li { position: relative; border-radius: 10px; transition: background-color .15s ease, box-shadow .15s ease; }
-.fixed-trip-stops li.is-passed { background: #edf1ee; }
-.fixed-trip-stops li.is-current { background: #dff3e8; }
+.fixed-trip-stops li.is-passed { background: #eef0ef; color: #68736e; }
+.fixed-trip-stops li.is-passed .fixed-stop-number { background: #dfe5e1; color: #68736e; }
+.fixed-trip-stops li.is-current { background: #d5f0e1; }
+.fixed-trip-stops li.is-current .fixed-stop-number { background: #a9ddc1; color: #145c42; }
 .fixed-trip-stops li.is-current::before { position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: 10px 0 0 10px; content: ""; background: var(--green); }
 .fixed-trip-stops li.is-upcoming { background: #f8faf8; }
 .fixed-stop-current { flex: none; padding: 2px 6px; color: var(--green); background: #bfe6d0; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 750; }
