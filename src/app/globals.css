@@ -506,7 +506,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-trip-stops li > div { min-width: 0; flex: 1; }
 .fixed-trip-stops strong { display: block; font-size: 14px; }
 .fixed-trip-stops small { color: var(--green); font-size: 12px; }
+.fixed-stop-marker { display: flex; width: 24px; flex: 0 0 24px; flex-direction: column; align-items: center; gap: 3px; }
 .fixed-stop-number { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 12px; }
+.fixed-stop-current-icon { color: var(--green); }
 .fixed-stop-select { display: flex; width: 100%; align-items: flex-start; gap: 10px; }
 .fixed-stop-main { display: flex; width: 100%; min-height: 62px; align-items: flex-start; gap: 10px; border: 0; background: transparent; padding: 8px 0; text-align: left; color: inherit; cursor: pointer; }
 .fixed-stop-main > span:last-child { min-width: 0; }
