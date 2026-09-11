@@ -41,8 +41,8 @@ export async function readSnapshot(
       "select id,name,active,status,capacity from vehicles order by id",
     )
   ).rows;
-  const travelTimes = (await c.query<{ fromName: string; toName: string; minutes: number }>(
-    "select from_name as \"fromName\",to_name as \"toName\",estimated_minutes + buffer_minutes as minutes from travel_time_profiles where active order by from_name,to_name",
+  const travelTimes = (await c.query<{ fromName: string; toName: string; minutes: number; originDwellMinutes: number }>(
+    "select from_name as \"fromName\",to_name as \"toName\",estimated_minutes + buffer_minutes as minutes,origin_dwell_minutes as \"originDwellMinutes\" from travel_time_profiles where active order by from_name,to_name",
   )).rows;
   const days: Snapshot["days"] = [];
   for (const date of datesBetween(start, end)) {

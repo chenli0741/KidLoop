@@ -14,9 +14,11 @@ type ActionFormProps = {
   submitLabel: string;
   className?: string;
   onReset?: () => void;
+  submitIcon?: React.ReactNode;
+  submitClassName?: string;
 };
 
-export function ActionForm({ action, children, submitLabel, className = "form-grid", onReset }: ActionFormProps) {
+export function ActionForm({ action, children, submitLabel, className = "form-grid", onReset, submitIcon, submitClassName }: ActionFormProps) {
   const locale = useLocale();
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -35,8 +37,8 @@ export function ActionForm({ action, children, submitLabel, className = "form-gr
             {state.message}
           </p>
         ) : <span />}
-        <button className="button primary" type="submit" disabled={pending}>
-          <Plus size={17} aria-hidden="true" />
+        <button className={`button primary ${submitClassName ?? ""}`} type="submit" disabled={pending}>
+          {submitIcon ?? <Plus size={17} aria-hidden="true" />}
           {pending ? text(locale, "保存中...", "Saving...") : submitLabel}
         </button>
       </div>

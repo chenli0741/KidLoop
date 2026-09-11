@@ -387,6 +387,21 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .resource-tabs a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 8px; color: var(--muted); border-radius: 10px; font-size: 14px; font-weight: 700; }
 .resource-tabs a[aria-current] { color: var(--green); background: white; box-shadow: 0 2px 6px #17211d08; }
 .resource-tabs.school-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.resource-list-section { min-width: 0; }
+.resource-heading-actions, .resource-row-actions { display: flex; align-items: center; gap: 6px; }
+.resource-heading-actions { flex-shrink: 0; }
+.resource-add-trigger { min-height: 40px; }
+.resource-rows { display: grid; gap: 8px; }
+.resource-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; padding: 13px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.resource-row-main { display: grid; gap: 4px; min-width: 0; }
+.resource-row-main strong { overflow-wrap: anywhere; }
+.resource-row-main span { color: var(--muted); font-size: 12px; }
+.resource-row-actions { flex-shrink: 0; }
+.inline-action-form { display: block; }
+.inline-action-form .form-footer { margin: 0; padding: 0; }
+.inline-action-form .form-footer > span { display: none; }
+.inline-action-form .icon-only-action { width: 34px; min-width: 34px; height: 34px; padding: 0; font-size: 0; }
+.resource-editor-dialog { width: min(620px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); overflow: auto; }
 .admin-entry { margin-top: 18px; }
 .admin-entry[aria-current] { background: #2b3d35; color: white; }
 .account-trigger { display: flex; align-items: center; gap: 10px; margin-top: auto; min-height: 48px; padding: 12px; border: 0; background: transparent; color: #d9e5dd; cursor: pointer; text-align: left; font-size: 14px; }

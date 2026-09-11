@@ -16,7 +16,7 @@ export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end
    (t.status in ('IN_PROGRESS','COMPLETED','NEEDS_ATTENTION') or exists(select 1 from trip_segment_completions f where f.trip_id=t.id) or exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))) as started,
    coalesce((select array_agg(ts.student_id order by ts.student_id) from trip_students ts where ts.trip_id=t.id),'{}'::uuid[]) as students
    from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term() and t.scheduled_date between $1 and $2 and t.status<>'CANCELED' order by t.id`,[start,end]),
-  c.query(`select from_name as "fromName",to_name as "toName",estimated_minutes + buffer_minutes as minutes from travel_time_profiles where active`)
+  c.query(`select from_name as "fromName",to_name as "toName",estimated_minutes + buffer_minutes as minutes,origin_dwell_minutes as "originDwellMinutes" from travel_time_profiles where active`)
  ]);
  return {routes,...roster,terms:terms.rows,exceptions:exceptions.rows,drivers:drivers.rows,vehicles:vehicles.rows,absences:absences.rows,travelTimes:travelTimes.rows,existing:existing.rows};
 }

@@ -169,9 +169,11 @@ function merge(
       const previous = path.at(-1);
       let duration: number | undefined = 0;
       if (previous) {
-        const configured = travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name)?.minutes;
+        const profile = travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name);
+        const configured = profile?.minutes;
         const fallback = edges.get(`${place(previous)}>${place(stop)}`);
-        duration = (configured ?? fallback) === undefined ? undefined : (configured ?? fallback)! + (previous.dwellMinutes ?? 0);
+        const dwell = previous.dwellMinutes || profile?.originDwellMinutes || 0;
+        duration = (configured ?? fallback) === undefined ? undefined : (configured ?? fallback)! + dwell;
       }
       if (duration === undefined) continue;
       const releases = students

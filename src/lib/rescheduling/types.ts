@@ -26,7 +26,7 @@ export type Resource = {
   status: string;
   capacity?: number;
 };
-export type TravelTime = { fromName: string; toName: string; minutes: number };
+export type TravelTime = { fromName: string; toName: string; minutes: number; originDwellMinutes?: number };
 export type Task = {
   routeId: string | null;
   tripId: string;

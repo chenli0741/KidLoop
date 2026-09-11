@@ -42,7 +42,7 @@ export function activeOn(r: FixedRoute, date: string) {
 export function planRoute(
   r: FixedRoute,
   matches: PickupMatch[],
-  travelTimes?: {fromName:string;toName:string;minutes:number}[],
+  travelTimes?: {fromName:string;toName:string;minutes:number;originDwellMinutes?:number}[],
 ): { students: RouteStudent[]; stops: RouteStop[] } {
   const byStudent = new Map<string, PickupMatch>();
   for (const m of matches)
@@ -62,14 +62,16 @@ export function planRoute(
     ? minutes(schoolTimes.get(anchor.id)!) - minutes(anchor.pickupTime || anchor.time)
     : 0;
   for (let i = 0; i < stops.length; i++) {
-    const configured = i > 0 ? travelTimes?.find(t => t.fromName === stops[i - 1].name && t.toName === stops[i].name)?.minutes : undefined;
+    const profile = i > 0 ? travelTimes?.find(t => t.fromName === stops[i - 1].name && t.toName === stops[i].name) : undefined;
+    const configured = profile?.minutes;
+    const dwell = stops[i - 1]?.dwellMinutes || profile?.originDwellMinutes || 0;
     const arrival =
       i === 0
         ? minutes(r.stops[0].time) + delta
         : configured !== undefined
-        ? minutes(stops[i - 1].time) + (stops[i - 1].dwellMinutes ?? 0) + configured
+        ? minutes(stops[i - 1].time) + dwell + configured
         : minutes(stops[i - 1].time) +
-          (stops[i - 1].dwellMinutes ?? 0) +
+          dwell +
           minutes(r.stops[i].time) -
           minutes(r.stops[i - 1].time);
     stops[i].time = clockTime(

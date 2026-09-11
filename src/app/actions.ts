@@ -35,7 +35,9 @@ export async function createTravelTime(_: FormState, formData: FormData): Promis
     const minutes = positiveInteger(formData, "estimatedMinutes");
     const buffer = Number(optional(formData, "bufferMinutes") || 0);
     if (from === to || !Number.isInteger(buffer) || buffer < 0 || buffer > 120) throw new Error("Invalid travel time.");
-    await query(`insert into travel_time_profiles(from_name,to_name,estimated_minutes,buffer_minutes,notes) values($1,$2,$3,$4,$5) on conflict(from_name,to_name) do update set estimated_minutes=excluded.estimated_minutes,buffer_minutes=excluded.buffer_minutes,notes=excluded.notes,active=true,updated_at=now()`, [from, to, minutes, buffer, optional(formData, "notes")]);
+    const dwell = Number(optional(formData, "dwellMinutes") || 0);
+    if (!Number.isInteger(dwell) || dwell < 0 || dwell > 120) throw new Error("Invalid dwell time.");
+    await query(`insert into travel_time_profiles(from_name,to_name,estimated_minutes,buffer_minutes,origin_dwell_minutes,notes) values($1,$2,$3,$4,$5,$6) on conflict(from_name,to_name) do update set estimated_minutes=excluded.estimated_minutes,buffer_minutes=excluded.buffer_minutes,origin_dwell_minutes=excluded.origin_dwell_minutes,notes=excluded.notes,active=true,updated_at=now()`, [from, to, minutes, buffer, dwell, optional(formData, "notes")]);
   }, ["/resources"], { zh: "地点间时间已保存。", en: "Travel time saved." });
 }
 
@@ -43,13 +45,30 @@ export async function deleteTravelTime(_: FormState, formData: FormData): Promis
   return runMutation(async () => { await query("update travel_time_profiles set active=false,updated_at=now() where id=$1", [required(formData, "id")]); }, ["/resources"], { zh: "地点间时间已停用。", en: "Travel time deactivated." });
 }
 
+export async function updateTravelTime(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const id = required(formData, "id");
+    const from = required(formData, "fromName");
+    const to = required(formData, "toName");
+    const minutes = positiveInteger(formData, "estimatedMinutes");
+    const buffer = Number(optional(formData, "bufferMinutes") || 0);
+    const dwell = Number(optional(formData, "dwellMinutes") || 0);
+    if (from === to || !Number.isInteger(buffer) || buffer < 0 || buffer > 120 || !Number.isInteger(dwell) || dwell < 0 || dwell > 120) throw new Error("Invalid travel time.");
+    await query("update travel_time_profiles set from_name=$2,to_name=$3,estimated_minutes=$4,buffer_minutes=$5,origin_dwell_minutes=$6,notes=$7,updated_at=now() where id=$1", [id, from, to, minutes, buffer, dwell, optional(formData, "notes")]);
+  }, ["/resources", "/routes"], { zh: "地点时间已更新。", en: "Travel time updated." });
+}
+
 export async function updateStudentStatusReason(_: FormState, formData: FormData): Promise<FormState> {
   return runMutation(async () => {
     const id = required(formData, "id");
     const roles = formData.getAll("roles").filter((value): value is string => ["ADMIN", "DRIVER", "PARENT"].includes(String(value))).map(String);
     if (!roles.length) throw new Error("Select at least one role.");
-    await query("update student_status_reasons set roles=$2::text[],updated_at=now() where id=$1", [id, roles]);
+    await query("update student_status_reasons set name_zh=$2,name_en=$3,roles=$4::text[],updated_at=now() where id=$1", [id, required(formData, "nameZh"), required(formData, "nameEn"), roles]);
   }, ["/resources"], { zh: "原因权限已保存。", en: "Reason roles saved." });
+}
+
+export async function deleteStudentStatusReason(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => { await query("update student_status_reasons set active=false,updated_at=now() where id=$1", [required(formData, "id")]); }, ["/resources?tab=reasons"], { zh: "接送原因已删除。", en: "Student status reason deleted." });
 }
 
 export async function createStudentStatusReason(_: FormState, formData: FormData): Promise<FormState> {
