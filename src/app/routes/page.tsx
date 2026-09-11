@@ -1,4 +1,3 @@
-import {readRosterData} from "@/lib/roster-data";
 import Link from "next/link";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
@@ -6,15 +5,14 @@ import { FixedRouteForm } from "@/components/fixed-route-form";
 import { PageHeader } from "@/components/page-header";
 import { RosterCreateDialog } from "@/components/roster-controls";
 import { requireUser } from "@/lib/auth";
-import { getDrivers, getPrograms, getSchools, getStudents, getVehicles } from "@/lib/data";
+import { getDrivers, getPrograms, getSchools, getVehicles } from "@/lib/data";
 import { todayInOperationsTimeZone } from "@/lib/date";
 import { db, query } from "@/lib/db";
-import { readFixedRoutes } from "@/lib/fixed-routes";
 import { visibleRoutes } from "@/lib/fixed-route-types";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 import type { PickupSetting } from "@/lib/pickup-types";
-import { readTrialRange } from "@/lib/schedule-trial-data";
+import { readTrialInput, readTrialRange } from "@/lib/schedule-trial-data";
 import { ScheduleActions } from "@/components/schedule-actions";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +23,13 @@ export default async function RoutesPage() {
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const today = todayInOperationsTimeZone();
-  const [allRoutes, schools, programs, drivers, vehicles, students, rules, roster, todayResult] = await Promise.all([
-    readFixedRoutes(db), getSchools(), getPrograms(), getDrivers(), getVehicles(), getStudents(),
-    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules where operating_term_id=current_operating_term() order by pickup_time`), readRosterData(db), readTrialRange(db, [today], true),
+  const inputPromise = readTrialInput(db, today, today);
+  const [input, schools, programs, drivers, vehicles, rules, todayResult] = await Promise.all([
+    inputPromise, getSchools(), getPrograms(), getDrivers(), getVehicles(),
+    query<PickupSetting & { schoolId: string }>(`select id,name,school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime",updated_at::text as "updatedAt" from school_pickup_rules where operating_term_id=current_operating_term() order by pickup_time`), readTrialRange(db, [today], true, inputPromise),
   ]);
-  const routes=visibleRoutes(allRoutes,todayInOperationsTimeZone());
-  const formProps = { operatingTermId:operation.id, termStart:operation.startsOn, termEnd:operation.endsOn, schools, programs, drivers, vehicles, students:students.map(({id,name,grade,schoolId,programId})=>({id,name,grade,schoolId,programId})), rules: rules.rows, today: todayInOperationsTimeZone(), locale, batches:roster.batches };
+  const routes=visibleRoutes(input.routes,todayInOperationsTimeZone());
+  const formProps = { operatingTermId:operation.id, termStart:operation.startsOn, termEnd:operation.endsOn, schools, programs, drivers, vehicles, students:input.children.map(({id,name,grade,schoolId,programId})=>({id,name:name??"",grade,schoolId,programId})), rules: rules.rows, today: todayInOperationsTimeZone(), locale, batches:input.batches };
   const weekdays = (days: number[]) => days.map(d => (locale === "zh" ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[d - 1]).join("、");
   const todayPlan = todayResult.days[0];
   return <div className="page-container">

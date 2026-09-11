@@ -25,8 +25,9 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
   const locale = await getLocale();
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
+  const routesPromise = readFixedRoutes(db);
   const [students, schools, programs, routes] = await Promise.all([
-    getStudents(), getSchools(), getPrograms(), readFixedRoutes(db),
+    getStudents(routesPromise), getSchools(), getPrograms(), routesPromise,
   ]);
   const requestedSchool = (await searchParams).school;
   const selectedSchool = schools.find((school) => school.id === requestedSchool) ?? schools[0];

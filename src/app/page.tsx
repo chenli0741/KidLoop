@@ -1,5 +1,6 @@
+import { hasDashboardTasks } from "@/lib/dashboard-data";
 import {DailyReviewAlert} from '@/components/daily-review-alert';
-import { db, query } from "@/lib/db";
+import { db } from "@/lib/db";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
 import { RouteTaskIssues } from "@/components/route-task-issues";
@@ -24,16 +25,7 @@ export default async function DashboardPage() {
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const today = todayInOperationsTimeZone();
-  const existingTasks = await query<{ exists: boolean }>(`select exists(
-    select 1 from trips t
-    where t.operating_term_id=current_operating_term()
-      and t.scheduled_date=$1::date
-      and t.fixed_route_id is not null
-      and t.status not in ('DRAFT','CANCELED')
-  ) or exists(
-    select 1 from route_task_issues i where i.service_date=$1::date
-  )`, [today]);
-  if (!existingTasks.rows[0]?.exists) await ensureRouteTasks(today);
+  if (!await hasDashboardTasks(db, today)) await ensureRouteTasks(today);
   const [counts, trips] = await Promise.all([getDashboardCounts(today, {ensure:false}), getTrips(today, {ensure:false})]);
   const stats = [
     { label: text(locale, "进行中行程", "Active trips"), value: counts.activeTrips, icon: Route, tone: "green" },

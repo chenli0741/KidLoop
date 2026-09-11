@@ -74,9 +74,10 @@ export async function getPrograms() {
   }));
 }
 
-export async function getStudents() {
+export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoutes>) {
   const user = await requireUser(["ADMIN"]);
-  const result = await query<{
+  const routesPromise = knownRoutes ?? readFixedRoutes(db);
+  const [result, routes] = await Promise.all([query<{
     id: string; name: string; photo_url: string; grade: string; age: number | null; route_assigned: boolean;
     no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
@@ -97,8 +98,7 @@ export async function getStudents() {
     left join parents pa on pa.id = st.parent_id
     where st.active = true and exists(select 1 from term_students ts where ts.student_id=st.id and ts.operating_term_id=current_operating_term())
     order by sc.name, st.classroom_name, st.name
-  `);
-  const routes=await readFixedRoutes(db);
+  `), routesPromise]);
   const assigned=new Set(routes.filter(r=>r.enabled&&r.endsOn>=todayInOperationsTimeZone()).flatMap(r=>r.students.map(a=>a.studentId)));
   return result.rows.map((row): Student => ({
     id: row.id,

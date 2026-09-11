@@ -10,14 +10,14 @@ import {routeName} from './route-name';
 import {materializeTrial} from './schedule-materialize';
 const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
 export async function lockRoutes(c:PoolClient){await c.query('select pg_advisory_xact_lock(70919009)');}
-export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string}):Promise<FixedRoute[]> {
+export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string},roster?:Promise<Awaited<ReturnType<typeof readRosterData>>>):Promise<FixedRoute[]> {
  const routes:FixedRoute[]=(await c.query(`select r.id,r.name,r.notes,r.excluded_student_ids as "excludedStudentIds",r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
  coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),''),'pickupTime',to_char(s.pickup_time,'HH24:MI'),'dwellMinutes',s.dwell_minutes) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  '[]'::jsonb as students
  from fixed_routes r where r.operating_term_id=current_operating_term()
  and ($1::uuid is null or r.driver_id=$1 or exists(select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.fixed_route_id=r.id and t.scheduled_date=$2::date and sh.driver_id=$1))
  order by r.name`,[scope?.driverId??null,scope?.date??null])).rows;
- const data=await readRosterData(c);
+ const data=await (roster ?? readRosterData(c));
  return routes.map(r=>({...r,students:automaticRoster(r.stops,data.children,data.rules,r.weekdays,r.excludedStudentIds,r.routeType==='TEMPORARY'?[]:data.batches)}));
 }
 export async function readRouteTaskIssues(c:Pick<PoolClient,"query">,date:string){

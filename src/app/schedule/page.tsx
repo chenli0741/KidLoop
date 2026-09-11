@@ -24,21 +24,30 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
   const locale=await getLocale(), params=await searchParams;
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
-  await transaction(async c=>{await requireTerm(c,operation.id);await initializeSchools(c,operation);});
+  // Normal page reads must not take the scheduling lock or reinsert every school.
+  // Keep the repair path for schools added outside the regular creation action.
+  const missingSchools = await query<{ missing: boolean }>(`select exists(
+    select 1 from schools s where not exists (
+      select 1 from school_terms t where t.school_id=s.id and t.operating_term_id=$1
+    )
+  ) as missing`, [operation.id]);
+  if (missingSchools.rows[0]?.missing) {
+    await transaction(async c => { await requireTerm(c, operation.id); await initializeSchools(c, operation); });
+  }
   if (params.tab === "routes") redirect("/routes");
   const [schools,programs]=await Promise.all([getSchools(),getPrograms()]);
   const school=schools.find(s=>s.id===params.school) ?? schools[0];
   const tab=params.tab==="preview" ? params.tab : "school";
   const schoolId=school?.id ?? null;
   const cutoff = schoolId ? (await query<{cutoff:string|null}>('select calendar_archived_through::text as cutoff from schools where id=$1',[schoolId])).rows[0]?.cutoff ?? null : null;
-  const [termsResult,exceptionsResult,rulesResult]=await Promise.all([
+  const [termsResult,exceptionsResult,rulesResult,studentCountsResult]=await Promise.all([
     query<PickupSetting>('select id,name,starts_on::text as "startsOn",ends_on::text as "endsOn",updated_at::text as "updatedAt" from school_terms where operating_term_id=current_operating_term() and school_id=$1 and ($2::date is null or ends_on > $2::date) order by starts_on desc',[schoolId,cutoff]),
     query<PickupSetting>('select grade_times as "gradeTimes",id,name,starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,\'HH24:MI\') as "pickupTime",updated_at::text as "updatedAt" from school_calendar_schedules where operating_term_id=current_operating_term() and school_id=$1 and ($2::date is null or ends_on > $2::date) order by starts_on',[schoolId,cutoff]),
     query<PickupSetting>(`select p.id,p.name,p.weekdays,to_char(p.pickup_time,'HH24:MI') as "pickupTime",p.updated_at::text as "updatedAt", p.grades from school_pickup_rules p where p.operating_term_id=current_operating_term() and p.school_id=$1 order by p.pickup_time,p.name`,[schoolId]),
-
+    query<{grade:string;count:string}>(`select trim(s.grade) as grade,count(*)::text as count from students s join term_students ts on ts.student_id=s.id and ts.operating_term_id=current_operating_term() where s.active and s.school_id=$1 group by trim(s.grade)`,[schoolId]),
   ]);
   const terms=termsResult.rows, exceptions=exceptionsResult.rows, rules=rulesResult.rows;
-  const studentCounts = schoolId ? (await query<{grade:string;count:string}>(`select trim(s.grade) as grade,count(*)::text as count from students s join term_students ts on ts.student_id=s.id and ts.operating_term_id=current_operating_term() where s.active and s.school_id=$1 group by trim(s.grade)`,[schoolId])).rows.reduce<Record<string,number>>((result,row)=>{result[row.grade]=Number(row.count);return result;},{}):{};
+  const studentCounts = studentCountsResult.rows.reduce<Record<string,number>>((result,row)=>{result[row.grade]=Number(row.count);return result;},{});
   const grades = PICKUP_GRADES;
   const today=todayInOperationsTimeZone();
   const weekdays=(days?:number[])=>days?.map(d=>(locale==="zh" ? ["周一","周二","周三","周四","周五","周六","周日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])[d-1]).join("、");
@@ -57,7 +66,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
   </section>;
   return <div className="page-container"><TermWorkspace term={operation} locale={locale}/><div className="school-page-header"><PageHeader eyebrow={text(locale,"学期安排","Term planning")} title={text(locale,"学校","Schools")} description={text(locale,"学校学期、假期与接送时间。","School terms, holidays and pickup times.")} actions={school ? <div className="school-header-picker"><SchoolFilter schools={schools} selected={school.id} label={text(locale,"学校","School")} page="/schedule" tab={tab} /><Link className="button secondary compact" href={`/routes/adjust?mode=rules&school=${school.id}`}><Sparkles size={16}/>{text(locale,"智能调整学校规则","Adjust school rules")}</Link></div> : undefined} /></div>
     {!school ? <EmptyState title={text(locale,"请先添加学校","Add a school first")} body={text(locale,"学校日历和接送规则将保存在学校下面。","Calendars and pickup rules belong to each school.")} href="/resources?tab=schools" action={text(locale,"添加学校","Add school")} /> : <>
-      <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"学校","School")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
+      <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"规则","Rules")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
       {tab==="school" && <>
         {section("term",text(locale,"学期日历","School terms"),text(locale,"默认使用运营学期日期；仅在本校不同的情况下编辑。","Dates default to the operating term. Edit only school-specific differences."),terms)}
         {section("exception",text(locale,"学校日历日程","School calendar schedule"),text(locale,"按日期或日期范围记录学校正式安排；年级实际时间直接显示在日程中。未覆盖的年级沿用常规规则。","Record formal school calendar schedules by date or range; show actual grade times directly in each schedule. Grades not covered use the regular rules."),exceptions)}
