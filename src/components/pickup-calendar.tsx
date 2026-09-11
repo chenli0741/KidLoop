@@ -22,7 +22,7 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, st
   const labels = {
     holiday: text(locale, "放假，不接送", "Holiday, no pickup"),
     pickup: text(locale, "上学，需要接送", "School day, pickup needed"),
-    adjusted: text(locale, "上学，使用日程时间", "School day, scheduled times apply"),
+    adjusted: text(locale, "上学，使用调整时间", "School day, adjusted times apply"),
     weekend: text(locale, "周末休息，不接送", "Weekend, no pickup"),
     "outside-term": text(locale, "学期外，不接送", "Outside term, no pickup"),
     unconfigured: text(locale, "学校日历待设置", "School calendar not configured"),
