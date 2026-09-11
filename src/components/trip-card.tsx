@@ -78,7 +78,8 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
 function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true,role,selectedStopIndex,onSelectStop}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean;role:"ADMIN"|"DRIVER";selectedStopIndex?:number;onSelectStop?:(index:number)=>void}) {
   const currentIndex = trip.currentStopIndex ?? 0;
   const currentStop = trip.routeStops?.[selectedStopIndex ?? currentIndex];
-  const visibleRiders = currentStop ? trip.riders.filter(rider => currentStop.schoolId ? rider.pickupStopId === currentStop.id : rider.dropoffStopId === currentStop.id) : trip.riders;
+  const visibleRiders = (currentStop ? trip.riders.filter(rider => currentStop.schoolId ? rider.pickupStopId === currentStop.id : rider.dropoffStopId === currentStop.id) : trip.riders)
+    .filter(rider => role !== "DRIVER" || (!rider.parentAbsent && rider.status !== "ABSENT"));
   const countedRiders = visibleRiders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   return <>
 
