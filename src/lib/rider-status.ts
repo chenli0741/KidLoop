@@ -27,7 +27,7 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   const { student_id: studentId, trip_id: tripId } = target.rows[0];
   // Match parent-plan and route-completion lock order.
   await client.query("select id from students where id = $1 for update", [studentId]);
-  const trip = await client.query<{ status: string; current_stop_index: number; progress_state: string; route_stops: Array<{id:string;schoolId:string|null;programId:string|null}> | null }>("select status,current_stop_index,progress_state,route_stops from trips where id = $1 for update", [tripId]);
+  const trip = await client.query<{ status: string; scheduled_date: string; current_stop_index: number; progress_state: string; route_stops: Array<{id:string;schoolId:string|null;programId:string|null}> | null }>("select status,scheduled_date::text,current_stop_index,progress_state,route_stops from trips where id = $1 for update", [tripId]);
   const current = await client.query<{ trip_id:string; status: RiderStatus; parent_absence: boolean; pickup_stop_id: string; dropoff_stop_id: string }>(
     "select trip_id, status, parent_absence, pickup_stop_id, dropoff_stop_id from trip_students where id = $1 for update", [assignmentId],
   );
@@ -53,12 +53,19 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
     [reasonId, user.role],
   ) : { rowCount: 0 } as { rowCount: number };
   if ((nextStatus === "EXCEPTION" || nextStatus === "ABSENT") && !reason.rowCount) throw new Error("Select a reason available to your role.");
+  if (user.role === "ADMIN" && nextStatus === "ABSENT") {
+    await client.query(`insert into student_day_plans(student_id,service_date,absent,note,updated_by)
+      values($1,$2,true,$3,$4)
+      on conflict(student_id,service_date) do update set absent=true,note=excluded.note,updated_by=excluded.updated_by,updated_at=clock_timestamp()`,
+      [studentId, trip.rows[0].scheduled_date, reasonId, user.id]);
+  }
   await client.query(`
     update trip_students set status = $2,
+      parent_absence = case when $2 = 'ABSENT' and $4 = 'ADMIN' then true else parent_absence end,
       picked_up_at = case when $2 = 'SCHEDULED' then null when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
       dropped_off_at = case when $3 or $2 = 'SCHEDULED' then null else dropped_off_at end,
       updated_at = now() where id = $1
-  `, [assignmentId, nextStatus, undo]);
+  `, [assignmentId, nextStatus, undo, user.role]);
   if (undo) {
     await client.query("delete from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id]);
   }
