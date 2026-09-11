@@ -13,7 +13,7 @@ import s from './pickup-camera.module.css';
 import {PickupGalleryButton} from './pickup-gallery-button';
 export function PickupCamera({trip,locale,onUpdated}:{trip:Trip;locale:Locale;onUpdated:(u:TripExecution)=>void}){
  const [open,setOpen]=useState(false),[initialImage,setInitialImage]=useState('');
- return <div className={s.launch}><button type="button" aria-label={text(locale,'拍照识别','Scan pickup')} title={text(locale,'拍照识别','Scan pickup')} onClick={()=>{setInitialImage('');setOpen(true);}}><Camera/></button><PickupGalleryButton locale={locale} onImage={image=>{setInitialImage(image);setOpen(true);}}/>{open&&<CameraDialog initialImage={initialImage} trip={trip} locale={locale} onUpdated={onUpdated} close={()=>{setOpen(false);setInitialImage('');}}/>}</div>;
+ return <div className={s.launch}><button type="button" aria-label={text(locale,'拍照识别','Scan pickup')} title={text(locale,'拍照识别','Scan pickup')} onClick={()=>{setInitialImage('');setOpen(true);}}><Camera/></button><span className={s.launchHint}>{text(locale,'可自动检查学生','Automatically check students')}</span>{open&&<CameraDialog initialImage={initialImage} trip={trip} locale={locale} onUpdated={onUpdated} close={()=>{setOpen(false);setInitialImage('');}}/>}</div>;
 }
 function CameraDialog({trip,locale,onUpdated,close,initialImage}:{trip:Trip;locale:Locale;onUpdated:(u:TripExecution)=>void;close:()=>void;initialImage:string}){
  const dialog=useRef<HTMLDialogElement>(null),video=useRef<HTMLVideoElement>(null),stream=useRef<MediaStream|null>(null),abort=useRef<AbortController|null>(null);
