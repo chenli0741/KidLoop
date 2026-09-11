@@ -135,7 +135,7 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>}
             {rider.otherVehicle ? <span>{text(locale,`已由 ${rider.otherVehicle} ${["ABSENT","EXCEPTION"].includes(rider.status)?"处理":"接走"}`,`${["ABSENT","EXCEPTION"].includes(rider.status)?"Handled":"Picked up"} by ${rider.otherVehicle}`)}</span> : <StatusBadge status={rider.status} />}
-            {interactive && selectedStopIndex === currentIndex && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions role={role} targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} onUpdated={onUpdated} /> : null}
+            {interactive && selectedStopIndex === currentIndex && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions role={role} targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} parentAbsent={rider.parentAbsent} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>

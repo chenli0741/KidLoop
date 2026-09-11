@@ -11,7 +11,7 @@ import type { RiderStatus } from "@/lib/types";
 import { missedPickupReasons, type StudentStatusReason } from "@/lib/missed-pickup";
 import type { TripExecution } from "@/lib/trip-execution";
 
-export function StatusActions({ assignmentId, status, onUpdated, targetTripId, role = "DRIVER" }: { targetTripId?: string; assignmentId: string; status: RiderStatus; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
+export function StatusActions({ assignmentId, status, parentAbsent = false, onUpdated, targetTripId, role = "DRIVER" }: { targetTripId?: string; assignmentId: string; status: RiderStatus; parentAbsent?: boolean; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -38,8 +38,8 @@ export function StatusActions({ assignmentId, status, onUpdated, targetTripId, r
     });
   }
 
-  if (status === "ABSENT" || status === "EXCEPTION") {
-    return <span className="status-complete"><Check size={16} /> {text(locale, "完成", "Complete")}</span>;
+  if (status === "ABSENT" || status === "EXCEPTION" || (role === "DRIVER" && parentAbsent)) {
+    return <span className="status-complete"><Check size={16} /> {parentAbsent && role === "DRIVER" ? text(locale, "管理员已请假", "Admin marked absent") : text(locale, "完成", "Complete")}</span>;
   }
 
   return (
