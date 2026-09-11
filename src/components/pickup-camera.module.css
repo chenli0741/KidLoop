@@ -10,13 +10,13 @@
 .box span {position:absolute;bottom:100%;left:-2px;background:#154b3f;padding:4px;font-size:12px;line-height:1.2;white-space:nowrap}
 .box[data-unknown=true] {border-color:#ffc25e}.box[data-unknown=true] span {background:#774d06}
 .row {display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}.row label {display:flex;align-items:center;gap:8px;min-height:44px}.row input {width:20px;height:20px}.row small {width:100%}
-.lockedMatch {display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:10px;background:#e5f2eb;color:#176b52;font-weight:600}
-.chooseButton {min-height:44px;padding:8px 14px;border:1px solid #b7d3c2;border-radius:10px;background:white;color:#176b52;font:inherit;font-weight:600;cursor:pointer}
+.lockedMatch {display:inline-flex;align-items:center;min-height:36px;padding:0 9px;border-radius:8px;background:#e5f2eb;color:#176b52;font-size:13px;font-weight:600}
+.chooseButton {min-height:36px;padding:6px 11px;border:1px solid #b7d3c2;border-radius:8px;background:white;color:#176b52;font-size:13px;font-weight:600;cursor:pointer}
 .chooseButton:disabled {opacity:.5;cursor:default}
 .chooserBackdrop {position:fixed;inset:0;z-index:2;display:grid;place-items:center;padding:16px;background:#0008}
 .chooser {width:min(420px,100%);max-height:min(70dvh,560px);overflow:auto;border-radius:16px;padding:16px;background:#f6f8f6;color:#173d32;box-shadow:0 16px 48px #0004}
 .chooserHeader {display:flex;align-items:center;justify-content:space-between;gap:12px}.chooserHeader button {display:grid;place-items:center;min-width:40px;min-height:40px;border:1px solid #dce5df;border-radius:50%;background:white;color:#176b52}.chooserHeader svg {width:18px}
-.chooserHint {margin:8px 0 12px;color:#527168;font-size:13px;line-height:1.45}.chooserOptions {display:grid;gap:8px}.chooserOptions button {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:10px 12px;border:1px solid #dce5df;border-radius:10px;background:white;color:#173d32;text-align:left;font:inherit;font-weight:600;cursor:pointer}.chooserOptions small {color:#527168;font-size:12px;font-weight:400}.chooserEmpty {margin:8px 0;color:#527168;font-size:13px}
+.chooserHint {margin:6px 0 10px;color:#527168;font-size:12px;line-height:1.35}.chooserOptions {display:grid;gap:6px}.chooserOptions button {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:8px 10px;border:1px solid #dce5df;border-radius:8px;background:white;color:#173d32;text-align:left;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.chooserOptions small {color:#527168;font-size:11px;font-weight:400}.chooserEmpty {margin:8px 0;color:#527168;font-size:12px}
 .tools {justify-content:center;margin-top:16px}.tools button:disabled {opacity:.4}.notice {font-size:13px;line-height:1.5}.error {color:#9d302d}
 
 .tools .confirm {display:flex;gap:8px;border-radius:14px;padding:12px 16px;background:#176b52;color:white;font-weight:600}
