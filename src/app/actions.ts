@@ -82,6 +82,50 @@ export async function createStudentStatusReason(_: FormState, formData: FormData
   }, ["/resources?tab=reasons"], { zh: "接送原因已添加。", en: "Student status reason added." });
 }
 
+function selectedIds(formData: FormData, key: string) {
+  return formData.getAll(key).filter((value): value is string => typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value));
+}
+
+export async function createRouteCombinationGroup(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const name = required(formData, "name");
+    const schools = selectedIds(formData, "schoolIds");
+    const programs = selectedIds(formData, "programIds");
+    const vehicles = selectedIds(formData, "vehicleIds");
+    if (!schools.length && !programs.length) throw new Error("Select at least one stop.");
+    await transaction(async client => {
+      const result = await client.query<{id:string}>("insert into route_combination_groups(name) values($1) returning id", [name]);
+      const id = result.rows[0].id;
+      for (const schoolId of schools) await client.query("insert into route_combination_group_stops(group_id,school_id) values($1,$2)", [id, schoolId]);
+      for (const programId of programs) await client.query("insert into route_combination_group_stops(group_id,program_id) values($1,$2)", [id, programId]);
+      for (const vehicleId of vehicles) await client.query("insert into route_combination_group_vehicles(group_id,vehicle_id) values($1,$2)", [id, vehicleId]);
+    });
+  }, ["/resources?tab=combinations"], { zh: "组合组已添加。", en: "Combination group added." });
+}
+
+export async function updateRouteCombinationGroup(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => {
+    const id = required(formData, "id");
+    const name = required(formData, "name");
+    const schools = selectedIds(formData, "schoolIds");
+    const programs = selectedIds(formData, "programIds");
+    const vehicles = selectedIds(formData, "vehicleIds");
+    if (!schools.length && !programs.length) throw new Error("Select at least one stop.");
+    await transaction(async client => {
+      await client.query("update route_combination_groups set name=$2,updated_at=clock_timestamp() where id=$1", [id, name]);
+      await client.query("delete from route_combination_group_stops where group_id=$1", [id]);
+      await client.query("delete from route_combination_group_vehicles where group_id=$1", [id]);
+      for (const schoolId of schools) await client.query("insert into route_combination_group_stops(group_id,school_id) values($1,$2)", [id, schoolId]);
+      for (const programId of programs) await client.query("insert into route_combination_group_stops(group_id,program_id) values($1,$2)", [id, programId]);
+      for (const vehicleId of vehicles) await client.query("insert into route_combination_group_vehicles(group_id,vehicle_id) values($1,$2)", [id, vehicleId]);
+    });
+  }, ["/resources?tab=combinations"], { zh: "组合组已保存。", en: "Combination group saved." });
+}
+
+export async function deleteRouteCombinationGroup(_: FormState, formData: FormData): Promise<FormState> {
+  return runMutation(async () => { await query("delete from route_combination_groups where id=$1", [required(formData, "id")]); }, ["/resources?tab=combinations"], { zh: "组合组已删除。", en: "Combination group deleted." });
+}
+
 export async function setLocale(formData: FormData) {
   const user = await requireUser();
   if (isTestAccount(user)) return;
