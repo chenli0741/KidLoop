@@ -19,7 +19,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
   ] : [
     { href: "/", label: text(locale, "今日", "Today"), icon: Gauge },
     { href: "/schedule", label: text(locale, "学校", "Schools"), icon: CalendarDays },
-    { href: "/routes", label: text(locale, "线路", "Routes"), icon: BusFront },
+    { href: "/routes", label: text(locale, "排班", "Scheduling"), icon: BusFront },
     { href: "/students", label: text(locale, "学生", "Students"), icon: UsersRound },
     { href: "/resources", label: text(locale, "资料", "Resources"), icon: MapPinned },
   ];

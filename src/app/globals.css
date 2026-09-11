@@ -500,6 +500,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .calendar-day:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 .calendar-day-detail { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
 .calendar-day-detail h3 { margin: 0 0 8px; }
+.school-month-grid-condensed { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.calendar-weekend-heading { grid-column: span 1; }
+.calendar-weekend { display: flex; align-items: center; justify-content: center; min-height: 72px; padding: 6px; border: 1px solid transparent; border-radius: 8px; background: #eef0ef; color: var(--muted); font-size: 11px; text-align: center; }
 .calendar-day-detail p { font-size: 13px; padding: 6px 0; }
 .calendar-detail-dialog { width: min(520px, calc(100vw - 24px)); }
 .calendar-detail-dialog .calendar-day-detail { margin: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
@@ -702,3 +705,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .review-issue-label { color:#a32222;font-weight:700; }
 .review-date.is-today .review-issue-label { color:#fff; }
 @media(max-width:680px) { .review-calendar { gap:5px; }.review-date { font-size:12px;padding:10px 4px; }.review-controls input,.review-controls select { font-size:16px; }.fixed-rider { padding:12px 0; } }
+
+.schedule-action-groups { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0 22px; }
+.schedule-action-group { display:flex; align-items:center; gap:8px; }
+.schedule-action-group .eyebrow { margin:0; }
+.schedule-review-link { margin-left:auto; }
+.schedule-generation-options { display:flex; flex-wrap:wrap; gap:10px; border:0; padding:0; margin:0; }
+.schedule-generation-options label { display:flex; align-items:center; gap:7px; padding:10px 12px; border:1px solid #d7e0db; border-radius:10px; }
+.schedule-generation-options input { width:18px; height:18px; }
+.custom-date-field { display:grid; gap:6px; margin-top:14px; }
+.schedule-today-section { background:#f7fbf8; }
+.schedule-today-section .pickup-record { background:#fff; }
+@media(max-width:680px) { .schedule-action-groups { align-items:stretch; flex-direction:column; }.schedule-action-group { justify-content:space-between; }.schedule-review-link { margin-left:0; } }

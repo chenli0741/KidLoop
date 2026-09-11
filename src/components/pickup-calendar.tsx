@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { calendarDays } from "@/lib/pickup-calendar";
 import type { PickupSetting } from "@/lib/pickup-types";
@@ -28,6 +28,8 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, st
     unconfigured: text(locale, "学校日历待设置", "School calendar not configured"),
   };
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
+  const monthSlots: ((typeof days)[number] | null)[] = [...Array.from({ length: offset }, () => null), ...days];
+  const monthWeeks = Array.from({ length: Math.ceil(monthSlots.length / 7) }, (_, index) => monthSlots.slice(index * 7, index * 7 + 7));
   const day = days.find(d => d.date === selected && (!firstVisible || d.date >= firstVisible)) ?? days.find(d => !firstVisible || d.date >= firstVisible) ?? days[0];
   const countFor = (grades: string[]) => grades.reduce((total, grade) => total + (studentCounts[grade] ?? 0), 0);
   const weekStart = (() => { const date = new Date(`${selected}T12:00:00Z`); const weekday = date.getUTCDay() || 7; date.setUTCDate(date.getUTCDate() - weekday + 1); return date; })();
@@ -56,15 +58,14 @@ export function PickupCalendar({ today, schoolName, terms, exceptions, rules, st
       <div className="calendar-view-switch" role="group" aria-label={text(locale,"日历视图","Calendar view")}><button type="button" className={view === "week" ? "active" : ""} aria-pressed={view === "week"} onClick={()=>setView("week")}>{text(locale,"周","Week")}</button><button type="button" className={view === "month" ? "active" : ""} aria-pressed={view === "month"} onClick={()=>setView("month")}>{text(locale,"月","Month")}</button></div>
       <button type="button" className="button secondary compact" onClick={()=>{setMonth(today.slice(0,7));setSelected(today);}}>{text(locale,"今天","Today")}</button>
     </div>
-    {view === "week" ? <div className="school-week-grid">{weekDays.map(d=><button type="button" key={d.date} className={`school-week-day ${d.status === "holiday" ? "calendar-holiday" : d.status === "adjusted" ? "calendar-special" : d.status === "pickup" ? "calendar-pickup" : ""}`} onClick={()=>{selectDate(d.date);detailDialog.current?.showModal();}}><strong>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {weekday:"short", timeZone:"UTC"}).format(new Date(`${d.date}T12:00:00Z`))}</strong><span>{d.date.slice(5).replace("-","/")}</span>{d.schoolTimes.length ? <div className="school-week-times">{d.schoolTimes.map(t=><div key={t.id}><b>{t.time}</b><span>{formatGradeGroup(t.grades)} · {countFor(t.grades)} {text(locale,"人","students")}</span></div>)}</div> : <small>{labels[d.status]}</small>}</button>)}</div> : <div className="school-month-grid">
-      {(locale === "zh" ? ["一","二","三","四","五","六","日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]).map(w=><div className="calendar-weekday" key={w}>{w}</div>)}
-      {Array.from({length:offset},(_,i)=><div key={`blank-${i}`} />)}
-      {days.map(d=>firstVisible && d.date < firstVisible ? <div key={d.date} aria-hidden="true"/> : <button type="button" key={d.date} aria-haspopup="dialog" aria-pressed={d.date===day.date} aria-current={d.date===today ? "date" : undefined} aria-label={`${d.date} ${labels[d.status]} ${d.exception?.name ?? ""} ${d.schoolTimes.map(t=>t.time).join(", ")}`} className={`calendar-day ${d.status === "holiday" ? "calendar-holiday" : d.status === "adjusted" ? "calendar-special" : d.status === "pickup" ? "calendar-pickup" : ""}`} onClick={()=>{selectDate(d.date);detailDialog.current?.showModal();}}>
+    {view === "week" ? <div className="school-week-grid">{weekDays.map(d=><button type="button" key={d.date} className={`school-week-day ${d.status === "holiday" ? "calendar-holiday" : d.status === "adjusted" ? "calendar-special" : d.status === "pickup" ? "calendar-pickup" : ""}`} onClick={()=>{selectDate(d.date);detailDialog.current?.showModal();}}><strong>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {weekday:"short", timeZone:"UTC"}).format(new Date(`${d.date}T12:00:00Z`))}</strong><span>{d.date.slice(5).replace("-","/")}</span>{d.schoolTimes.length ? <div className="school-week-times">{d.schoolTimes.map(t=><div key={t.id}><b>{t.time}</b><span>{formatGradeGroup(t.grades)} · {countFor(t.grades)} {text(locale,"人","students")}</span></div>)}</div> : <small>{labels[d.status]}</small>}</button>)}</div> : <div className="school-month-grid school-month-grid-condensed">
+      {(locale === "zh" ? ["一","二","三","四","五"] : ["Mon","Tue","Wed","Thu","Fri"]).map(w=><div className="calendar-weekday" key={w}>{w}</div>)}<div className="calendar-weekday calendar-weekend-heading">{text(locale,"周末","Weekend")}</div>
+      {monthWeeks.map((week,index)=><Fragment key={`week-${index}`}>{week.slice(0,5).map((d,dayIndex)=>d===null||firstVisible&&d.date<firstVisible?<div key={`blank-${index}-${dayIndex}`} aria-hidden="true"/>:<button type="button" key={d.date} aria-haspopup="dialog" aria-pressed={d.date===day.date} aria-current={d.date===today ? "date" : undefined} aria-label={`${d.date} ${labels[d.status]} ${d.exception?.name ?? ""} ${d.schoolTimes.map(t=>t.time).join(", ")}`} className={`calendar-day ${d.status === "holiday" ? "calendar-holiday" : d.status === "adjusted" ? "calendar-special" : d.status === "pickup" ? "calendar-pickup" : ""}`} onClick={()=>{selectDate(d.date);detailDialog.current?.showModal();}}>
         <strong>{d.day}</strong>
         {d.exception ? <span>{d.exception.name}</span> : d.term?.startsOn===d.date ? <span>{text(locale,"开学","Term starts")}</span> : d.term?.endsOn===d.date ? <span>{text(locale,"学期结束","Term ends")}</span> : null}
         {d.schoolTimes.length > 0 && <small className="calendar-day-times">{d.schoolTimes.map(t=>`${t.time}·${countFor(t.grades)}${text(locale,"人"," students")}`).join(" ")}</small>}
         {!d.schoolTimes.length && !d.closed && <small>{d.status === "weekend" ? text(locale,"休息","Off") : d.status === "outside-term" ? text(locale,"学期外","No term") : text(locale,"待设置","Pending")}</small>}
-      </button>)}
+      </button>)}<div className="calendar-weekend" aria-label={text(locale,"周六周日休息","Saturday and Sunday are off")}>{text(locale,"周末休息","Weekend off")}</div></Fragment>)}
     </div>}
     <dialog ref={detailDialog} className="record-dialog calendar-detail-dialog" aria-labelledby={detailTitle}>
       <div className="record-dialog-heading"><h2 id={detailTitle}>{day.date}{day.date===today ? ` · ${text(locale,"今天","Today")}` : ""}</h2><button type="button" className="icon-button" aria-label={text(locale,"关闭当天详情","Close day details")} title={text(locale,"关闭当天详情","Close day details")} onClick={()=>detailDialog.current?.close()}><X size={18}/></button></div>
