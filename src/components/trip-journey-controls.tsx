@@ -21,7 +21,9 @@ export function TripJourneyControls({ trip, locale, onUpdated }: { trip: Trip; l
   const pendingRiders = stop?.schoolId ? atStopRiders.filter(r => r.pickupStopId === stop.id && r.status === "SCHEDULED").length : 0;
   const dropoffRiders = stop?.programId ? atStopRiders.filter(r => r.dropoffStopId === stop.id && r.status === "PICKED_UP").length : 0;
   const action = inTransit ? "ARRIVE" : dropoffRiders ? "DROP_OFF" : "GO";
-  const label = inTransit ? { zh: "到达", en: "Arrive" } : dropoffRiders ? { zh: "Drop off", en: "Drop off" } : { zh: "GO", en: "GO" };
+  const target = inTransit ? trip.routeStops[Math.min(index + 1, trip.routeStops.length - 1)] : stop;
+  const targetName = target?.name ?? "";
+  const label = inTransit ? { zh: `到达 · ${targetName}`, en: `Arrive · ${targetName}` } : dropoffRiders ? { zh: `送达 · ${targetName}`, en: `Drop off · ${targetName}` } : { zh: `前往 · ${targetName}`, en: `GO · ${targetName}` };
   return <div className="trip-journey-controls">
     <button type="button" className="button primary trip-start-button" disabled={pending || pendingRiders > 0} onClick={() => {
       setError("");
