@@ -154,10 +154,10 @@ export async function getShifts(fromDate?: string) {
   }));
 }
 
-export async function getTrips(date: string) {
+export async function getTrips(date: string, options?: { ensure?: boolean }) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
   if(user.role === 'DRIVER' && !user.driverId) return [];
-  await ensureRouteTasks(date,user.role === 'DRIVER' ? user.driverId! : undefined);
+  if(options?.ensure !== false) await ensureRouteTasks(date,user.role === 'DRIVER' ? user.driverId! : undefined);
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
@@ -259,9 +259,9 @@ export async function getTrips(date: string) {
   })), user);
 }
 
-export async function getDashboardCounts(date: string) {
+export async function getDashboardCounts(date: string, options?: { ensure?: boolean }) {
   await requireUser(["ADMIN"]);
-  await ensureRouteTasks(date);
+  if(options?.ensure !== false) await ensureRouteTasks(date);
   const result = await query<{
     vehicles: string; drivers: string; students: string; active_trips: string; attention: string;
   }>(`

@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { TripCard } from "@/components/trip-card";
 import { todayInOperationsTimeZone, formatDate } from "@/lib/date";
 import { getDashboardCounts, getTrips } from "@/lib/data";
+import { ensureRouteTasks } from "@/lib/ensure-route-tasks";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 
@@ -23,7 +24,8 @@ export default async function DashboardPage() {
   const operation=await openTerm(db);
   if(!operation)return <div className="page-container"><TermWorkspace locale={locale}/></div>;
   const today = todayInOperationsTimeZone();
-  const [counts, trips] = await Promise.all([getDashboardCounts(today), getTrips(today)]);
+  await ensureRouteTasks(today);
+  const [counts, trips] = await Promise.all([getDashboardCounts(today, {ensure:false}), getTrips(today, {ensure:false})]);
   const stats = [
     { label: text(locale, "进行中行程", "Active trips"), value: counts.activeTrips, icon: Route, tone: "green" },
     { label: text(locale, "今日学生", "Today’s riders"), value: counts.students, icon: UsersRound, tone: "blue" },
