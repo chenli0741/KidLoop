@@ -14,11 +14,9 @@ YuNet detection and SFace embeddings run locally with ONNX Runtime Web WASM in a
 
 The app compares the captured image to authorized student photo URLs already used in the manifest. Reference images with zero/multiple faces and Test-account avatars are excluded. Cosine >= 0.40 and a >= 0.05 margin select a candidate; duplicate assignments are cleared. The looser threshold is intended for small, shadowed or partial-profile faces in a vehicle, while the margin still rejects ambiguous candidates. Thresholds are initial settings, not field-calibrated. No identity result has been tested on production children's photos during development.
 
-Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video, terminates the worker and discards state. Input/output tensors and decoded reference images are released after use; the worker and its WASM heap are discarded after completion. A 60-second scan deadline terminates stalled work while keeping the dialog usable. Reference image loads time out after 8 seconds; the optional belt request times out after 15 seconds without blocking pickup. No-face scans skip the larger SFace model. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
+Cabin image and embeddings remain transient in browser memory. Cancel/retake/unmount stops video, terminates the worker and discards state. Input/output tensors and decoded reference images are released after use; the worker and its WASM heap are discarded after completion. A 60-second scan deadline terminates stalled work while keeping the dialog usable. Reference image loads time out after 8 seconds. No-face scans skip the larger SFace model. No album write, database image record or application image storage is used. Browser reference/model caching follows existing HTTP behavior.
 
-Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The explanatory paragraph was removed from the camera dialog at user request; processing behavior is unchanged. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
-
-`OPENAI_API_KEY` enables belt analysis; `OPENAI_PICKUP_VISION_MODEL` defaults to `gpt-4o-mini`. Results are VISIBLE / CHECK / UNCLEAR; a missing key or provider failure displays unavailable and does not block manual pickup confirmation. The confirmation action stays disabled until the belt request returns or reaches its timeout, so the driver sees a settled result before confirming; an unavailable result remains an explicit fallback and does not prevent manual confirmation. Visible means a belt was seen, not that its fit or restraint is certified. The per-process 5-second throttle prevents repeated taps but is not a distributed billing quota.
+Seatbelt recognition is intentionally disabled. KidLoop does not send cabin images to a backend or external AI service, and no local seatbelt model is currently bundled. Pickup confirmation therefore relies on the driver's visual/manual check and the existing student status flow.
 
 ## Verification
 
@@ -26,7 +24,7 @@ Seatbelt assistance sends the frame and numbered normalized face boxes (no names
 - Matching tests: ambiguous, weak and duplicate identity rejection; affine alignment; detection suppression.
 - Isolated local PostgreSQL: driver authorization, batch capacity rollback, competing-driver rejection, shared pickup and location-history behavior.
 - Browser smoke: real model load and blank-tensor inference; mocked camera preview/capture, no-face Done without writes, retake and close. No production pickup writes.
-- Still required: physical iPhone camera permissions, real vehicle lighting/angles, speed and recognition usefulness, and actual provider seatbelt output. Do not describe desktop checks as iPhone acceptance.
+- Still required: physical iPhone camera permissions, real vehicle lighting/angles, speed and recognition usefulness. Do not describe desktop checks as iPhone acceptance.
 
 Speech remains a separate deferred task in `docs/pending-local-speech.md`.
 
