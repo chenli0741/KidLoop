@@ -37,6 +37,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
 
   ]);
   const terms=termsResult.rows, exceptions=exceptionsResult.rows, rules=rulesResult.rows;
+  const studentCounts = schoolId ? (await query<{grade:string;count:string}>(`select trim(s.grade) as grade,count(*)::text as count from students s join term_students ts on ts.student_id=s.id and ts.operating_term_id=current_operating_term() where s.active and s.school_id=$1 group by trim(s.grade)`,[schoolId])).rows.reduce<Record<string,number>>((result,row)=>{result[row.grade]=Number(row.count);return result;},{}):{};
   const grades = PICKUP_GRADES;
   const today=todayInOperationsTimeZone();
   const weekdays=(days?:number[])=>days?.map(d=>(locale==="zh" ? ["周一","周二","周三","周四","周五","周六","周日"] : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])[d-1]).join("、");
@@ -61,7 +62,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
         {section("exception",text(locale,"学校日历日程","School calendar schedule"),text(locale,"按日期或日期范围记录学校正式安排；年级实际时间直接显示在日程中。未覆盖的年级沿用常规规则。","Record formal school calendar schedules by date or range; show actual grade times directly in each schedule. Grades not covered use the regular rules."),exceptions)}
         {section("rule",text(locale,"年级接送时间","Grade pickup times"),text(locale,"相同时间的年级可合并设置；周三等不同时间另建一条规则。","Group grades sharing a time. Add a separate rule for weekdays with different times."),rules)}
       </>}
-      {tab==="preview" && school && <PickupCalendar key={`${school.id}:${cutoff}`} archivedThrough={cutoff} today={today} schoolName={school.name} terms={terms} exceptions={exceptions} rules={rules} locale={locale} />}
+      {tab==="preview" && school && <PickupCalendar key={`${school.id}:${cutoff}`} archivedThrough={cutoff} today={today} schoolName={school.name} terms={terms} exceptions={exceptions} rules={rules} studentCounts={studentCounts} locale={locale} />}
     </>}
   </div>;
 }
