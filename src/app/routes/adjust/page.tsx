@@ -22,7 +22,7 @@ export default async function AdjustmentPage() {
         ← {text(locale, "返回线路", "Back to routes")}
       </Link>
       <header className="adjust-heading">
-        <span>KidLoop</span>
+        <span>Kid Loop Rides</span>
         <h1>{text(locale, "智能调整接送安排", "Adjust pickup schedules")}</h1>
         <p>
           {text(

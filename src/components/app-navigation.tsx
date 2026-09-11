@@ -29,7 +29,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
       <div className="brand">
         <div className="brand-mark"><BusFront size={21} aria-hidden="true" /></div>
         <div className="brand-identity">
-          <strong>Kid Loop</strong>
+          <strong>Kid Loop Rides</strong>
           <span title={user.name}>{user.role === "PARENT" ? text(locale, "家长端", "Parent") : user.role === "DRIVER" ? text(locale, "司机端", "Driver") : text(locale, "运营管理", "Operations")} · {user.name}</span>
         </div>
       </div>
