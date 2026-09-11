@@ -501,14 +501,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-riders { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .fixed-rider { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .fixed-stop-editor .form-hint { display: flex; gap: 6px; flex-wrap: wrap; }
-.fixed-trip-stops { list-style: none; margin: 0; padding: 16px 20px; background: #f8faf8; display: grid; gap: 8px; }
+.fixed-trip-stops { list-style: none; margin: 0; padding: 18px 20px; background: #f8faf8; display: grid; gap: 10px; }
 .fixed-trip-stops li { display: flex; gap: 10px; }
 .fixed-trip-stops li > div { min-width: 0; flex: 1; }
 .fixed-trip-stops strong { display: block; font-size: 14px; }
 .fixed-trip-stops small { color: var(--green); font-size: 12px; }
 .fixed-stop-number { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 12px; }
 .fixed-stop-select { display: flex; width: 100%; align-items: flex-start; gap: 10px; }
-.fixed-stop-main { display: flex; width: 100%; align-items: flex-start; gap: 10px; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; cursor: pointer; }
+.fixed-stop-main { display: flex; width: 100%; min-height: 62px; align-items: flex-start; gap: 10px; border: 0; background: transparent; padding: 8px 0; text-align: left; color: inherit; cursor: pointer; }
 .fixed-stop-main > span:last-child { min-width: 0; }
 .fixed-stop-copy { display: block; min-width: 0; flex: 1; }
 .fixed-stop-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
