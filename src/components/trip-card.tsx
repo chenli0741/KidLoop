@@ -41,6 +41,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
   },[source.id,source.hasSharedPickups]);
   function onUpdated(update: TripExecution) {
     refreshEpoch.current++;
+    setSelectedStopIndex(update.currentStopIndex ?? null);
     setState(previous => ({ ...previous, trip: applyTripExecution(previous.trip, update) }));
   }
   const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
