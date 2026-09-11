@@ -514,8 +514,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .fixed-stop-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .fixed-stop-title strong { overflow-wrap: anywhere; }
 .fixed-stop-address { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
-.fixed-stop-select > .segment-map { flex: none; width: 44px; height: 44px; margin-top: -4px; }
-.fixed-trip-stops li.is-current { border-radius: 10px; background: #eef8f3; }
+.fixed-stop-select > .segment-map { flex: 0 0 44px; width: 44px; height: 44px; margin: 0; align-self: center; display: inline-grid; place-items: center; }
+.fixed-trip-stops li { border-radius: 10px; transition: background-color .15s ease, box-shadow .15s ease; }
+.fixed-trip-stops li.is-passed { background: #edf1ee; }
+.fixed-trip-stops li.is-current { background: #dff3e8; box-shadow: inset 3px 0 var(--green); }
+.fixed-trip-stops li.is-upcoming { background: #f8faf8; }
+.fixed-stop-current { flex: none; padding: 2px 6px; color: var(--green); background: #bfe6d0; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 750; }
 .fixed-trip-stops li.is-selected { box-shadow: 0 0 0 2px rgba(20,115,82,.18); }
 .term-workspace { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:16px; margin-bottom:20px; background:var(--green-soft); border-radius:14px; }
 .term-workspace p { margin:6px 0 0; font-size:13px; color:var(--muted); }
