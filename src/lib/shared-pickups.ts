@@ -18,6 +18,20 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
     left join parents p on p.id=s.parent_id
     left join student_day_plans dp on dp.student_id=s.id and dp.service_date=owner.scheduled_date
     where m.trip_id=any($1::uuid[])`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
+  const allSharedTripIds = [...new Set(rows.flatMap(row => [row.trip_id, row.owner_id]))];
+  const capacityRows = allSharedTripIds.length ? (await c.query<{id:string;capacity:number;fixed:number}>(`select t.id,v.capacity,
+    count(ts.id) filter (where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
+    from trips t join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
+    left join trip_students ts on ts.trip_id=t.id where t.id=any($1::uuid[]) group by t.id,v.capacity`,[allSharedTripIds])).rows : [];
+  const capacityByTrip = new Map(capacityRows.map(row => [row.id, { capacity: row.capacity, fixed: row.fixed }]));
+  const baseByTrip = new Map(trips.map(trip => [trip.id, trip]));
+  const participants = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const set = participants.get(row.id) ?? new Set<string>();
+    set.add(row.trip_id);
+    set.add(row.owner_id);
+    participants.set(row.id, set);
+  }
   return trips.map(trip=>{
     const shared=rows.filter(r=>r.trip_id===trip.id);
     const ids=new Set(shared.map(r=>r.id));
@@ -25,7 +39,16 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
       grade:r.grade,age:r.age,classroomName:r.classroom_name,parentName:r.parent_name,parentPhone:r.parent_phone,
       parentNote:r.parent_note,parentAbsent:r.parent_absent,status:r.status,pickupStopId:r.pickup_stop_id,dropoffStopId:r.dropoff_stop_id,
       shared:true,otherVehicle:r.owner_id!==trip.id && r.status!=='SCHEDULED' ? r.vehicle_name:undefined}));
-    return {...trip,hasSharedPickups:shared.length>0,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
+    if (!shared.length) return {...trip,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
+    const sharedCount = new Set(shared.map(r => r.id)).size;
+    const capacityLeft = (candidate: Trip) => candidate.capacity - candidate.riders.filter(r => !r.shared && !r.otherVehicle && !['ABSENT','EXCEPTION'].includes(r.status)).length;
+    const availableElsewhere = [...new Set(shared.flatMap(r => [...(participants.get(r.id) ?? [])]))]
+      .filter(id => id !== trip.id && (baseByTrip.has(id) || capacityByTrip.has(id)))
+      .reduce((sum, id) => {
+        const capacity = capacityByTrip.get(id);
+        return sum + Math.max(0, capacity ? capacity.capacity - capacity.fixed : capacityLeft(baseByTrip.get(id)!));
+      }, 0);
+    return {...trip,hasSharedPickups:true,sharedPickupMin:Math.max(0,sharedCount-availableElsewhere),sharedPickupMax:Math.min(sharedCount,Math.max(0,capacityLeft(trip))),riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
   });
 }
 

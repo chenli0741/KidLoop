@@ -104,6 +104,8 @@ export type Rider = {
 
 export type Trip = {
   hasSharedPickups?: boolean;
+  sharedPickupMin?: number;
+  sharedPickupMax?: number;
   executionVersion?: string;
   completedSegments?: string[];
   currentStopIndex?: number;
