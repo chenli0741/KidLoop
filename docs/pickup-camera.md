@@ -18,7 +18,7 @@ Cabin image and embeddings remain transient in browser memory. Cancel/retake/unm
 
 Seatbelt assistance sends the frame and numbered normalized face boxes (no names or student reference photos) to the authenticated `/api/pickup-camera/seatbelts` endpoint. It checks the driver's trip, bounds payload size, strips metadata and calls OpenAI with `store:false`. The explanatory paragraph was removed from the camera dialog at user request; processing behavior is unchanged. KidLoop does not persist or log the image. `store:false` is not a promise about provider retention; provider account policy still applies.
 
-`OPENAI_API_KEY` enables belt analysis; `OPENAI_PICKUP_VISION_MODEL` defaults to `gpt-4o-mini`. Results are VISIBLE / CHECK / UNCLEAR; a missing key or provider failure displays unavailable and does not block manual pickup confirmation. Visible means a belt was seen, not that its fit or restraint is certified. The per-process 5-second throttle prevents repeated taps but is not a distributed billing quota.
+`OPENAI_API_KEY` enables belt analysis; `OPENAI_PICKUP_VISION_MODEL` defaults to `gpt-4o-mini`. Results are VISIBLE / CHECK / UNCLEAR; a missing key or provider failure displays unavailable and does not block manual pickup confirmation. The confirmation action stays disabled until the belt request returns or reaches its timeout, so the driver sees a settled result before confirming; an unavailable result remains an explicit fallback and does not prevent manual confirmation. Visible means a belt was seen, not that its fit or restraint is certified. The per-process 5-second throttle prevents repeated taps but is not a distributed billing quota.
 
 ## Verification
 
