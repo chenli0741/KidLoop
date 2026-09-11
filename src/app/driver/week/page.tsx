@@ -40,7 +40,10 @@ async function Day({date,today,locale,driverId,monthly}:{date:string;today:strin
  const rows=future?plans.map(p=>({id:p.routeId,name:p.name,stops:p.stops,count:p.students.length})):trips.map(t=>({id:t.id,name:t.routeName??'',stops:t.routeStops??[],count:t.riders.length}));
  return <section className={`workweek-day is-${scheduleDatePeriod(date,today)}`}><header className="workweek-day-header"><h2>{formatDate(date,locale)}</h2><span>{schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} · {rows.length} {text(locale,'个行程','trips')}</span></header>
   {!rows.length&&<p className="workweek-empty">{text(locale,'暂无接送计划','No trips planned')}</p>}
-  {rows.map(row=><article className="workweek-trip" key={row.id}><h3>{row.name}</h3>{row.stops.map(s=><p key={s.id}><strong>{s.name}</strong> · {s.time}</p>)}<p>{row.count} {text(locale,'名学生','students')}</p></article>)}
+  {rows.map(row=><article className="workweek-trip" key={row.id}>
+   <div className="workweek-trip-heading"><h3>{row.name}</h3><span>{row.count} {text(locale,'名学生','students')}</span></div>
+   <div className="workweek-stops">{row.stops.map(s=><p className="workweek-stop" key={s.id}><time>{s.time}</time><strong>{s.name}</strong></p>)}</div>
+  </article>)}
   {trial?.issues.filter(i=>i.routeId&&plans.some(p=>p.routeId===i.routeId)).map((i,index)=><p className="form-error" key={index}>{i.message.split(' / ')[locale==='zh'?0:1]??i.message}</p>)}
   {!future&&<Link className="workweek-detail" href={`/driver?date=${date}&week=${date}&view=${monthly?'month':'week'}`}>{text(locale,'查看当天任务','View day')} →</Link>}
  </section>;

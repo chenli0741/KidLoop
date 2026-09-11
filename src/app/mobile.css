@@ -192,7 +192,7 @@
 }
 
 @media (max-width: 920px) {
-  .workweek-day-header h2 { font-size: 17px; }
+  .workweek-day-header h2 { font-size: 15px; }
   .workweek-segment > div { grid-template-columns: minmax(0, 1fr) auto; }
   .workweek-segment time { font-size: 14px; }
 }

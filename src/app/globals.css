@@ -571,8 +571,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .workweek-day-header h2 { font-size: 15px; margin: 0 0 8px; }
 .workweek-day-header span { color: var(--muted); font-size: 12px; }
 .workweek-trips { padding: 12px; }
-.workweek-trip + .workweek-trip { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
-.workweek-trip-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--green); font-size: 13px; }
+.workweek-trip { padding: 12px 0; }
+.workweek-trip + .workweek-trip { border-top: 1px solid var(--line); }
+.workweek-trip-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; color: var(--green); }
+.workweek-trip-heading h3 { min-width: 0; margin: 0; color: var(--ink); font-size: 15px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
+.workweek-trip-heading span { flex: none; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.workweek-stops { display: grid; gap: 6px; margin-top: 10px; }
+.workweek-stop { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: baseline; margin: 0; font-size: 13px; line-height: 1.35; }
+.workweek-stop time { color: var(--green); font-variant-numeric: tabular-nums; }
+.workweek-stop strong { min-width: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .workweek-vehicle { display: flex; gap: 5px; color: var(--muted); font-size: 11px; line-height: 1.5; margin: 12px 0; }
 .workweek-vehicle svg { flex-shrink: 0; margin-top: 2px; }
 .workweek-vehicle span { overflow-wrap: anywhere; }
