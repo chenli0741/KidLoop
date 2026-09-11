@@ -1,10 +1,10 @@
 // Each scan owns its worker: timeout, retake and close release the entire WASM heap.
-export function runRecognitionWorker<T>(create:()=>Worker,input:unknown,signal:AbortSignal,progress:(done:number,total:number)=>void,timeoutMs=60000):Promise<T>{
+export function runRecognitionWorker<T>(create:()=>Worker,input:unknown,signal:AbortSignal,progress:(done:number,total:number)=>void,timeoutMs=60000,keepAlive=false):Promise<T>{
  return new Promise((resolve,reject)=>{
   if(signal.aborted){reject(new DOMException('Canceled','AbortError'));return;}
   const worker=create();let settled=false;
   const finish=(error?:Error,result?:T)=>{
-   if(settled)return;settled=true;clearTimeout(timer);signal.removeEventListener('abort',cancel);worker.terminate();
+   if(settled)return;settled=true;clearTimeout(timer);signal.removeEventListener('abort',cancel);if(!keepAlive||error)worker.terminate();
    if(error)reject(error);else resolve(result!);
   };
   const cancel=()=>finish(new DOMException('Canceled','AbortError'));

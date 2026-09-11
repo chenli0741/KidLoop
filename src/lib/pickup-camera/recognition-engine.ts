@@ -1,6 +1,10 @@
 import * as ort from 'onnxruntime-web/wasm';
 import {alignment,matchFaces,suppressFaces,type FaceBox} from './matching';
 
+let detectorPromise:Promise<ort.InferenceSession>|undefined;
+let recognizerPromise:Promise<ort.InferenceSession>|undefined;
+const embeddingCache=new Map<string,{embedding?:Float32Array;reason?:ReferenceIssue['reason']}>();
+
 function canvas(w:number,h:number){return new OffscreenCanvas(w,h);}
 async function loadImage(url:string,signal:AbortSignal){const response=await fetch(new URL(url,self.location.origin),{signal:AbortSignal.any([signal,AbortSignal.timeout(8000)])});if(!response.ok)throw new Error('Image unavailable');return createImageBitmap(await response.blob());}
 function tensor(c:OffscreenCanvas,bgr=false){
@@ -12,10 +16,10 @@ export type ReferenceIssue={assignmentId:string;reason:'NO_PHOTO'|'DEMO_PHOTO'|'
 export async function recognizePickup(imageUrl:string,references:{id:string;photoUrl:string}[],signal:AbortSignal,progress:(done:number,total:number)=>void){
  ort.env.wasm.wasmPaths=self.location.origin+'/onnx/';ort.env.wasm.numThreads=1;
  let image:ImageBitmap|undefined;
- let detector:ort.InferenceSession|undefined,recognizer:ort.InferenceSession|undefined;
+  let detector:ort.InferenceSession|undefined,recognizer:ort.InferenceSession|undefined;
  const check=()=>{if(signal.aborted)throw new DOMException('Canceled','AbortError');};
  try{
-  detector=await ort.InferenceSession.create('/models/pickup/yunet.onnx',{executionProviders:['wasm']});check();
+  detector=await (detectorPromise??=ort.InferenceSession.create('/models/pickup/yunet.onnx',{executionProviders:['wasm']}));check();
   async function detect(img:ImageBitmap){
    const scale=Math.min(640/img.width,640/img.height),input=canvas(640,640);input.getContext('2d')!.drawImage(img,0,0,img.width*scale,img.height*scale);
    const data=tensor(input,true);let output:ort.InferenceSession.ReturnType|undefined;
@@ -42,19 +46,21 @@ export async function recognizePickup(imageUrl:string,references:{id:string;phot
   }
   image=await loadImage(imageUrl,signal);check();const faces=await detect(image),queries=[];
   if(!faces.length)return {matches:[],referenceIssues:[],usableReferences:0};
-  recognizer=await ort.InferenceSession.create('/models/pickup/sface.onnx',{executionProviders:['wasm']});check();
+  recognizer=await (recognizerPromise??=ort.InferenceSession.create('/models/pickup/sface.onnx',{executionProviders:['wasm']}));check();
   for(const face of faces)queries.push({face,embedding:await embedding(image,face)});
   const known:{assignmentId:string;embedding:Float32Array}[]=[],issues:ReferenceIssue[]=[];
   for(const [i,r] of references.entries()){
    check();progress(i,references.length);
    // Test avatars and missing references must never produce invented identities.
    if(!r.photoUrl||r.photoUrl.startsWith('/demo-avatars/')){issues.push({assignmentId:r.id,reason:r.photoUrl?'DEMO_PHOTO':'NO_PHOTO'});continue;}
+   const cached=embeddingCache.get(r.photoUrl);
+   if(cached){if(cached.embedding)known.push({assignmentId:r.id,embedding:cached.embedding});else issues.push({assignmentId:r.id,reason:cached.reason??'PROCESSING_FAILED'});continue;}
    let photo:ImageBitmap;
    try{photo=await loadImage(r.photoUrl,signal);check();}catch{check();issues.push({assignmentId:r.id,reason:'LOAD_FAILED'});continue;}
-   try{const found=await detect(photo);if(found.length!==1){issues.push({assignmentId:r.id,reason:found.length?'MULTIPLE_FACES':'NO_FACE'});continue;}known.push({assignmentId:r.id,embedding:await embedding(photo,found[0])});}catch{check();issues.push({assignmentId:r.id,reason:'PROCESSING_FAILED'});}finally{photo.close();}
+   try{const found=await detect(photo);if(found.length!==1){const reason=found.length?'MULTIPLE_FACES':'NO_FACE';embeddingCache.set(r.photoUrl,{reason});issues.push({assignmentId:r.id,reason});continue;}const value=await embedding(photo,found[0]);embeddingCache.set(r.photoUrl,{embedding:value});known.push({assignmentId:r.id,embedding:value});}catch{check();embeddingCache.set(r.photoUrl,{reason:'PROCESSING_FAILED'});issues.push({assignmentId:r.id,reason:'PROCESSING_FAILED'});}finally{photo.close();}
   }
   progress(references.length,references.length);check();
   const matched=matchFaces(queries,known).map(r=>({...r,face:{...r.face,x:r.face.x/image!.width,y:r.face.y/image!.height,width:r.face.width/image!.width,height:r.face.height/image!.height,landmarks:[]}}));
   return {matches:matched,referenceIssues:issues,usableReferences:known.length};
- }finally{image?.close();await detector?.release();await recognizer?.release();}
+  }finally{image?.close();}
 }
