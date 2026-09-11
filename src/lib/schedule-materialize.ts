@@ -56,7 +56,7 @@ export async function materializeTrial(c:PoolClient,date:string){
   }
   if(assignment)await c.query('update trip_students set trip_id=$2,pickup_stop_id=$3,dropoff_stop_id=$4,status=$5,parent_absence=$6 where id=$1',[assignment,trip,a.pickupStopId,a.dropoffStopId,absent?'ABSENT':prior.parent_absence?'SCHEDULED':prior.status,absent]);
   else assignment=(await c.query("insert into trip_students(trip_id,student_id,pickup_stop_id,dropoff_stop_id,status,parent_absence) values($1,$2,$3,$4,$5,$6) returning id",[trip,studentId,a.pickupStopId,a.dropoffStopId,absent?'ABSENT':'SCHEDULED',absent])).rows[0].id;
-  if(plan.shared[studentId])for(const target of targets){const rider=target.students.find(a=>a.studentId===studentId)!;await c.query('insert into shared_pickup_members values($1,$2,$3,$4)',[assignment,tripMap.get(target.routeId),rider.pickupStopId,rider.dropoffStopId]);}
+  if(plan.shared[studentId])for(const target of targets){const targetTrip=tripMap.get(target.routeId);const rider=target.students.find(a=>a.studentId===studentId)!;if(targetTrip&&targetTrip!==trip)await c.query('insert into shared_pickup_members values($1,$2,$3,$4)',[assignment,targetTrip,rider.pickupStopId,rider.dropoffStopId]);}
  }
  for(const t of mutableTrips){
   if(!tripMap.has(t.fixed_route_id)){

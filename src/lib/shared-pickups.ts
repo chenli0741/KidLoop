@@ -17,7 +17,7 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
     join driver_shifts sh on sh.id=owner.shift_id join vehicles v on v.id=sh.vehicle_id
     left join parents p on p.id=s.parent_id
     left join student_day_plans dp on dp.student_id=s.id and dp.service_date=owner.scheduled_date
-    where m.trip_id=any($1::uuid[])`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
+    where m.trip_id=any($1::uuid[]) and m.trip_id<>ts.trip_id`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
   const allSharedTripIds = [...new Set(rows.flatMap(row => [row.trip_id, row.owner_id]))];
   const capacityRows = allSharedTripIds.length ? (await c.query<{id:string;capacity:number;fixed:number}>(`select t.id,v.capacity,
     count(ts.id) filter (where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
