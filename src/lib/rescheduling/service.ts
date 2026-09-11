@@ -311,3 +311,44 @@ export async function applyDraft(
     [id, candidateIndex],
   );
 }
+
+export async function applyRules(
+  c: PoolClient,
+  id: string,
+  userId: string,
+  revision: number,
+  today: string,
+) {
+  await lockRoutes(c);
+  const row = (await c.query(`select * from reschedule_requests where id=$1 and user_id=$2 for update`, [id, userId])).rows[0];
+  if (!row) throw new Error("调整记录不存在 / Adjustment not found");
+  if (!['READY','RULES_APPLIED'].includes(row.status) || row.revision !== revision)
+    throw new Error("请先完成规则解析 / Complete the rule review first");
+  const intent = row.intent as Intent;
+  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn);
+  validateIntent(intent, snapshot, today);
+  if (snapshot.term.id !== row.operating_term_id || snapshot.hash !== row.snapshot_hash)
+    throw new Error("排班或规则已变化，请重新解析 / Schedule or rules changed; parse again");
+  for (const day of snapshot.days)
+    await applyCalendar(c, intent, day.date, day.matches, snapshot.students);
+  await c.query("update reschedule_requests set status='RULES_APPLIED',updated_at=clock_timestamp() where id=$1", [id]);
+}
+
+export async function regenerateRulesSchedule(
+  c: PoolClient,
+  id: string,
+  userId: string,
+  revision: number,
+  today: string,
+) {
+  const row = (await c.query<{intent:Intent;status:string;operating_term_id:string}>(`select intent,status,operating_term_id from reschedule_requests where id=$1 and user_id=$2`, [id, userId])).rows[0];
+  if (!row) throw new Error("调整记录不存在 / Adjustment not found");
+  if (row.status !== 'RULES_APPLIED' || revision < 1) throw new Error("请先保存规则 / Save the rules first");
+  const dates: string[] = [];
+  for (let value = row.intent.startsOn; value <= row.intent.endsOn; ) {
+    dates.push(value);
+    const next = new Date(`${value}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1); value = next.toISOString().slice(0, 10);
+  }
+  await lockRoutes(c);
+  for (const date of dates) await materializeRoutes(c, date, today);
+}

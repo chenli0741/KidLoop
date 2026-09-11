@@ -680,6 +680,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .adjust-success { padding:24px; background:#e5f2eb; border-radius:12px; }
 .adjust-success small { overflow-wrap:anywhere; }
 .adjust-usage { margin-top:24px; color:#64726a; font-size:12px; }
+.adjust-rule-confirm { display:grid; gap:10px; margin-top:16px; padding:16px; border:1px solid #cfe2d7; border-radius:12px; background:#f1f8f3; }
+.adjust-rule-confirm h3,.adjust-rule-confirm p { margin:0; }
+.adjust-rule-confirm label { display:flex; align-items:center; gap:8px; }
 
 .account-trigger .account-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 
@@ -704,6 +707,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .review-date.is-selected { outline:3px solid #196d54;outline-offset:2px; }
 .review-issue-label { color:#a32222;font-weight:700; }
 .review-date.is-today .review-issue-label { color:#fff; }
+.review-calendar.review-week-calendar { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.review-weekdays { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.review-month-weekdays { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.review-controls .calendar-view-switch { align-self:end; }
+.review-controls .calendar-view-switch a { display:inline-flex; align-items:center; min-height:32px; padding:4px 10px; border-radius:7px; color:var(--muted); font-size:12px; text-decoration:none; }
+.review-controls .calendar-view-switch a[aria-current="page"] { background:var(--green); color:#fff; }
+.review-month-calendar { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.review-weekend { display:flex; align-items:center; justify-content:center; min-height:72px; padding:8px; border-radius:12px; background:#eef0ef; color:var(--muted); font-size:12px; text-align:center; }
 @media(max-width:680px) { .review-calendar { gap:5px; }.review-date { font-size:12px;padding:10px 4px; }.review-controls input,.review-controls select { font-size:16px; }.fixed-rider { padding:12px 0; } }
 
 .schedule-action-groups { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0 22px; }

@@ -12,9 +12,11 @@ type Catalog = Record<
 export function AdjustmentWorkspace({
   catalog,
   configured,
+  mode = "schedule",
 }: {
   catalog: Catalog;
   configured: boolean;
+  mode?: "rules" | "schedule";
 }) {
   const locale = useLocale(),
     t = (zh: string, en: string) => text(locale, zh, en);
@@ -24,6 +26,7 @@ export function AdjustmentWorkspace({
     [error, setError] = useState("");
   const [selected, setSelected] = useState<number | null>(null),
     [confirmed, setConfirmed] = useState(false),
+    [rulesConfirmed, setRulesConfirmed] = useState(false),
     [recording, setRecording] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
@@ -34,6 +37,7 @@ export function AdjustmentWorkspace({
     if (draft?.id !== value.id || draft?.revision !== value.revision) {
       setSelected(null);
       setConfirmed(false);
+      setRulesConfirmed(false);
     }
     setDraft(value);
     currentId.current = value.id;
@@ -150,6 +154,22 @@ export function AdjustmentWorkspace({
     } finally {
       setBusy(false);
     }
+  }
+  async function applyRulesOnly() {
+    if (!draft || !rulesConfirmed || busy) return;
+    setBusy(true); setError("");
+    try {
+      keep(await call({ action: "apply-rules", id: draft.id, revision: draft.revision, confirmed: true }));
+      setRulesConfirmed(false);
+    } catch (e) { setError(e instanceof Error ? e.message : t("规则保存失败，请刷新重试。", "Could not save rules; refresh and try again.")); await refresh().catch(() => {}); }
+    finally { setBusy(false); }
+  }
+  async function regenerate() {
+    if (!draft || busy) return;
+    setBusy(true); setError("");
+    try { keep(await call({ action: "regenerate", id: draft.id, revision: draft.revision })); }
+    catch (e) { setError(e instanceof Error ? e.message : t("重新排班失败，请刷新重试。", "Could not regenerate the schedule; refresh and try again.")); await refresh().catch(() => {}); }
+    finally { setBusy(false); }
   }
   async function startRecording() {
     setError("");
@@ -327,8 +347,8 @@ export function AdjustmentWorkspace({
           disabled={busy || recording}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={t(
-            "例如：这周 Ellis 的 K 年级十二点放学，其他年级照常，尽量不要增加司机。",
-            "For example: Ellis grade K dismisses at noon this week. Keep other grades unchanged and use existing drivers if possible.",
+            mode === "rules" ? "例如：10月5日至9日 Cumberland 和 Cherry Chase 全校 11:35 放学。" : "例如：这周 Ellis 的 K 年级十二点放学，其他年级照常，尽量不要增加司机。",
+            mode === "rules" ? "For example: Cumberland and Cherry Chase dismiss at 11:35 for all grades from October 5 to 9." : "For example: Ellis grade K dismisses at noon this week. Keep other grades unchanged and use existing drivers if possible.",
           )}
         />
         <div className="adjust-actions">
@@ -386,6 +406,13 @@ export function AdjustmentWorkspace({
             <p>
               {draft.intent.startsOn} — {draft.intent.endsOn}
             </p>
+            {draft.intent.changes.length > 0 && <div className="adjust-rule-confirm">
+              <h3>{t("规则调整", "Rule changes")}</h3>
+              <p>{t("先保存学校日历规则，保存后再重新排班。", "Save the school calendar rules first, then regenerate the schedule.")}</p>
+              {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
+              {draft.status !== "RULES_APPLIED" && <><label><input type="checkbox" checked={rulesConfirmed} disabled={busy} onChange={event => setRulesConfirmed(event.target.checked)} />{t("我已核对这些规则调整。", "I reviewed these rule changes.")}</label><button className="button primary" type="button" disabled={!rulesConfirmed || busy} onClick={() => void applyRulesOnly()}>{busy ? t("保存中…", "Saving…") : t("确认规则并保存", "Confirm and save rules")}</button></>}
+              {draft.status === "RULES_APPLIED" && <button className="button primary" type="button" disabled={busy} onClick={() => void regenerate()}>{busy ? t("重新排班中…", "Regenerating…") : t("重新排班", "Regenerate schedule")}</button>}
+            </div>}
             {draft.intent.changes.map((c, i) => (
               <p key={i}>
                 {catalog.schools[c.schoolId]} · {c.grades.join(", ")} · {c.time}

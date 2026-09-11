@@ -16,6 +16,7 @@ import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { PickupSettingForm } from "@/components/pickup-setting-form";
 import { PICKUP_GRADES } from "@/lib/pickup-grades";
 import { formatGradeGroup } from "@/lib/pickup-types";
+import { Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export default async function SchedulePage({ searchParams }: {searchParams:Promise<{school?:string;tab?:string;term?:string}>}) {
@@ -54,7 +55,7 @@ export default async function SchedulePage({ searchParams }: {searchParams:Promi
 
     </div></article>)}</div>}
   </section>;
-  return <div className="page-container"><TermWorkspace term={operation} locale={locale}/><div className="school-page-header"><PageHeader eyebrow={text(locale,"学期安排","Term planning")} title={text(locale,"学校","Schools")} description={text(locale,"学校学期、假期与接送时间。","School terms, holidays and pickup times.")} actions={school ? <div className="school-header-picker"><SchoolFilter schools={schools} selected={school.id} label={text(locale,"学校","School")} page="/schedule" tab={tab} /></div> : undefined} /></div>
+  return <div className="page-container"><TermWorkspace term={operation} locale={locale}/><div className="school-page-header"><PageHeader eyebrow={text(locale,"学期安排","Term planning")} title={text(locale,"学校","Schools")} description={text(locale,"学校学期、假期与接送时间。","School terms, holidays and pickup times.")} actions={school ? <div className="school-header-picker"><SchoolFilter schools={schools} selected={school.id} label={text(locale,"学校","School")} page="/schedule" tab={tab} /><Link className="button secondary compact" href={`/routes/adjust?mode=rules&school=${school.id}`}><Sparkles size={16}/>{text(locale,"智能调整学校规则","Adjust school rules")}</Link></div> : undefined} /></div>
     {!school ? <EmptyState title={text(locale,"请先添加学校","Add a school first")} body={text(locale,"学校日历和接送规则将保存在学校下面。","Calendars and pickup rules belong to each school.")} href="/resources?tab=schools" action={text(locale,"添加学校","Add school")} /> : <>
       <nav className="resource-tabs school-tabs" aria-label={text(locale,"学校设置分类","School setting categories")}>{[["school",text(locale,"学校","School")],["preview",text(locale,"日历","Calendar")]].map(([id,label])=><Link key={id} href={`/schedule?school=${school.id}&tab=${id}`} aria-current={tab===id ? "page" : undefined}>{label}</Link>)}</nav>
       {tab==="school" && <>

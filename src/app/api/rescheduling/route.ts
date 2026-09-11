@@ -2,7 +2,7 @@ import { getUser } from "@/lib/auth";
 import { db, transaction } from "@/lib/db";
 import { todayInOperationsTimeZone } from "@/lib/date";
 import { openTerm } from "@/lib/operating-terms";
-import { getDraft, trial, applyDraft } from "@/lib/rescheduling/service";
+import { getDraft, trial, applyDraft, applyRules, regenerateRulesSchedule } from "@/lib/rescheduling/service";
 import { parseRequest, transcribe } from "@/lib/rescheduling/ai";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -121,6 +121,11 @@ export async function POST(request: Request) {
           todayInOperationsTimeZone(),
         ),
       );
+    } else if (input.action === "apply-rules") {
+      if (input.confirmed !== true) throw new Error("请确认规则调整 / Confirm the rule changes");
+      await transaction((c) => applyRules(c, input.id, user.id, input.revision, todayInOperationsTimeZone()));
+    } else if (input.action === "regenerate") {
+      await transaction((c) => regenerateRulesSchedule(c, input.id, user.id, input.revision, todayInOperationsTimeZone()));
     } else if (input.action === "trial") {
       if (
         typeof input.message !== "string" ||

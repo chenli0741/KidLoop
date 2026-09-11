@@ -5,9 +5,11 @@ import { text } from "@/lib/i18n";
 import { db } from "@/lib/db";
 import { AdjustmentWorkspace } from "@/components/adjustment-workspace";
 export const dynamic = "force-dynamic";
-export default async function AdjustmentPage() {
+export default async function AdjustmentPage({ searchParams }: { searchParams: Promise<{ mode?: string; school?: string }> }) {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
+  const params = await searchParams;
+  const mode = params.mode === "rules" ? "rules" : "schedule";
   const rows = (
     await db.query(`select
     (select coalesce(jsonb_object_agg(id,name),'{}') from schools) as schools,
@@ -23,12 +25,12 @@ export default async function AdjustmentPage() {
       </Link>
       <header className="adjust-heading">
         <span>Kid Loop Rides</span>
-        <h1>{text(locale, "智能调整接送安排", "Adjust pickup schedules")}</h1>
+        <h1>{mode === "rules" ? text(locale, "智能调整学校规则", "Adjust school rules") : text(locale, "智能调整接送安排", "Adjust pickup schedules")}</h1>
         <p>
           {text(
             locale,
-            "说出变化，查看联动方案，确认后生效。",
-            "Describe the change, review a coordinated plan, then confirm.",
+            mode === "rules" ? "说出学校日期、年级和放学时间变化，确认后保存到学校日历。" : "说出排班变化，查看调整方案，确认后生效。",
+            mode === "rules" ? "Describe school date, grade, and dismissal changes, then save them to the school calendar." : "Describe a schedule change, review the adjustment, then confirm.",
           )}
         </p>
       </header>
@@ -38,6 +40,7 @@ export default async function AdjustmentPage() {
           !!process.env.OPENAI_API_KEY &&
           !!process.env.OPENAI_RESCHEDULING_MODEL
         }
+        mode={mode}
       />
     </div>
   );
