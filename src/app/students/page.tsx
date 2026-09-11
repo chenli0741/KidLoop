@@ -7,7 +7,6 @@ import { RosterCreateDialog, SchoolFilter } from "@/components/roster-controls";
 import { StudentRecordActions } from "@/components/student-record-actions";
 import {StudentPhotoPreview} from '@/components/student-photo-preview';
 import { GraduationCap, Phone, UsersRound } from "lucide-react";
-import Link from "next/link";
 import { StudentCreateForm } from "@/components/student-create-form";
 import { readFixedRoutes } from "@/lib/fixed-routes";
 import { studentRouteOptions } from "@/lib/student-route-options";
@@ -82,7 +81,6 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                       {Boolean(student.noPickupWeekdays?.length) && <span>{text(locale,'每周不接送：','No pickup: ')}{student.noPickupWeekdays!.map(day=>(locale==='zh'?['周一','周二','周三','周四','周五','周六','周日']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])[day-1]).join(' / ')}</span>}
                       <span><Phone size={14} /> {student.parentName ? `${student.parentName} · ${student.parentPhone}` : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
                     </div>
-                    {student.routeAssigned === false && <p className="setup-callout"><Link href="/routes">{text(locale, "待安排线路", "Route assignment pending")} →</Link></p>}
                     <div className="destination"><span>{text(locale, "送达", "Dropoff")}</span><strong>{student.programName}</strong></div>
                   </div>
                 </article>

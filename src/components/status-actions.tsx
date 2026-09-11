@@ -45,17 +45,17 @@ export function StatusActions({ assignmentId, status, onUpdated, targetTripId, r
   return (
     <div className="status-actions">
       <div className="status-button-row">
-        {status === "SCHEDULED" ? (
+        {role === "DRIVER" && status === "SCHEDULED" ? (
           <button type="button" className="button compact primary" disabled={pending} onClick={() => update("PICKED_UP")}>
             <UserCheck size={16} /> {text(locale, "已接到", "Picked up")}
           </button>
         ) : null}
-        {status === "PICKED_UP" ? (
+        {role === "DRIVER" && status === "PICKED_UP" ? (
           <button type="button" className="icon-button" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} aria-label={text(locale, "撤销接到", "Undo pickup")} disabled={pending} onClick={() => update("SCHEDULED")}>
             <RotateCcw size={17} />
           </button>
         ) : null}
-        {status === "DROPPED_OFF" ? (
+        {role === "DRIVER" && status === "DROPPED_OFF" ? (
           <button type="button" className="icon-button" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} aria-label={text(locale, "撤销送达", "Undo drop-off")} disabled={pending} onClick={() => update("PICKED_UP")}>
             <RotateCcw size={17} />
           </button>
