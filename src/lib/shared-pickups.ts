@@ -41,7 +41,17 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
       shared:true,otherVehicle:r.owner_id!==trip.id && r.status!=='SCHEDULED' ? r.vehicle_name:undefined}));
     if (!shared.length) return {...trip,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
     const sharedCount = new Set(shared.map(r => r.id)).size;
-    const capacityLeft = (candidate: Trip) => candidate.capacity - candidate.riders.filter(r => !r.shared && !r.otherVehicle && !['ABSENT','EXCEPTION'].includes(r.status)).length;
+    const capacityLeft = (candidate: Trip) => {
+      const stops = candidate.routeStops ?? [];
+      const fixed = candidate.riders.filter(r => !r.shared && !r.otherVehicle && !['ABSENT','EXCEPTION'].includes(r.status));
+      if (stops.length < 2) return candidate.capacity - fixed.length;
+      const maxLoad = Math.max(0, ...stops.slice(0, -1).map((_, index) => fixed.filter(r => {
+        const from = stops.findIndex(stop => stop.id === r.pickupStopId);
+        const to = stops.findIndex(stop => stop.id === r.dropoffStopId);
+        return from >= 0 && to > from && from <= index && index < to;
+      }).length));
+      return candidate.capacity - maxLoad;
+    };
     const availableElsewhere = [...new Set(shared.flatMap(r => [...(participants.get(r.id) ?? [])]))]
       .filter(id => id !== trip.id && (baseByTrip.has(id) || capacityByTrip.has(id)))
       .reduce((sum, id) => {
