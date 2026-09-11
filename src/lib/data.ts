@@ -157,7 +157,12 @@ export async function getShifts(fromDate?: string) {
 export async function getTrips(date: string, options?: { ensure?: boolean }) {
   const user = await requireUser(["ADMIN", "DRIVER"]);
   if(user.role === 'DRIVER' && !user.driverId) return [];
-  if(options?.ensure !== false) await ensureRouteTasks(date,user.role === 'DRIVER' ? user.driverId! : undefined);
+  if(options?.ensure !== false) {
+    if(user.role === 'DRIVER') {
+      const existing=await query('select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term() and t.scheduled_date=$1::date and t.status not in (\'DRAFT\',\'CANCELED\') and sh.driver_id=$2 limit 1',[date,user.driverId]);
+      if(!existing.rowCount) await ensureRouteTasks(date,user.driverId!);
+    } else await ensureRouteTasks(date);
+  }
   const driverId = user.role === "DRIVER" ? user.driverId : null;
   const [tripResult, riderResult] = await Promise.all([
     query<{
