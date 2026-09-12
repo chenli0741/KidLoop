@@ -9,6 +9,10 @@ export function validServiceDate(date: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
 }
 
+export function completedRideDay(rides: { status: string; droppedOffAt?: string | null }[]) {
+  return rides.length > 0 && rides.every((ride) => ride.status === "DROPPED_OFF" || Boolean(ride.droppedOffAt));
+}
+
 export async function recomputeTrip(client: PoolClient, tripId: string) {
   await client.query(`
     update trips set status = (

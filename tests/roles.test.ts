@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { readFile, readdir } from "node:fs/promises";
 import { hashPassword, verifyPassword, tokenHash } from "../src/lib/password";
-import { saveDayPlan, validServiceDate } from "../src/lib/day-plans";
+import { completedRideDay, saveDayPlan, validServiceDate } from "../src/lib/day-plans";
 import type { AuthUser } from "../src/lib/types";
 import { todayInOperationsTimeZone } from "../src/lib/date";
 
@@ -23,6 +23,13 @@ test("service date validates actual calendar dates", () => {
   assert.equal(validServiceDate("2026-02-30"), false);
   assert.equal(validServiceDate("2028-02-29"), true);
   assert.equal(validServiceDate("2026-13-01"), false);
+});
+
+test("completed ride days no longer offer parent absence controls", () => {
+  assert.equal(completedRideDay([]), false);
+  assert.equal(completedRideDay([{ status: "SCHEDULED", droppedOffAt: null }]), false);
+  assert.equal(completedRideDay([{ status: "DROPPED_OFF", droppedOffAt: "2026-09-11T22:00:00Z" }]), true);
+  assert.equal(completedRideDay([{ status: "DROPPED_OFF" }, { status: "PICKED_UP" }]), false);
 });
 
 test("parent plans enforce ownership, preserve execution facts and audit changes", async () => {

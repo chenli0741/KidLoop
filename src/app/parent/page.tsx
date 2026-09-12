@@ -6,7 +6,7 @@ import { getParentChildren, getParentSchedule } from "@/lib/parent-data";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import { formatDate, formatTime, todayInOperationsTimeZone } from "@/lib/date";
-import { validServiceDate } from "@/lib/day-plans";
+import { completedRideDay, validServiceDate } from "@/lib/day-plans";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
@@ -28,6 +28,7 @@ export default async function ParentPage({ searchParams }: { searchParams: Promi
     <div className="family-grid">{children.map((child) => {
       const rides = schedule.rides.filter((ride) => ride.studentId === child.id);
       const plan = schedule.plans.find((p) => p.studentId === child.id);
+      const ridesCompleted = completedRideDay(rides);
       return <article className="family-card" key={child.id}>
         <header className="family-child"><div className="family-photo">{child.photoUrl ? <Image unoptimized={child.photoUrl.startsWith("/api/")} src={child.photoUrl} alt={child.name} fill sizes="72px" /> : <UsersRound size={30} />}</div><div><h2>{child.name}</h2><p>{child.schoolName} · {child.classroomName}</p><small>{text(locale, "年级", "Grade")} {child.grade || "—"} · {child.age === null ? text(locale, "年龄待补充", "Age pending") : text(locale, `${child.age} 岁`, `Age ${child.age}`)}</small></div></header>
         <p className="family-destination"><MapPin size={16} />{child.programName}</p>
@@ -44,9 +45,9 @@ export default async function ParentPage({ searchParams }: { searchParams: Promi
             <ol className="ride-timeline"><li className={ride.pickedUpAt ? "done" : ""}>{text(locale, "已接到", "Picked up")}<span>{ride.pickedUpAt ? new Date(ride.pickedUpAt).toLocaleTimeString(locale === "zh" ? "zh-CN" : "en-US", { timeZone: "America/Los_Angeles", hour: "2-digit", minute: "2-digit" }) : "—"}</span></li><li className={ride.droppedOffAt ? "done" : ""}>{text(locale, "已送达", "Dropped off")}<span>{ride.droppedOffAt ? new Date(ride.droppedOffAt).toLocaleTimeString(locale === "zh" ? "zh-CN" : "en-US", { timeZone: "America/Los_Angeles", hour: "2-digit", minute: "2-digit" }) : "—"}</span></li></ol>
           </div>)}
         </section>
-        <section className="family-plan"><h3>{text(locale, "请假与特殊要求", "Absence & special requests")}</h3><p className="form-hint">{formatDate(date, locale)}</p>
+        {!ridesCompleted && <section className="family-plan"><h3>{text(locale, "请假与特殊要求", "Absence & special requests")}</h3><p className="form-hint">{formatDate(date, locale)}</p>
           {date >= today ? <DayPlanForm key={`${child.id}:${date}`} studentId={child.id} date={date} absent={plan?.absent ?? false} note={plan?.note ?? ""} /> : <p>{plan?.note || text(locale, "当天没有留言。历史安排不可修改。", "No note for this date. Past plans cannot be edited.")}</p>}
-        </section>
+        </section>}
       </article>;
     })}</div>
   </div>;
