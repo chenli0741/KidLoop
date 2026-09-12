@@ -103,7 +103,7 @@ export default async function TermsPage({
           ],
           [
             "school_calendar_schedules",
-            "学校日历日程",
+            "日历日程",
             "Holidays",
             ["school_id", "name", "starts_on", "ends_on", "pickup_time"],
           ],

@@ -34,8 +34,8 @@ export async function RouteCombinationResources() {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
   const [schools, programs, vehicles, groups] = await Promise.all([
-    query<Stop>("select id,coalesce(short_name,name) as name from schools where active order by name"),
-    query<Stop>("select id,name from after_school_programs where active order by name"),
+    query<Stop>("select id,coalesce(short_name,name) as name from schools order by name"),
+    query<Stop>("select id,name from after_school_programs order by name"),
     query<Vehicle>("select id,name,plate,capacity from vehicles where active order by name"),
     query<Group & { school_ids: string[]; program_ids: string[]; vehicle_ids: string[] }>(`select g.id,g.name,
       coalesce(array_agg(s.school_id) filter (where s.school_id is not null),'{}') as school_ids,

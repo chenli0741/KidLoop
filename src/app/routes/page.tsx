@@ -43,7 +43,7 @@ export default async function RoutesPage() {
     </section>
 
     <section className="pickup-section">
-      <div className="section-heading"><div><h2>{text(locale, "常用线路参考", "Common route patterns")}</h2><p className="form-hint">{text(locale, "这些是日常排班中常见的线路模式，仅作参考。", "Frequent route patterns from regular schedules, for reference only.")}</p></div><RosterCreateDialog title={text(locale, "添加常用线路", "Add route pattern")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>
+      <div className="section-heading"><div><h2>{text(locale, "常用线路", "Common route patterns")}</h2><p className="form-hint">{text(locale, "这些是日常排班中常见的线路模式，仅作参考。", "Frequent route patterns from regular schedules, for reference only.")}</p></div><RosterCreateDialog title={text(locale, "添加常用线路", "Add route pattern")} closeLabel={text(locale, "关闭", "Close")}><FixedRouteForm key={routes.length} {...formProps} /></RosterCreateDialog></div>
       {!routes.length && <p>{text(locale, "暂无线路。", "No routes.")}</p>}
       {routes.map(route => <article className="pickup-record" key={route.id}>
         <div><h3>{route.name} · {text(locale,`已选 ${route.students.length} 人`,`${route.students.length} selected`)} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
