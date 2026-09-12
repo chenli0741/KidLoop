@@ -4,18 +4,20 @@ import { noPickupWeekdays } from './student-schedule';
 
 export class StudentEditError extends Error {}
 
+const structuredNoteKinds = new Set(["historical-test-data", "roster-photo-import"]);
+
 export function editableNote(notes: string): string {
   try {
     const parsed = JSON.parse(notes);
-    if (parsed?.kind === "historical-test-data") return typeof parsed.note === "string" ? parsed.note : "";
+    if (structuredNoteKinds.has(parsed?.kind)) return typeof parsed.note === "string" ? parsed.note : "";
   } catch { /* Ordinary notes are plain text. */ }
   return notes;
 }
 
-function mergeNote(previous: string, note: string) {
+export function mergeEditableNote(previous: string, note: string) {
   try {
     const parsed = JSON.parse(previous);
-    if (parsed?.kind === "historical-test-data") return JSON.stringify({ ...parsed, note });
+    if (structuredNoteKinds.has(parsed?.kind)) return JSON.stringify({ ...parsed, note });
   } catch { /* Keep ordinary notes as plain text. */ }
   return note;
 }
@@ -98,7 +100,7 @@ export async function saveStudent(client: PoolClient, form: FormData, actorId?: 
   }
   await client.query(`update students set name=$2,school_id=$3,classroom_id=null,program_id=$4,grade=$5,age=$6,
     photo_url=$7,parent_id=$8,notes=$9,classroom_name=$10,no_pickup_weekdays=$11,updated_at=clock_timestamp() where id=$1`,
-    [current.id, name, schoolId, programId, grade, age, removePhoto ? "" : replacement || current.photo_url, parentId, mergeNote(current.notes, note),classroomName,excludedDays]);
+    [current.id, name, schoolId, programId, grade, age, removePhoto ? "" : replacement || current.photo_url, parentId, mergeEditableNote(current.notes, note),classroomName,excludedDays]);
 }
 
 export async function archiveStudent(client: PoolClient, form: FormData) {

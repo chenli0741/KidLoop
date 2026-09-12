@@ -1,5 +1,4 @@
 import { displayedStudentPhoto } from './photo-display';
-import { ensureRouteTasks } from "./ensure-route-tasks";
 import "server-only";
 import { editableNote } from "@/lib/student-management";
 import { requireUser } from "@/lib/auth";
@@ -9,11 +8,11 @@ import type { DayPlan, RiderStatus } from "@/lib/types";
 export async function getParentChildren() {
   const user = await requireUser(["PARENT"]);
   const result = await query<{
-    operatingTermId: string; id: string; name: string; photoUrl: string; grade: string; age: number | null;
+    operatingTermId: string; id: string; name: string; photoUrl: string; cartoonUrl: string; grade: string; age: number | null;
     schoolName: string; classroomName: string; programName: string; notes: string; updatedAt: string;
     parentName: string; relationship: string; parentPhone: string; backupPhone: string; email: string;
   }>(`
-    select current_operating_term() as "operatingTermId", st.id, st.name, st.photo_url as "photoUrl", st.grade, st.age, st.notes,
+    select current_operating_term() as "operatingTermId", st.id, st.name, st.photo_url as "photoUrl", (select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=st.id and ca.source_photo_url=coalesce(st.photo_url,'')) as "cartoonUrl", st.grade, st.age, st.notes,
       coalesce(sc.short_name,sc.name) as "schoolName", st.classroom_name as "classroomName", p.name as "programName", st.updated_at::text as "updatedAt",
       coalesce(pa.name, '') as "parentName", coalesce(pa.relationship, '') as relationship,
       coalesce(pa.phone, '') as "parentPhone", coalesce(pa.backup_phone, '') as "backupPhone", coalesce(pa.email, '') as email
@@ -23,12 +22,11 @@ export async function getParentChildren() {
     left join parents pa on pa.id = st.parent_id
     where us.user_id = $1 and exists(select 1 from term_students et where et.student_id=st.id and et.operating_term_id=current_operating_term()) and st.active order by st.name
   `, [user.id]);
-  return result.rows.map((child) => ({ ...child, photoUrl: displayedStudentPhoto(user, child.photoUrl), notes: editableNote(child.notes) }));
+  return result.rows.map(({cartoonUrl, ...child}) => ({ ...child, photoUrl: displayedStudentPhoto(user, child.photoUrl, cartoonUrl), notes: editableNote(child.notes) }));
 }
 
 export async function getParentSchedule(date: string) {
   const user = await requireUser(["PARENT"]);
-  await ensureRouteTasks(date);
   const [rides, plans] = await Promise.all([
     query<{
       id: string; studentId: string; date: string; departure: string; status: RiderStatus;

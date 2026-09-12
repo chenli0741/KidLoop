@@ -2,13 +2,13 @@ import 'server-only';
 import type { PoolClient } from 'pg';
 import type { AuthUser, Trip, Rider } from './types';
 import { overCapacity } from './route-plan';
-import { displayedStudentPhoto } from './photo-display';
+import { displayedStudentPhoto, recognitionStudentPhoto } from './photo-display';
 
 // Caller supplies authorized trips. The canonical assignment is never duplicated.
 export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[], user: AuthUser) {
   if (!trips.length) return trips;
   const rows = (await c.query(`select m.trip_id, m.pickup_stop_id,m.dropoff_stop_id,ts.id,ts.trip_id as owner_id,ts.status,
-    s.id as student_id,s.name,s.photo_url,s.grade,s.age,s.classroom_name,
+    s.id as student_id,s.name,s.photo_url,(select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=s.id and ca.source_photo_url=coalesce(s.photo_url,'')) as cartoon_url,s.grade,s.age,s.classroom_name,
     case when $2::boolean then coalesce(p.name,'') else '' end as parent_name,
     case when $2::boolean then coalesce(p.phone,'') else '' end as parent_phone,
     coalesce(dp.note,'') as parent_note,coalesce(dp.absent,false) as parent_absent,v.name as vehicle_name
@@ -35,7 +35,7 @@ export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[]
   return trips.map(trip=>{
     const shared=rows.filter(r=>r.trip_id===trip.id);
     const ids=new Set(shared.map(r=>r.id));
-    const riders: Rider[]=shared.map(r=>({id:r.id,studentId:r.student_id,name:r.name,photoUrl:displayedStudentPhoto(user,r.photo_url),
+    const riders: Rider[]=shared.map(r=>({id:r.id,studentId:r.student_id,name:r.name,photoUrl:displayedStudentPhoto(user,r.photo_url,r.cartoon_url),recognitionPhotoUrl:recognitionStudentPhoto(user,r.photo_url),
       grade:r.grade,age:r.age,classroomName:r.classroom_name,parentName:r.parent_name,parentPhone:r.parent_phone,
       parentNote:r.parent_note,parentAbsent:r.parent_absent,status:r.status,pickupStopId:r.pickup_stop_id,dropoffStopId:r.dropoff_stop_id,
       shared:true,otherVehicle:r.owner_id!==trip.id && r.status!=='SCHEDULED' ? r.vehicle_name:undefined}));

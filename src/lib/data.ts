@@ -1,6 +1,6 @@
 import {readFixedRoutes} from './fixed-routes';
 import { addSharedRiders } from './shared-pickups';
-import { displayedStudentPhoto } from './photo-display';
+import { displayedStudentPhoto, recognitionStudentPhoto } from './photo-display';
 import { todayInOperationsTimeZone } from "./date";
 import { ensureRouteTasks } from "./ensure-route-tasks";
 import type { RouteStop } from "./fixed-route-types";
@@ -78,13 +78,13 @@ export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoute
   const user = await requireUser(["ADMIN"]);
   const routesPromise = knownRoutes ?? readFixedRoutes(db);
   const [result, routes] = await Promise.all([query<{
-    id: string; name: string; photo_url: string; grade: string; age: number | null; route_assigned: boolean;
+    id: string; name: string; photo_url: string; cartoon_url: string; grade: string; age: number | null; route_assigned: boolean;
     no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
     backup_phone: string; email: string; notes: string; updated_at: string;
   }>(`
     select false as route_assigned,
-           st.id, st.name, st.photo_url, st.grade, st.age, st.no_pickup_weekdays,
+           st.id, st.name, st.photo_url, (select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=st.id and ca.source_photo_url=coalesce(st.photo_url,'')) as cartoon_url, st.grade, st.age, st.no_pickup_weekdays,
            st.classroom_name, st.classroom_id,
            sc.id as school_id, coalesce(sc.short_name,sc.name) as school_name,
            p.id as program_id, p.name as program_name,
@@ -103,7 +103,7 @@ export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoute
   return result.rows.map((row): Student => ({
     id: row.id,
     name: row.name,
-    photoUrl: displayedStudentPhoto(user, row.photo_url),
+    photoUrl: displayedStudentPhoto(user, row.photo_url, row.cartoon_url),
     grade: row.grade,
     age: row.age,
     classroomName: row.classroom_name,
@@ -193,12 +193,12 @@ export async function getTrips(date: string, options?: { ensure?: boolean }) {
       order by t.departure_time, d.name
     `, [date, driverId]),
     query<{
-      missed_pickup_note: string | null; trip_id: string; id: string; student_id: string; name: string; photo_url: string;
+      missed_pickup_note: string | null; trip_id: string; id: string; student_id: string; name: string; photo_url: string; cartoon_url: string;
       classroom_name: string; grade: string; age: number | null; parent_name: string;
       parent_phone: string; status: Rider["status"]; parent_note: string; parent_absent: boolean; pickup_stop_id: string|null; dropoff_stop_id:string|null; school_name:string;
     }>(`
       select (select note from status_history where trip_student_id=ts.id and to_status='EXCEPTION' order by created_at desc limit 1) as missed_pickup_note,
-             ts.pickup_stop_id,ts.dropoff_stop_id,(select coalesce(short_name,name) from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url,
+             ts.pickup_stop_id,ts.dropoff_stop_id,(select coalesce(short_name,name) from schools where id=st.school_id) as school_name, ts.trip_id, ts.id, st.id as student_id, st.name, st.photo_url, (select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=st.id and ca.source_photo_url=coalesce(st.photo_url,'')) as cartoon_url,
              st.classroom_name, st.grade, st.age,
              case when $2::uuid is null then coalesce(pa.name, '') else '' end as parent_name,
              case when $2::uuid is null then coalesce(pa.phone, '') else '' end as parent_phone, ts.status,
@@ -222,7 +222,8 @@ export async function getTrips(date: string, options?: { ensure?: boolean }) {
       id: row.id,
       studentId: row.student_id,
       name: row.name,
-      photoUrl: displayedStudentPhoto(user, row.photo_url),
+      photoUrl: displayedStudentPhoto(user, row.photo_url, row.cartoon_url),
+      recognitionPhotoUrl: recognitionStudentPhoto(user, row.photo_url),
       classroomName: row.classroom_name,
       grade: row.grade,
       age: row.age,

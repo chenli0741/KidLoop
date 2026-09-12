@@ -22,7 +22,7 @@ async function main() {
     const accounts = [
       { role: "ADMIN", name: "Test Admin", email: "admin@test.kidloop.local", password: randomBytes(15).toString("base64url") },
       { role: "DRIVER", name: driver.name, email: "driver@test.kidloop.local", password: randomBytes(15).toString("base64url") },
-      { role: "PARENT", name: "Test Parent", email: "parent@test.kidloop.local", password: randomBytes(15).toString("base64url") },
+      { role: "PARENT", name: "Test Parent", email: "parent@test.kidloop.local", password: "parent123" },
     ];
     for (const account of accounts) {
       const user = (await client.query<{ id: string }>("insert into app_users(name,email,role,password_hash,driver_id) values($1,$2,$3,$4,$5) returning id", [account.name, account.email, account.role, await hashPassword(account.password), account.role === "DRIVER" ? driver.id : null])).rows[0];

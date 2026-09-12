@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BusFront, CalendarDays, Gauge, MapPinned, UsersRound, ShieldCheck } from "lucide-react";
+import { BusFront, CalendarDays, ContactRound, Gauge, MapPinned, UsersRound, ShieldCheck } from "lucide-react";
 import { AccountMenu } from "@/components/account-menu";
 import type { AuthUser } from "@/lib/types";
 import { useLocale } from "@/components/locale-provider";
@@ -13,6 +13,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
   const locale = useLocale();
   const items = user.role === "PARENT" ? [
     { href: "/parent", label: text(locale, "我的孩子", "My children"), icon: UsersRound },
+    { href: "/parent/children", label: text(locale, "资料", "Details"), icon: ContactRound },
   ] : user.role === "DRIVER" ? [
     { href: "/driver", label: text(locale, "行程", "Trips"), icon: BusFront },
     { href: "/driver/week", label: text(locale, "日程", "Schedule"), icon: CalendarDays },
@@ -35,7 +36,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
       </div>
       <nav data-role={user.role} aria-label={text(locale, "主导航", "Main navigation")}>
         {items.map(({ href, label, icon: Icon }) => {
-          const active = (href === "/" || href === "/driver") ? pathname === href : pathname.startsWith(href);
+          const active = (href === "/" || href === "/driver" || href === "/parent") ? pathname === href : pathname.startsWith(href);
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "nav-link active" : "nav-link"}>
               <Icon size={19} aria-hidden="true" />

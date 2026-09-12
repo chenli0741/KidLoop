@@ -18,14 +18,18 @@ function stopPicker(locale: "zh" | "en", schools: Stop[], programs: Stop[], vehi
   return <>
     {group && <input type="hidden" name="id" value={group.id} />}
     <label><span>{text(locale, "组合名称", "Group name")}</span><input name="name" defaultValue={group?.name} maxLength={160} required placeholder={text(locale, "例如：McAuliffe 到 Morningstar", "e.g. McAuliffe to Morningstar")} /></label>
-    <fieldset className="stop-picker full"><legend>{text(locale, "选择 Stop", "Choose stops")}</legend>
+    <fieldset className="route-combination-picker full"><legend>{text(locale, "选择地点", "Choose stops")}</legend>
       <p className="form-hint">{text(locale, "学校和培训班都可以选择。一个地点可以加入多个组合组。", "Schools and programs can both be selected. A stop may belong to more than one group.")}</p>
-      <div className="settings-checkbox">{schools.map(stop => <label key={stop.id}><input type="checkbox" name="schoolIds" value={stop.id} defaultChecked={schoolIds.has(stop.id)} />{stop.name}</label>)}</div>
-      <div className="settings-checkbox">{programs.map(stop => <label key={stop.id}><input type="checkbox" name="programIds" value={stop.id} defaultChecked={programIds.has(stop.id)} />{stop.name}</label>)}</div>
+      <div className="route-combination-options">
+        {schools.map(stop => <label className="route-combination-option" key={stop.id}><input type="checkbox" name="schoolIds" value={stop.id} defaultChecked={schoolIds.has(stop.id)} /><span>{stop.name}</span></label>)}
+        {programs.map(stop => <label className="route-combination-option" key={stop.id}><input type="checkbox" name="programIds" value={stop.id} defaultChecked={programIds.has(stop.id)} /><span>{stop.name}</span></label>)}
+      </div>
     </fieldset>
-    <fieldset className="stop-picker full"><legend>{text(locale, "分配车辆", "Assign vehicles")}</legend>
+    <fieldset className="route-combination-picker full"><legend>{text(locale, "分配车辆", "Assign vehicles")}</legend>
       <p className="form-hint">{text(locale, "排班会根据这些车辆的座位和可用状态计算需要几条线。", "Scheduling uses these vehicles' seats and availability to calculate the number of lines.")}</p>
-      <div className="settings-checkbox">{vehicles.map(vehicle => <label key={vehicle.id}><input type="checkbox" name="vehicleIds" value={vehicle.id} defaultChecked={vehicleIds.has(vehicle.id)} />{vehicle.name} · {vehicle.capacity}{text(locale, "座", " seats")}</label>)}</div>
+      <div className="route-combination-options">
+        {vehicles.map(vehicle => <label className="route-combination-option" key={vehicle.id}><input type="checkbox" name="vehicleIds" value={vehicle.id} defaultChecked={vehicleIds.has(vehicle.id)} /><span>{vehicle.name} · {vehicle.capacity}{text(locale, "座", " seats")}</span></label>)}
+      </div>
     </fieldset>
   </>;
 }

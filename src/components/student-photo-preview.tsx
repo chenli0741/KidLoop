@@ -11,7 +11,7 @@ export function StudentPhotoPreview({src,name,locale,sizes='80px'}:{src:string;n
  function close(){setOpen(false);trigger.current?.focus();}
  return <>
   <button ref={trigger} type="button" className={s.trigger} onClick={()=>setOpen(true)} aria-haspopup="dialog" aria-label={text(locale,`查看 ${name} 的照片`,`View ${name}'s photo`)}>
-   <Image src={src} alt={name} fill sizes={sizes} unoptimized={src.startsWith('/api/photos/')}/>
+   <Image src={src} alt={name} fill sizes={sizes} unoptimized={src.startsWith('/api/')}/>
   </button>
   {open&&createPortal(<PhotoDialog src={src} name={name} locale={locale} close={close}/>,document.body)}
  </>;

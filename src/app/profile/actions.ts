@@ -7,7 +7,7 @@ import { requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { query, transaction } from "@/lib/db";
 import { tokenHash } from "@/lib/password";
 import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS } from "@/lib/login-preferences";
-import { saveOwnProfile, changeOwnPassword, saveOwnChild } from "@/lib/profile-management";
+import { saveOwnProfile, changeOwnPassword, saveOwnChild, saveOwnFamilyDetails } from "@/lib/profile-management";
 import { getLocale } from "@/lib/i18n-server";
 import { text, type Locale } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
@@ -68,5 +68,14 @@ export async function updateChild(_: FormState, form: FormData): Promise<FormSta
     });
     for (const path of ["/parent", "/parent/children", "/students", "/driver", "/routes", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);
     return { ok: true, message: text(locale, "孩子资料已保存。", "Child information saved.") };
+  } catch (error) { return failure(error, locale); }
+}
+
+export async function updateFamilyDetails(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser(["PARENT"]); const locale = await getLocale();
+  try {
+    await transaction(client => saveOwnFamilyDetails(client, user, form));
+    for (const path of ["/parent", "/parent/children", "/students", "/driver", "/routes", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);
+    return { ok: true, message: text(locale, "家长与接送信息已保存，并应用到所有孩子。", "Parent and pickup information saved for all children.") };
   } catch (error) { return failure(error, locale); }
 }

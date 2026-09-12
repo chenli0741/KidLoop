@@ -2,7 +2,7 @@
 import { useRef, useId, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CircleUserRound, KeyRound, Languages, LogOut, Pencil, UsersRound, X } from "lucide-react";
+import { CircleUserRound, KeyRound, Languages, LogOut, Pencil, X } from "lucide-react";
 import { setLocale } from "@/app/actions";
 import { logout } from "@/app/login/actions";
 import { useLocale } from "@/components/locale-provider";
@@ -26,7 +26,6 @@ export function AccountMenu({ user }: { user: AuthUser }) {
         <nav aria-label={text(locale, "个人账号", "Personal account")}>
           <Link href="/profile" onClick={close}><Pencil size={19} />{text(locale, "个人资料", "Personal information")}</Link>
           <Link href="/profile#password" onClick={close}><KeyRound size={19} />{text(locale, "修改密码", "Change password")}</Link>
-          {user.role === "PARENT" && <Link href="/parent/children" onClick={close}><UsersRound size={19} />{text(locale, "修改孩子资料", "Edit children's information")}</Link>}
         </nav>
         {!isTestAccount(user) && <div className="account-menu-language"><span><Languages size={19} />{text(locale, "语言", "Language")}</span><form action={setLocale}><button name="locale" value="zh" aria-pressed={locale === "zh"}>中文</button><button name="locale" value="en" aria-pressed={locale === "en"}>English</button></form></div>}
         <form action={logout}><button className="account-menu-logout"><LogOut size={19} />{text(locale, "退出登录", "Sign out")}</button></form>

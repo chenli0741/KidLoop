@@ -4,11 +4,12 @@ import { ActionForm } from "@/components/action-form";
 import { SettingsForm } from "@/components/settings-form";
 import { createAccount, updateAccount } from "@/app/accounts/actions";
 import { useLocale } from "@/components/locale-provider";
+import { StudentSchoolChecklist, type AccountStudent } from "@/components/student-school-checklist";
 import { text } from "@/lib/i18n";
 import type { UserRole } from "@/lib/types";
 
 export type EditableAccount = {id:string;name:string;email:string;phone:string;role:UserRole;driver_id:string|null;updatedAt:string;student_ids:string[]};
-export function AccountForm({ drivers, students, initial }: { initial?:EditableAccount; drivers: { id: string; name: string }[]; students: { id: string; name: string; schoolName: string }[] }) {
+export function AccountForm({ drivers, students, initial }: { initial?:EditableAccount; drivers: { id: string; name: string }[]; students: AccountStudent[] }) {
   const locale = useLocale();
   const [role, setRole] = useState<UserRole>(initial?.role ?? "PARENT");
   const Form = initial ? SettingsForm : ActionForm;
@@ -20,6 +21,6 @@ export function AccountForm({ drivers, students, initial }: { initial?:EditableA
     {initial && role !== "DRIVER" && <label className="full"><span>{text(locale,"电话","Phone")}</span><input name="phone" type="tel" maxLength={80} defaultValue={initial.phone}/></label>}
     <label className="full"><span>{text(locale, "角色", "Role")}</span><select name="role" value={role} onChange={(event) => setRole(event.target.value as UserRole)}><option value="PARENT">{text(locale, "家长", "Parent")}</option><option value="DRIVER">{text(locale, "司机", "Driver")}</option><option value="ADMIN">{text(locale, "管理员", "Admin")}</option></select></label>
     {role === "DRIVER" && <label className="full"><span>{text(locale, "绑定司机", "Link driver")}</span><select name="driverId" required defaultValue={initial?.driver_id ?? ""}><option value="" disabled>{text(locale, "选择司机", "Select driver")}</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>}
-    {role === "PARENT" && <fieldset className="student-checklist"><legend>{initial ? text(locale,"绑定孩子","Linked children") : text(locale, "绑定孩子（至少一名）", "Link children (at least one)")}</legend>{students.map((student) => <label key={student.id}><input name="studentIds" type="checkbox" value={student.id} defaultChecked={initial?.student_ids.includes(student.id)} /><span><strong>{student.name}</strong><small>{student.schoolName}</small></span></label>)}</fieldset>}
+    {role === "PARENT" && <StudentSchoolChecklist students={students} selectedIds={initial?.student_ids} legend={initial ? text(locale,"绑定孩子","Linked children") : text(locale, "绑定孩子（至少一名）", "Link children (at least one)")} schoolLabel={text(locale,"按学校筛选","Filter by school")} allSchoolsLabel={text(locale,"全部学校","All schools")} />}
   </Form>;
 }

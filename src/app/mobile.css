@@ -48,6 +48,7 @@
   .form-grid { gap: 16px; }
   .student-checklist input { min-height: 20px; width: 20px; height: 20px; }
   .student-checklist label { min-height: 56px; }
+  .student-checklist .student-school-filter { grid-template-columns: 1fr; align-items: stretch; gap: 6px; }
   .student-checklist strong { font-size: 14px; }
   .student-checklist small { font-size: 12px; }
   .student-checklist { border-radius: 12px; }
@@ -135,6 +136,9 @@
   .destination strong { white-space: normal; font-size: 12px; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid label, .form-grid .full, .form-footer { grid-column: 1; }
+  .route-combination-picker { padding: 13px; border-radius: 12px; }
+  .route-combination-options { grid-template-columns: 1fr; }
+  .form-grid .route-combination-option { min-height: 48px; border-radius: 10px; }
   .form-footer { align-items: stretch; flex-direction: column; }
   .form-footer .button { width: 100%; }
   .trip-planner-form .student-checklist { grid-column: 1; }
@@ -150,7 +154,7 @@
 
 @media (max-width: 920px) {
   .sidebar nav[data-role="ADMIN"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .sidebar nav[data-role="PARENT"] { grid-template-columns: 1fr; }
+  .sidebar nav[data-role="PARENT"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar nav[data-role="DRIVER"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar nav:not([data-role="ADMIN"]) .nav-link { flex-direction: row; gap: 10px; font-size: 14px; }
   .language-switcher { right: max(72px, calc(env(safe-area-inset-right) + 60px)); width: 88px; }

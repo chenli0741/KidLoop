@@ -84,6 +84,7 @@ export type Shift = {
 };
 
 export type Rider = {
+  recognitionPhotoUrl?: string;
   shared?: boolean;
   otherVehicle?: string;
   pickupStopId?:string|null; dropoffStopId?:string|null; schoolName?:string;
