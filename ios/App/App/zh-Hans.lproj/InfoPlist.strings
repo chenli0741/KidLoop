@@ -1,0 +1,8 @@
+/* System permission purpose strings. */
+"NSCameraUsageDescription" = "拍摄个人头像，或拍摄学生照片用于接送时确认学生身份。";
+"NSPhotoLibraryUsageDescription" = "选择个人头像，或选择学生照片用于接送时确认学生身份。";
+"NSPhotoLibraryAddUsageDescription" = "仅在你选择保存时，将拍摄的照片保存到相册。";
+"NSMicrophoneUsageDescription" = "录入你说出的调度要求，并转换成可编辑文字。";
+"NSSpeechRecognitionUsageDescription" = "将你说出的调度要求转换成可编辑文字。";
+"NSLocationWhenInUseUsageDescription" = "在确认接到或送达学生时记录当前位置；定位失败不影响操作。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "仅在确认接到或送达学生时记录当前位置，不进行后台定位。";

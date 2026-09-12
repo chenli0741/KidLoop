@@ -648,3 +648,11 @@ MVP 至少需要通过以下端到端场景：
 - Little Tree 周五第 1 条线由 Chen 驾驶，两个车辆共享 Cumberland 的 16 名当天候选；Chen 线路另接 Cherry Chase 5 名学生。实际人数随校历及不接送规则变化。周五仍有 8 名未安排学生，核对界面如实显示，不补造安排。
 - 61 项回归测试、类型检查、Lint、生产构建通过；隔离数据库 Chrome/WebKit 覆盖自动名单、取消勾选、保存、周/月和手机布局。线上 WebKit 复核表单和周/月页面无脚本错误，完整页面两次复核约 1.9–2.9 秒；这包含网络与渲染，不是试算 CPU 耗时，也不构成设备性能保证。
 - 已部署 https://kid-loop.vercel.app；本轮代码、迁移、测试和文档纳入同一提交。iPhone 17 Pro 模拟器的线路 → 每日核对 → 日期切换 → 返回线路已验证全程留在原生容器；物理 iPhone 的完整操作验收未完成。
+
+### App Store 权限说明修复（2026-09-11）
+
+英文审核界面出现中文系统权限说明的问题已在原生配置中修复：全部 7 项权限以英文为默认文案，增加英文和简体中文 InfoPlist.strings 并纳入构建。系统弹窗遵循 iOS App 语言，网页 Cookie 不会即时改变系统语言。需上传新 build 后复审，验证状态与操作见 `docs/ios-capabilities.md`。
+
+### 隐私政策与支持网页（2026-09-11）
+
+保留公开英文 `/privacy.html`、`/support.html`，新增简体中文 `/privacy-zh.html`、`/support-zh.html`。更新接送操作位置、家长提供参考照片后的本地辅助识别、可选云端智能排班/语音、保留与删除请求说明；联系人沿用 Li Chen / chenli0741@gmail.com。页面通过同站同窗口链接切换语言与查看帮助，不唤起邮件客户端；不要求登录。网页内容不代表已填写 App Store Connect 隐私问卷。详见 `docs/privacy-policy.md`。

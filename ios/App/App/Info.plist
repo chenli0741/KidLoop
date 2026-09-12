@@ -25,17 +25,17 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>将你说出的调度要求转换成可编辑文字。</string>
+	<string>Convert your spoken scheduling request into editable text.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>仅在确认接到或送达学生时记录当前位置，不进行后台定位。</string>
+	<string>Record your current location only when you confirm a student pickup or drop-off. Your location is not tracked in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>在确认接到或送达学生时记录当前位置；定位失败不影响操作。</string>
+	<string>Record your current location when you confirm a student pickup or drop-off. You can still confirm if location is unavailable.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>拍摄学生照片，用于接送时确认孩子身份。</string>
+	<string>Take a profile photo or a student photo to help identify the student during pickup and drop-off.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>仅在你选择保存时，将拍摄的照片保存到相册。</string>
+	<string>Save a photo to your photo library only when you choose to save it.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>选择学生照片，用于接送时确认孩子身份。</string>
+	<string>Choose a profile photo or a student photo to help identify the student during pickup and drop-off.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -56,7 +56,7 @@
 		</dict>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>录入你说出的调度要求，并转换成可编辑文字。</string>
+	<string>Record your spoken scheduling request and convert it into editable text.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

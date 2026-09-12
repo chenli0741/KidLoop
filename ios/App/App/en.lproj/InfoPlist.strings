@@ -1,0 +1,8 @@
+/* System permission purpose strings. */
+"NSCameraUsageDescription" = "Take a profile photo or a student photo to help identify the student during pickup and drop-off.";
+"NSPhotoLibraryUsageDescription" = "Choose a profile photo or a student photo to help identify the student during pickup and drop-off.";
+"NSPhotoLibraryAddUsageDescription" = "Save a photo to your photo library only when you choose to save it.";
+"NSMicrophoneUsageDescription" = "Record your spoken scheduling request and convert it into editable text.";
+"NSSpeechRecognitionUsageDescription" = "Convert your spoken scheduling request into editable text.";
+"NSLocationWhenInUseUsageDescription" = "Record your current location when you confirm a student pickup or drop-off. You can still confirm if location is unavailable.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Record your current location only when you confirm a student pickup or drop-off. Your location is not tracked in the background.";

@@ -41,3 +41,17 @@ const result = await recognizeImageText(imageBlob, ['zh-Hans', 'en-US']);
 本次提供原生 API 与 TypeScript 调用封装，没有另增 OCR 业务页面。macOS 上使用相同识别引擎的合成中英文图片测试通过（`tests/native-ocr.swift`），iPhone 真机目标无签名编译通过；不等于实机图像效果和授权弹窗验收。
 
 Apple API reference: https://developer.apple.com/documentation/vision/vnrecognizetextrequest
+
+## App Store 权限说明本地化（2026-09-11）
+
+苹果对 1.0 (2) 的 Guideline 4 反馈指出：英文界面中相机和相册用途说明显示为中文。原生工程默认语言为英文，但 Info.plist 中的权限文案全部为中文。
+
+- Info.plist 的 7 项权限用途说明统一使用英文作为回退文案，覆盖相机、相册读取、相册保存、麦克风、语音识别和两项定位权限。
+- 新增 `en.lproj/InfoPlist.strings` 与 `zh-Hans.lproj/InfoPlist.strings`，并纳入 Xcode Resources。照片说明同时覆盖个人头像与接送身份确认所用的学生照片。
+- 系统授权弹窗按 iOS 的 App 语言选择本地化，不跟随 Web 的 `kidloop_locale` Cookie 即时切换。英文审核设备应使用 English；中文资源仅供 iOS 选择简体中文时使用。
+- 必须重新构建并上传新 build，网页部署无法修改已安装 App 的系统权限说明。此次不改变版本号；送审时使用 App Store Connect 中尚未使用且高于已提交版本的 build 号（被拒 build 为 2）。
+- 送审前用英文 iPhone 和 iPad 兼容模式安装新包，重置对应授权或在全新测试环境中触发相册、相机弹窗，检查英文说明及允许、拒绝后的操作；模拟器不能代替真机拍照验证。另验证中文 App 语言下的说明。
+
+依据：[Apple — Resolving the Privacy-Sensitive Data App Rejection](https://developer.apple.com/library/archive/qa/qa1937/_index.html)。
+
+验证结果：`plutil -lint`、`npm run ios:check`、Release iOS Simulator 无签名构建通过；检查生成的 KidLoop.app，确认中英文资源各包含完整 7 项权限，英文资源与包内默认文案一致。尚未验证真机系统弹窗、生成签名包或上传送审。
