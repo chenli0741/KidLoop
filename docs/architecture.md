@@ -204,3 +204,7 @@ CAPACITOR_SERVER_URL=https://your-kidloop-domain.example npm run ios:sync
 `schedule-materialize.ts` 在事务与统一锁内写入当日车次及唯一学生执行记录。司机操作仍通过服务端权限、共享并发和容量校验；完成整条行程后状态只读。运行中修改配置不自动改变已开始的接送。
 
 日历摘要和所选日详情使用独立 Suspense 边界；司机未来日程只读试算。界面不传每个孩子的重复地点、地址或完整资料。
+
+### 移动端视口与固定导航
+
+头部、底部导航与内容区共享固定 App 容器。移动端容器以 `visualViewport.height` / `offsetTop` 跟随键盘和 iOS 视口平移，文档本身不滚动，仅 `.app-main` 可滚动。底部模块切换只重置该内容区并释放表单焦点，关闭移动端默认页面滚动定位。原生壳使用 `ios.contentInset: never`，由 CSS `env(safe-area-inset-*)` 统一提供安全区；此配置变更须重新安装原生构建。

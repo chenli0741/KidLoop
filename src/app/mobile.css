@@ -1,8 +1,9 @@
 /* iPhone and compact touch layouts. Desktop styles live in globals.css. */
 @media (max-width: 920px) {
   /* Keep document rubber-banding from moving the app chrome on iOS. */
-  html:has(.app-shell), body:has(.app-shell) { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  .app-shell { position: fixed; inset: 0; height: 100dvh; min-height: 0; overflow: hidden; }
+  html:has(.app-shell), body:has(.app-shell) { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body:has(.app-shell) { position: fixed; inset: 0; }
+  .app-shell { position: fixed; inset: var(--app-viewport-top, 0px) 0 auto; height: var(--app-viewport-height, 100dvh); min-height: 0; overflow: hidden; contain: layout; }
   .sidebar { inset: auto 0 0; width: auto; height: auto; padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); color: var(--ink); background: rgba(255,255,255,.96); border-top: 1px solid var(--line); }
   .brand { position: fixed; inset: 0 0 auto; height: calc(64px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 20px 0 max(20px, env(safe-area-inset-left)); gap: 10px; background: #f5f7f5; border-bottom: 1px solid #e7ece8; }
   .brand-mark { width: 35px; height: 35px; color: white; background: var(--green); border-radius: 12px; }

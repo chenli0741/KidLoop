@@ -11,7 +11,8 @@ const config: CapacitorConfig = {
   loggingBehavior: "debug",
   ios: {
     scheme: "KidLoop",
-    contentInset: "automatic",
+    // The web layout owns safe-area padding; avoid a second native inset.
+    contentInset: "never",
     preferredContentMode: "mobile",
     allowsLinkPreview: false,
   },
