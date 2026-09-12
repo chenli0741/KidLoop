@@ -356,6 +356,16 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .family-note, .family-plan p, .request-card p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .family-rides, .family-plan { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .family-card h3 { margin: 0 0 14px; font-size: 16px; }
+.day-plan-form select, .day-plan-form textarea { font-family: inherit; font-size: 16px; font-weight: 400; line-height: 1.5; }
+.day-plan-form select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2353605a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 20px 20px;
+}
 .family-ride { padding: 15px; margin-top: 12px; background: #f6f9f6; border-radius: 14px; font-size: 13px; }
 .family-ride-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .family-ride p { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; line-height: 1.5; }
