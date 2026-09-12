@@ -15,7 +15,6 @@ export function LoginForm({ rememberedEmail = "" }: { rememberedEmail?: string }
     <label className="full"><span>{text(locale, "邮箱", "Email")}</span><input id="login-email" type="email" name="email" autoComplete="username" autoCapitalize="none" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} /></label>
     <label className="full"><span>{text(locale, "密码", "Password")}</span><input id="login-password" type="password" name="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={128} /></label>
     <label className="login-remember full"><input type="checkbox" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>{text(locale, "记住登录 30 天", "Keep me signed in for 30 days")}</span></label>
-    <p className="form-hint full">{text(locale, "下次可直接进入；退出后保留邮箱，密码可使用系统自动填充。", "Return without signing in again. After signing out, your email is remembered and you can use password autofill.")}</p>
     {state.message && <p className="form-message error full" role="alert">{state.message}</p>}
     <button className="button primary full" disabled={pending}>{text(locale, pending ? "登录中…" : "登录", pending ? "Signing in…" : "Sign in")}<ArrowRight size={18} /></button>
   </form>;
