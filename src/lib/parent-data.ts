@@ -1,4 +1,4 @@
-import { displayedStudentPhoto } from './photo-display';
+import { parentStudentPhoto } from './photo-display';
 import "server-only";
 import { editableNote } from "@/lib/student-management";
 import { requireUser } from "@/lib/auth";
@@ -22,7 +22,7 @@ export async function getParentChildren() {
     left join parents pa on pa.id = st.parent_id
     where us.user_id = $1 and exists(select 1 from term_students et where et.student_id=st.id and et.operating_term_id=current_operating_term()) and st.active order by st.name
   `, [user.id]);
-  return result.rows.map(({cartoonUrl, ...child}) => ({ ...child, photoUrl: displayedStudentPhoto(user, child.photoUrl, cartoonUrl), notes: editableNote(child.notes) }));
+  return result.rows.map(({cartoonUrl, ...child}) => ({ ...child, photoUrl: parentStudentPhoto(user, child.photoUrl, cartoonUrl), notes: editableNote(child.notes) }));
 }
 
 export async function getParentSchedule(date: string) {

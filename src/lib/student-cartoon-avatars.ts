@@ -1,7 +1,7 @@
 import 'server-only';
 
 // Match the reference-photo relationship checks. A changed source invalidates its avatar.
-export const cartoonAvatarAccessSql = `select ca.blob_url
+export const cartoonAvatarAccessSql = `select ca.blob_url, ca.created_at::text as version
  from student_cartoon_avatars ca join students s on s.id=ca.student_id
  where s.id=$1 and ca.source_photo_url=coalesce(s.photo_url,'') and (
    $3='ADMIN' or
