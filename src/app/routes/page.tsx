@@ -1,3 +1,4 @@
+import { familiarityScore } from "@/lib/driver-familiarity";
 import Link from "next/link";
 import { openTerm } from "@/lib/operating-terms";
 import { TermWorkspace } from "@/components/term-workspace";
@@ -39,7 +40,7 @@ export default async function RoutesPage() {
 
     <section className="pickup-section schedule-today-section"><div className="section-heading"><div><h2>{text(locale, "今日排班", "Today's schedule")}</h2><p className="form-hint">{today} · {todayPlan?.plans.length ?? 0} {text(locale, "条安排", "plans")}</p></div><Link className="text-link" href={`/schedule/review?date=${today}&view=week`}>{text(locale, "查看核对", "Review")} →</Link></div>
       {todayPlan?.issues.length ? <div className="setup-callout">{text(locale, `有 ${todayPlan.issues.length} 项需要核对。`, `${todayPlan.issues.length} item(s) need review.`)}</div> : null}
-      {todayPlan?.plans.length ? <div className="pickup-records">{todayPlan.plans.map(plan => <article className="pickup-record" key={plan.routeId}><div><h3>{plan.name}</h3><p>{plan.stops.map(stop => `${stop.time} · ${stop.name}`).join(" → ")}</p><p>{plan.students.length} {text(locale, "名学生", "students")} · {text(locale, "司机", "Driver")} {drivers.find(driver => driver.id === plan.driverId)?.name ?? "—"} · {text(locale, "车辆", "Vehicle")} {vehicles.find(vehicle => vehicle.id === plan.vehicleId)?.name ?? "—"}</p></div></article>)}</div> : <p className="form-hint">{text(locale, "今天还没有排班，使用上面的生成排班。", "No schedule for today yet. Use Generate schedule above.")}</p>}
+      {todayPlan?.plans.length ? <div className="pickup-records">{todayPlan.plans.map(plan => <article className="pickup-record" key={plan.routeId}><div><h3>{plan.sourceRouteId ? text(locale,"加开接送 · ","Extra pickup · ") : ""}{plan.name}</h3><p>{plan.stops.map(stop => `${stop.time} · ${stop.name}`).join(" → ")}</p><p>{plan.students.length} {text(locale, "名学生", "students")} · {text(locale, "司机", "Driver")} {drivers.find(driver => driver.id === plan.driverId)?.name ?? "—"} · {text(locale, "车辆", "Vehicle")} {vehicles.find(vehicle => vehicle.id === plan.vehicleId)?.name ?? "—"}</p>{plan.assignmentReason && <p className="form-hint">{plan.assignmentReason.split(" / ")[locale === "zh" ? 0 : 1]}</p>}</div></article>)}</div> : <p className="form-hint">{text(locale, "今天还没有排班，使用上面的生成排班。", "No schedule for today yet. Use Generate schedule above.")}</p>}
     </section>
 
     <section className="pickup-section">
@@ -49,6 +50,7 @@ export default async function RoutesPage() {
         <div><h3>{route.name} · {text(locale,`已选 ${route.students.length} 人`,`${route.students.length} selected`)} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
           <p>{route.routeType==='TEMPORARY'?text(locale,'临时行程','Temporary trip'):text(locale,'固定线路','Recurring route')} · {route.startsOn} — {route.endsOn} · {weekdays(route.weekdays)}</p>
           <p>{drivers.find(d => d.id === route.driverId)?.name ?? text(locale, "司机待绑定", "Driver unassigned")} · {vehicles.find(v => v.id === route.vehicleId)?.name ?? text(locale, "车辆待绑定", "Vehicle unassigned")}</p>
+          <p className="form-hint">{text(locale,"常跑司机权重：","Driver familiarity: ")}{drivers.map(d=>({name:d.name,score:familiarityScore(input.driverRuns??[],d.id,[route.id],undefined,today)})).filter(d=>d.score>0).sort((a,b)=>b.score-a.score).map(d=>`${d.name} ${d.score.toFixed(1)}`).join(" · ") || text(locale,"暂无实际执行记录，优先使用已绑定司机","No completed service history; prefer the assigned driver")}</p>
           <p style={{whiteSpace:"pre-line"}}>{route.notes}</p>
           <ol>{route.stops.map(stop => <li key={stop.id}>{stop.time || text(locale,"时间待确认","Time pending")} · {stop.name}</li>)}</ol>
         </div>

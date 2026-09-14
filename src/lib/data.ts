@@ -24,7 +24,7 @@ export async function getVehicles() {
 export async function getDrivers() {
   await requireUser(["ADMIN"]);
   const result = await query<Driver>(`
-    select id, name, phone, status, to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime", updated_at::text as "updatedAt"
+    select id, name, phone, status, to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime",to_char(latest_dismissal_time,'HH24:MI') as "latestDismissalTime",school_preference_mode as "schoolPreferenceMode",array(select school_id from driver_school_preferences dsp where dsp.driver_id=drivers.id order by school_id) as "preferredSchoolIds", updated_at::text as "updatedAt"
     from drivers
     where active = true
     order by name

@@ -9,7 +9,7 @@ export async function materializeTrial(c:PoolClient,date:string){
  const input=await readTrialInput(c,date,date);
  if(!input.routes.length)return;
  const day=trialDay(input,date);
- const existing=(await c.query(`select t.id,t.shift_id,t.fixed_route_id from trips t where t.operating_term_id=current_operating_term() and t.scheduled_date=$1 and t.fixed_route_id is not null order by t.id for update`,[date])).rows;
+ const existing=(await c.query(`select t.id,t.shift_id,coalesce(t.generated_plan_id,t.fixed_route_id) as fixed_route_id,coalesce(t.source_route_id,t.fixed_route_id) as source_route_id from trips t where t.operating_term_id=current_operating_term() and t.scheduled_date=$1 and (t.fixed_route_id is not null or t.generated_plan_id is not null) order by t.id for update`,[date])).rows;
  const old=(await c.query(`select ts.id,ts.trip_id,ts.student_id,ts.status,ts.parent_absence,ts.picked_up_at,exists(select 1 from status_history h where h.trip_student_id=ts.id) as history from trip_students ts where ts.trip_id=any($1::uuid[]) order by ts.id for update`,[existing.map(t=>t.id)])).rows;
  const protectedRoutes=new Set(input.existing?.filter(t=>t.started).map(t=>t.routeId).filter((id):id is string=>!!id));
  // Protect the whole actual shared execution group if anyone has already acted.
@@ -22,24 +22,29 @@ export async function materializeTrial(c:PoolClient,date:string){
  // Capacity warnings must not suppress publication: the operator needs to see
  // the task and resolve the extra rider after generation. Hard execution
  // blockers (resource conflicts, missing travel data, etc.) still block routes.
- const blocked=new Set(day.issues.filter(i=>!['OTHER_TRIP','CAPACITY'].includes(i.code)).flatMap(i=>i.routeId?[i.routeId]:i.studentId&&i.code!=='UNASSIGNED'?day.plans.filter(p=>p.students.some(a=>a.studentId===i.studentId)).map(p=>p.routeId):[]));
+ const blocked=new Set(day.issues.filter(i=>!i.advisory&&!['OTHER_TRIP','CAPACITY'].includes(i.code)).flatMap(i=>i.routeId?[i.routeId]:i.studentId&&i.code!=='UNASSIGNED'?day.plans.filter(p=>p.students.some(a=>a.studentId===i.studentId)).map(p=>p.routeId):[]));
  const immutableStudents=new Set(old.filter(a=>protectedRoutes.has(existing.find(t=>t.id===a.trip_id)!.fixed_route_id)).map(a=>a.student_id));
- for(const p of day.plans)if(!protectedRoutes.has(p.routeId)&&p.students.some(a=>immutableStudents.has(a.studentId))){blocked.add(p.routeId);day.issues.push({code:'STARTED',routeId:p.routeId,message:'学生已有执行安排，保留原记录 / Student trip already started; original retained'});}
+ for(const p of day.plans)if(!protectedRoutes.has(p.routeId)){
+  // A child already served by this route's extra run must not cancel the normal run.
+  const sameSource=new Set(old.filter(a=>immutableStudents.has(a.student_id)&&existing.some(t=>t.id===a.trip_id&&protectedRoutes.has(t.fixed_route_id)&&t.source_route_id===(p.sourceRouteId??p.routeId))).map(a=>a.student_id));
+  p.students=p.students.filter(a=>!sameSource.has(a.studentId));
+  if(p.students.some(a=>immutableStudents.has(a.studentId))){blocked.add(p.routeId);day.issues.push({code:'STARTED',routeId:p.routeId,message:'学生已有执行安排，保留原记录 / Student trip already started; original retained'});}
+ }
  // Never silently drop an assignment with audit history on a roster change.
  for(const a of old)if(a.history&&!immutableStudents.has(a.student_id)&&!day.plans.some(p=>p.students.some(s=>s.studentId===a.student_id))){
   const route=existing.find(t=>t.id===a.trip_id)!.fixed_route_id;protectedRoutes.add(route);
   day.issues.push({code:'HISTORY',routeId:route,message:'移出学生已有操作历史，保留并待核对 / Removed student has history; review needed'});
  }
  await c.query(`delete from route_task_issues where service_date=$1 and route_id=any($2::uuid[])`,[date,input.routes.map(r=>r.id)]);
- for(const r of input.routes){const issues=day.issues.filter(i=>i.routeId===r.id);if(issues.length)await c.query('insert into route_task_issues values($1,$2,$3)',[r.id,date,[...new Set(issues.map(i=>i.message))].join('\n')]);}
- const executable=day.plans.filter(p=>!blocked.has(p.routeId)&&!protectedRoutes.has(p.routeId));
+ for(const r of input.routes){const issues=day.issues.filter(i=>i.routeId===r.id||day.plans.some(p=>p.routeId===i.routeId&&p.sourceRouteId===r.id)||existing.some(t=>t.fixed_route_id===i.routeId&&t.source_route_id===r.id));if(issues.length)await c.query('insert into route_task_issues values($1,$2,$3)',[r.id,date,[...new Set(issues.map(i=>i.message))].join('\n')]);}
+ const executable=day.plans.filter(p=>p.students.length&&!blocked.has(p.routeId)&&!protectedRoutes.has(p.routeId));
  const tripMap=new Map<string,string>();
  for(const p of executable){
   const prior=existing.find(t=>t.fixed_route_id===p.routeId);
   const shift=prior?.shift_id||(await c.query('insert into driver_shifts(driver_id,vehicle_id,shift_date,start_time,end_time) values($1,$2,$3,$4,$5) returning id',[p.driverId,p.vehicleId,date,p.stops[0].time,p.stops.at(-1)!.time])).rows[0].id;
   await c.query("update driver_shifts set driver_id=$2,vehicle_id=$3,start_time=$4,end_time=$5,status='SCHEDULED' where id=$1",[shift,p.driverId,p.vehicleId,p.stops[0].time,p.stops.at(-1)!.time]);
-  const trip=prior?.id||(await c.query('insert into trips(shift_id,scheduled_date,departure_time,fixed_route_id,route_name,route_stops) values($1,$2,$3,$4,$5,$6) returning id',[shift,date,p.stops[0].time,p.routeId,p.name,JSON.stringify(p.stops)])).rows[0].id;
-  await c.query("update trips set route_name=$2,route_stops=$3,departure_time=$4,status='PUBLISHED' where id=$1",[trip,p.name,JSON.stringify(p.stops),p.stops[0].time]);tripMap.set(p.routeId,trip);
+  const trip=prior?.id||(await c.query('insert into trips(shift_id,scheduled_date,departure_time,fixed_route_id,route_name,route_stops,source_route_id,generated_plan_id) values($1,$2,$3,$4,$5,$6,$7,$8) returning id',[shift,date,p.stops[0].time,p.sourceRouteId?null:p.routeId,p.name,JSON.stringify(p.stops),p.sourceRouteId??null,p.sourceRouteId?p.routeId:null])).rows[0].id;
+  await c.query("update trips set route_name=$2,route_stops=$3,departure_time=$4,assignment_reason=$5,status='PUBLISHED' where id=$1",[trip,p.name,JSON.stringify(p.stops),p.stops[0].time,p.assignmentReason??null]);tripMap.set(p.routeId,trip);
  }
  const mutableTrips=existing.filter(t=>!protectedRoutes.has(t.fixed_route_id));
  await c.query('delete from shared_pickup_members where trip_id=any($1::uuid[])',[mutableTrips.map(t=>t.id)]);

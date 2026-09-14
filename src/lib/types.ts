@@ -1,3 +1,4 @@
+import type {DriverPreferences} from './driver-preferences';
 export type VehicleStatus = "AVAILABLE" | "IN_SERVICE" | "MAINTENANCE";
 export type DriverStatus = "AVAILABLE" | "OFF_DUTY";
 export type ShiftStatus = "SCHEDULED" | "ACTIVE" | "COMPLETED" | "CANCELED";
@@ -18,7 +19,7 @@ export type Vehicle = {
   updatedAt: string;
 };
 
-export type Driver = {
+export type Driver = DriverPreferences & {
   id: string;
   name: string;
   phone: string;

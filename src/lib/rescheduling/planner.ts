@@ -1,3 +1,7 @@
+import {driverAllowsSchools,driverAllowsTime,schoolPreferenceScore} from '../driver-preferences';
+import { familiarityScore } from '../driver-familiarity';
+import { allocateEarlyTrips, type EarlyRequest } from '../automatic-extra-trips';
+import type { TrialInput, TrialIssue } from '../schedule-trial';
 import {
   activeOn,
   planRoute,
@@ -261,7 +265,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         if (
           !snapshot.drivers.some(
             (d) => d.id === r.driverId && d.active && d.status === "AVAILABLE" &&
-              (!d.earliestDismissalTime || !before.students.some(s => changedMatches.some(m => m.student_id === s.studentId && minutes(m.time) < minutes(d.earliestDismissalTime!)))),
+              (driverAllowsSchools(d,before.stops.filter(s=>s.schoolId&&before.students.some(r=>r.pickupStopId===s.id)).map(s=>s.schoolId!)) && !before.students.some(s => changedMatches.some(m => m.student_id === s.studentId && !driverAllowsTime(d,m.time)))),
           ) ||
           !snapshot.vehicles.some(
             (v) =>
@@ -302,9 +306,31 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     const before = originals
       .map((r) => asPlan(r, routeMatches(r, day.matches), snapshot.travelTimes))
       .filter((r) => r.students.length);
-    const base = originals
+    let base = originals
       .map((r) => asPlan(r, routeMatches(r, matches), snapshot.travelTimes))
       .filter((r) => r.students.length);
+    // Partial early dismissal adds direct short runs while preserving the normal runs.
+    const earlyRequests: EarlyRequest[]=[];
+    const normal = originals.flatMap(r=>{
+      const available=routeMatches(r,matches);
+      const candidates=r.students.filter(s=>available.some(m=>m.student_id===s.studentId&&day.matches.some(old=>old.student_id===s.studentId&&minutes(m.time)<minutes(old.time))));
+      const eligible=r.students.filter(s=>available.some(m=>m.student_id===s.studentId));
+      const early=candidates.length<eligible.length||new Set(candidates.map(s=>available.find(m=>m.student_id===s.studentId)!.time)).size>1?candidates:[];
+      const groups=new Map<string,typeof early>();
+      for(const rider of early){const time=available.find(m=>m.student_id===rider.studentId)!.time;const key=`${rider.pickupStopId}:${rider.dropoffStopId}:${time}`;groups.set(key,[...groups.get(key)??[],rider]);}
+      for(const students of groups.values())earlyRequests.push({sourceRouteId:r.id,preferredDriverId:r.driverId,preferredVehicleId:r.vehicleId,time:available.find(m=>m.student_id===students[0].studentId)!.time.slice(0,5),pickup:r.stops.find(s=>s.id===students[0].pickupStopId)!,dropoff:r.stops.find(s=>s.id===students[0].dropoffStopId)!,students,shared:{}});
+      const plan=asPlan({...r,students:r.students.filter(s=>!early.includes(s))},available,snapshot.travelTimes);
+      return plan.students.length?[{...plan,preserveAssignment:!intent.unavailableDriverIds.includes(plan.driverId)&&!intent.unavailableVehicleIds.includes(plan.vehicleId)}]:[];
+    });
+    if(earlyRequests.length){
+      const extraInput:TrialInput={routes:snapshot.routes,children:[],rules:[],batches:[],terms:[],exceptions:[],absences:day.absentIds.map(studentId=>({date:day.date,studentId})),
+        drivers:snapshot.drivers.filter(d=>!intent.unavailableDriverIds.includes(d.id)&&(!intent.noAdditionalDrivers||before.some(p=>p.driverId===d.id))),vehicles:snapshot.vehicles.filter(v=>!intent.unavailableVehicleIds.includes(v.id)).map(v=>({...v,capacity:v.capacity??0})),driverRuns:snapshot.driverRuns,travelTimes:snapshot.travelTimes,
+        existing:blockers.map(t=>({...t,date:day.date,students:t.students.map(s=>s.studentId)}))};
+      const extraIssues:TrialIssue[]=[];
+      const extras=allocateEarlyTrips(extraInput,day.date,earlyRequests,normal.map(p=>({...p,routeId:p.sourceIds[0],shared:{}})),extraIssues);
+      if(extraIssues.length){result.conflicts.push(...extraIssues.map(i=>`${day.date}: ${i.message}`));return result;}
+      base=[...normal,...extras.map(p=>({sourceIds:[p.sourceRouteId!],name:p.name,driverId:p.driverId,vehicleId:p.vehicleId,students:p.students,stops:p.stops,automaticExtra:true,preserveAssignment:true}))];
+    }
     if (base.length > 30) {
       result.conflicts.push(
         "单日超过 30 条线路，超出本次试算范围 / More than 30 routes in one day",
@@ -338,9 +364,9 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         });
       }
     }
-    variants.push(split);
+    if(!earlyRequests.length) variants.push(split);
     // Try bounded pairwise combinations, including cross-school paths with known template edges.
-    for (let i = 0; i < split.length && variants.length < 16; i++)
+    for (let i = 0; !earlyRequests.length && i < split.length && variants.length < 16; i++)
       for (let j = i + 1; j < split.length && variants.length < 16; j++) {
         const joined = merge(split[i], split[j], snapshot.routes, matches, snapshot.travelTimes);
         if (joined)
@@ -392,14 +418,16 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
           task.stops.some((s) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time))
         )
           return;
-        const ds = drivers.filter(d => !d.earliestDismissalTime || !task.students.some(s => matches.some(m => m.student_id === s.studentId && minutes(m.time) < minutes(d.earliestDismissalTime!)))).sort(
+        const ds = drivers.filter(d => (!task.preserveAssignment || d.id===task.driverId) && (driverAllowsSchools(d,task.stops.filter(s=>s.schoolId&&task.students.some(r=>r.pickupStopId===s.id)).map(s=>s.schoolId!)) && !task.students.some(s => matches.some(m => m.student_id === s.studentId && !driverAllowsTime(d,m.time))))).sort(
           (a, b) =>
+            schoolPreferenceScore(b,task.stops.filter(s=>s.schoolId).map(s=>s.schoolId!))-schoolPreferenceScore(a,task.stops.filter(s=>s.schoolId).map(s=>s.schoolId!)) ||
+            familiarityScore(snapshot.driverRuns??[],b.id,task.sourceIds,task.stops.find(s=>s.schoolId)?.schoolId??undefined,day.date) - familiarityScore(snapshot.driverRuns??[],a.id,task.sourceIds,task.stops.find(s=>s.schoolId)?.schoolId??undefined,day.date) ||
             Number(b.id === task.driverId) - Number(a.id === task.driverId) ||
             (intent.preferExistingDrivers
               ? Number(usedDrivers.has(b.id)) - Number(usedDrivers.has(a.id))
               : 0),
         );
-        const vs = [...vehicles].sort(
+        const vs = vehicles.filter(v=>!task.preserveAssignment||v.id===task.vehicleId).sort(
           (a, b) =>
             Number(b.id === task.vehicleId) - Number(a.id === task.vehicleId),
         );
@@ -451,11 +479,13 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         : 0,
       d.replaceIds.length,
       d.after.length,
+      -d.after.reduce((sum,p)=>sum+schoolPreferenceScore(snapshot.drivers.find(r=>r.id===p.driverId)??{},p.stops.filter(s=>s.schoolId).map(s=>s.schoolId!)),0),
+      -d.after.reduce((sum,p)=>sum+familiarityScore(snapshot.driverRuns??[],p.driverId,p.sourceIds,p.stops.find(s=>s.schoolId)?.schoolId??undefined,day.date),0),
     ];
     dayResults.sort((a, b) => {
       const x = score(a),
         y = score(b);
-      return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+      return x[0] - y[0] || x[3] - y[3] || x[4] - y[4] || x[1] - y[1] || x[2] - y[2];
     });
     const distinct = [
       ...new Map(dayResults.map((d) => [JSON.stringify(d.after), d])).values(),

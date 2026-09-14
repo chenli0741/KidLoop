@@ -1,3 +1,4 @@
+import { readDriverRuns } from '../driver-familiarity-data';
 import "server-only";
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -33,7 +34,7 @@ export async function readSnapshot(
   ).rows;
   const drivers = (
     await c.query<Resource>(
-      `select id,name,active,status,to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime" from drivers order by id`,
+      `select id,name,active,status,to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime",to_char(latest_dismissal_time,'HH24:MI') as "latestDismissalTime",school_preference_mode as "schoolPreferenceMode",array(select school_id from driver_school_preferences dsp where dsp.driver_id=drivers.id order by school_id) as "preferredSchoolIds" from drivers order by id`,
     )
   ).rows;
   const vehicles = (
@@ -94,7 +95,8 @@ export async function readSnapshot(
       [start, end],
     )
   ).rows[0];
-  const snapshot = { term, routes, students, drivers, vehicles, days };
+  const driverRuns = await readDriverRuns(c,start,end);
+  const snapshot = { term, routes, students, drivers, vehicles, days, driverRuns };
   return {
     ...snapshot,
     travelTimes,

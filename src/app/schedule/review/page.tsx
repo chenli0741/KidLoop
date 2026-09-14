@@ -43,10 +43,10 @@ async function Calendar({dates,selected,today,view,locale}:{dates:string[];selec
 async function Details({date,today,locale}:{date:string;today:string;locale:Locale}){
  if(date<today)return <section className="pickup-section"><h2>{date}</h2><p>{text(locale,'过去日期仅保留实际执行记录，不按新规则重新试算。','Past dates retain actual execution records and are not recalculated.')}</p></section>;
  const {days}=await readTrialRange(db,[date],true);const day=days[0];
- const [students,schools]=await Promise.all([db.query('select id,name from students'),db.query('select id,coalesce(short_name,name) as name from schools')]);
+ const [students,schools,drivers]=await Promise.all([db.query('select id,name from students'),db.query('select id,coalesce(short_name,name) as name from schools'),db.query('select id,name from drivers')]);
  return <section className="pickup-section"><h2>{date} · {text(locale,'安排核对','Arrangement review')}</h2><p>{text(locale,`${day.expected} 名应接学生 · ${day.plans.length} 条线路`,`${day.expected} expected students · ${day.plans.length} routes`)}</p>
   {!day.issues.length&&<p>{text(locale,'未发现安排异常。','No arrangement issues found.')}</p>}
   {day.issues.map((issue,index)=><p className="form-error" key={index}>{schools.rows.find(s=>s.id===issue.schoolId)?.name} {students.rows.find(s=>s.id===issue.studentId)?.name} {day.plans.find(p=>p.routeId===issue.routeId)?.name} · {issue.message.split(' / ')[locale==='zh'?0:1]??issue.message}</p>)}
-  {day.plans.map(plan=><article className="pickup-record" key={plan.routeId}><h3>{plan.name}</h3><p>{plan.stops.map(s=>`${s.time} ${s.name}`).join(' → ')}</p><p>{plan.students.map(a=>students.rows.find(s=>s.id===a.studentId)?.name).join('、')}</p></article>)}
+  {day.plans.map(plan=><article className="pickup-record" key={plan.routeId}><h3>{plan.sourceRouteId?text(locale,"加开接送 · ","Extra pickup · "):""}{plan.name}</h3><p>{text(locale,"司机：","Driver: ")}{drivers.rows.find(d=>d.id===plan.driverId)?.name}</p>{plan.assignmentReason&&<p>{plan.assignmentReason.split(" / ")[locale==="zh"?0:1]}</p>}<p>{plan.stops.map(s=>`${s.time} ${s.name}`).join(' → ')}</p><p>{plan.students.map(a=>students.rows.find(s=>s.id===a.studentId)?.name).join('、')}</p></article>)}
  </section>;
 }

@@ -1,5 +1,6 @@
 "use server";
-import { parseEarliestDismissalTime } from "@/lib/driver-conditions";
+import {parseDriverPreferences} from "@/lib/driver-preferences";
+import {saveDriverPreferences} from "@/lib/driver-preferences-data";
 import { requireTerm, openTerm, initializeSchools } from "@/lib/operating-terms";
 import { attachPhoto, photoPath } from "@/lib/student-photos";
 
@@ -215,10 +216,11 @@ export async function createVehicle(_: FormState, formData: FormData): Promise<F
 
 export async function createDriver(_: FormState, formData: FormData): Promise<FormState> {
   return runMutation(async () => {
-    await query(
-      "insert into drivers (name, phone, earliest_dismissal_time) values ($1, $2, $3)",
-      [required(formData, "name"), optional(formData, "phone"), parseEarliestDismissalTime(formData.get("earliestDismissalTime"))],
-    );
+    const preferences=parseDriverPreferences(formData);
+    await transaction(async c=>{
+      const result=await c.query("insert into drivers(name,phone) values($1,$2) returning id",[required(formData,"name"),optional(formData,"phone")]);
+      await saveDriverPreferences(c,result.rows[0].id,preferences);
+    });
   }, ["/", "/resources", "/schedule"], { zh: "司机已添加。", en: "Driver added." });
 }
 

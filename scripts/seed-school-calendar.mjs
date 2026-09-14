@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import pg from "pg";
 
-// User-confirmed defaults, not a claim about official school dismissal times.
+// Historical test defaults for the remaining legacy schools only.
+// Ellis was corrected to grade-specific school rules on 2026-09-14; never seed
+// its former all-grade Tuesday 12:45 / other-day 13:45 test defaults again.
 const schools = [
-  { name: "Ellis", tuesday: "12:45", other: "13:45" },
   { name: "McAuliffe", tuesday: "14:00", other: "14:35" },
   { name: "Stratford School", tuesday: "12:45", other: "13:45" },
 ];

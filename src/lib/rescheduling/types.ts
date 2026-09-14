@@ -1,3 +1,5 @@
+import type {DriverPreferences} from '../driver-preferences';
+import type { DriverRun } from '../driver-familiarity';
 import type { FixedRoute, RouteStop, RouteStudent } from "../fixed-route-types";
 import type { PickupMatch } from "../route-plan";
 export type Intent = {
@@ -19,7 +21,7 @@ export type Rider = {
   programId: string | null;
   reviewed: boolean;
 };
-export type Resource = {
+export type Resource = DriverPreferences & {
   id: string;
   name: string;
   active: boolean;
@@ -40,6 +42,7 @@ export type Task = {
   stops: RouteStop[];
 };
 export type Snapshot = {
+  driverRuns?: DriverRun[];
   term: { id: string; startsOn: string; endsOn: string };
   routes: FixedRoute[];
   students: Rider[];
@@ -55,6 +58,8 @@ export type Snapshot = {
   hash: string;
 };
 export type PlannedRoute = {
+  preserveAssignment?: boolean;
+  automaticExtra?: boolean;
   sourceIds: string[];
   name: string;
   driverId: string;

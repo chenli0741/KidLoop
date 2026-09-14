@@ -8,15 +8,15 @@ import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDate, formatTime, todayInOperationsTimeZone } from "@/lib/date";
-import { getDrivers, getShifts, getVehicles } from "@/lib/data";
+import { getDrivers, getShifts, getVehicles, getSchools } from "@/lib/data";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 
 export async function FleetResources() {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
-  const [vehicles, drivers, shifts] = await Promise.all([
-    getVehicles(), getDrivers(), getShifts(todayInOperationsTimeZone()),
+  const [vehicles, drivers, shifts, schools] = await Promise.all([
+    getVehicles(), getDrivers(), getShifts(todayInOperationsTimeZone()), getSchools(),
   ]);
 
   return (
@@ -56,9 +56,9 @@ export async function FleetResources() {
               {drivers.map((driver) => (
                 <article className="record-card" key={driver.id}>
                   <div className="record-icon teal"><CircleGauge size={21} /></div>
-                  <div className="record-main"><strong>{driver.name}</strong><span><Phone size={13} /> {driver.phone}</span><span>{driver.earliestDismissalTime ? text(locale, `仅接 ${driver.earliestDismissalTime} 及以后放学`, `Dismissals at or after ${driver.earliestDismissalTime}`) : text(locale, "放学时间不限", "No dismissal time restriction")}</span></div>
+                  <div className="record-main"><strong>{driver.name}</strong><span><Phone size={13} /> {driver.phone}</span><span>{driver.earliestDismissalTime ? text(locale, `仅接 ${driver.earliestDismissalTime} 及以后放学`, `Dismissals at or after ${driver.earliestDismissalTime}`) : text(locale, "放学时间不限", "No dismissal time restriction")}</span><span>{driver.latestDismissalTime ? text(locale,`最晚 ${driver.latestDismissalTime} 放学`,`Latest dismissal ${driver.latestDismissalTime}`) : null}</span><span>{driver.schoolPreferenceMode && driver.schoolPreferenceMode !== 'NONE' ? `${text(locale,driver.schoolPreferenceMode==='ONLY'?'只接':'优先接',driver.schoolPreferenceMode==='ONLY'?'Only':'Prefer')}: ${schools.filter(s=>driver.preferredSchoolIds?.includes(s.id)).map(s=>s.name).join('、')}` : text(locale,'不限学校','Any school')}</span></div>
                   <StatusBadge status={driver.status} />
-                  <DriverRecordActions driver={driver} locale={locale} />
+                  <DriverRecordActions driver={driver} locale={locale} schools={schools} />
                 </article>
               ))}
             </div>
@@ -69,7 +69,7 @@ export async function FleetResources() {
           <ActionForm action={createDriver} submitLabel={text(locale, "添加司机", "Add driver")}>
             <label><span>{text(locale, "司机姓名", "Driver name")}</span><input name="name" placeholder={text(locale, "姓名", "Full name")} required /></label>
             <label><span>{text(locale, "电话", "Phone")}</span><input name="phone" type="tel" placeholder="(555) 123-4567" /></label>
-            <DriverConditionFields locale={locale} />
+            <DriverConditionFields locale={locale} schools={schools} />
           </ActionForm>
         </FormPanel>
       </div>

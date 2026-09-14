@@ -1,10 +1,13 @@
+import {driverAllowsSchools,driverAllowsTime,type DriverPreferences} from './driver-preferences';
+import { allocateEarlyTrips, type EarlyRequest } from './automatic-extra-trips';
+import type { DriverRun } from './driver-familiarity';
 import type { FixedRoute, RouteStop, RouteStudent } from './fixed-route-types';
 import { automaticRoster, batchTime, type RosterChild, type DismissalRule, type PickupBatch } from './automatic-roster';
 import { planRoute, overlaps } from './route-plan';
 
-export type TrialIssue={code:string;schoolId?:string;studentId?:string;routeId?:string;message:string};
-export type TrialPlan={routeId:string;name:string;driverId:string;vehicleId:string;stops:RouteStop[];students:RouteStudent[];shared:Record<string,string>};
-export type TrialInput={routes:FixedRoute[];children:RosterChild[];rules:DismissalRule[];batches:PickupBatch[];terms:{schoolId:string;startsOn:string;endsOn:string}[];exceptions:{schoolId:string;startsOn:string;endsOn:string;pickupTime:string|null;gradeTimes:{grades:string[];time:string}[]}[];drivers:{id:string;active:boolean;status:string;earliestDismissalTime?:string|null}[];vehicles:{id:string;active:boolean;status:string;capacity:number}[];absences:{date:string;studentId:string}[];travelTimes?:{fromName:string;toName:string;minutes:number}[];existing?:{date:string;routeId:string|null;tripId:string;started:boolean;driverId:string;vehicleId:string;start:string;end:string;students:string[]}[]};
+export type TrialIssue={code:string;advisory?:boolean;schoolId?:string;studentId?:string;routeId?:string;message:string};
+export type TrialPlan={routeId:string;sourceRouteId?:string;assignmentReason?:string;name:string;driverId:string;vehicleId:string;stops:RouteStop[];students:RouteStudent[];shared:Record<string,string>};
+export type TrialInput={driverRuns?:DriverRun[];routes:FixedRoute[];children:RosterChild[];rules:DismissalRule[];batches:PickupBatch[];terms:{schoolId:string;startsOn:string;endsOn:string}[];exceptions:{schoolId:string;startsOn:string;endsOn:string;pickupTime:string|null;gradeTimes:{grades:string[];time:string}[]}[];drivers:(DriverPreferences & {id:string;active:boolean;status:string;earliestDismissalTime?:string|null})[];vehicles:{id:string;active:boolean;status:string;capacity:number}[];absences:{date:string;studentId:string}[];travelTimes?:{fromName:string;toName:string;minutes:number;originDwellMinutes?:number}[];existing?:{date:string;routeId:string|null;tripId:string;sourceRouteId?:string|null;stops?:RouteStop[];started:boolean;driverId:string;vehicleId:string;start:string;end:string;students:string[]}[]};
 export type TrialDay={date:string;plans:TrialPlan[];issues:TrialIssue[];expected:number;holiday:boolean;checked:boolean};
 export function trialDay(input:TrialInput,date:string):TrialDay {
  const weekday=new Date(date+'T12:00:00Z').getUTCDay()||7;
@@ -22,18 +25,36 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   const time=exception?.gradeTimes.find(g=>g.grades.includes(child.grade))?.time??exception?.pickupTime??normalTime;
   expected.set(child.id,{child,normalTime,time});
  }
- const plans:TrialPlan[]=[];
+ const plans:TrialPlan[]=[],earlyRequests:EarlyRequest[]=[];
  for(const route of input.routes){
   if(!route.enabled||route.startsOn>date||route.endsOn<date||!route.weekdays.includes(weekday))continue;
-  const roster=automaticRoster(route.stops,input.children,input.rules,[weekday],route.excludedStudentIds,route.routeType==='TEMPORARY'?[]:input.batches).filter(a=>expected.has(a.studentId));
+  let roster=automaticRoster(route.stops,input.children,input.rules,[weekday],route.excludedStudentIds,route.routeType==='TEMPORARY'?[]:input.batches).filter(a=>expected.has(a.studentId));
+  const servedByExtra=new Set(input.existing?.filter(t=>t.date===date&&t.started&&t.sourceRouteId===route.id).flatMap(t=>t.students));
+  roster=roster.filter(a=>!servedByExtra.has(a.studentId));
   if(!roster.length)continue;
-  const earliest=input.drivers.find(d=>d.id===route.driverId)?.earliestDismissalTime;
+  if(route.routeType!=='TEMPORARY'){
+   const candidates=roster.filter(a=>expected.get(a.studentId)!.time<expected.get(a.studentId)!.normalTime);
+   const early=candidates.length<roster.length||new Set(candidates.map(a=>expected.get(a.studentId)!.time)).size>1?candidates:[];
+   const grouped=new Map<string,RouteStudent[]>();
+   for(const a of early){const key=`${a.pickupStopId}:${a.dropoffStopId}:${expected.get(a.studentId)!.time}`;grouped.set(key,[...grouped.get(key)??[],a]);}
+   for(const students of grouped.values()){
+    const pickup=route.stops.find(s=>s.id===students[0].pickupStopId)!,dropoff=route.stops.find(s=>s.id===students[0].dropoffStopId)!;
+    const batch=input.batches.find(b=>b.schoolId===pickup.schoolId&&b.weekday===weekday&&b.pickupTime===batchTime(pickup,input.rules,weekday)&&b.shared);
+    earlyRequests.push({sourceRouteId:route.id,preferredDriverId:route.driverId,preferredVehicleId:route.vehicleId,time:expected.get(students[0].studentId)!.time,pickup,dropoff,students,shared:Object.fromEntries(batch?students.map(a=>[a.studentId,batch.id]):[])});
+   }
+   const ids=new Set(early.map(a=>a.studentId));roster=roster.filter(a=>!ids.has(a.studentId));
+   if(!roster.length)continue;
+  }
+  const driver=input.drivers.find(d=>d.id===route.driverId);
+  const serving=roster.filter(a=>!input.absences.some(x=>x.date===date&&x.studentId===a.studentId));
+  if(driver&&!driverAllowsSchools(driver,serving.map(a=>expected.get(a.studentId)!.child.schoolId))){issues.push({code:'DRIVER_SCHOOL',routeId:route.id,message:'线路接送学校不符合司机只接所选学校的设置 / Pickup schools are outside the driver school restriction'});continue;}
+  const earliest=driver?.earliestDismissalTime;
   // Compare each child's actual dismissal, including grade-specific early days.
   // Do not shift an early pickup later just to fit the driver's condition.
-  const tooEarly=earliest&&roster.find(a=>!input.absences.some(x=>x.date===date&&x.studentId===a.studentId)&&expected.get(a.studentId)!.time<earliest);
+  const tooEarly=driver&&serving.find(a=>!driverAllowsTime(driver,expected.get(a.studentId)!.time));
   if(tooEarly){
    const dismissal=expected.get(tooEarly.studentId)!.time;
-   issues.push({code:'DRIVER_TIME',routeId:route.id,message:`当天 ${dismissal} 放学，早于司机可接的 ${earliest}，需另安排司机 / Dismissal at ${dismissal} is before the driver's ${earliest} limit; assign another driver`});
+   issues.push({code:'DRIVER_TIME',routeId:route.id,message:`当天 ${dismissal} 放学，不在司机可接时间 ${earliest??"不限"}–${driver?.latestDismissalTime??"不限"} 内，需另安排司机 / Dismissal ${dismissal} is outside the driver time window`});
    continue;
   }
   const r={...route,students:roster};
@@ -59,6 +80,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
    issues.push({code:'OTHER_TRIP',routeId:p.routeId,message:'部分学生已有其他行程，未重复安排 / Students with another trip are not duplicated'});
   }
  }
+ plans.push(...allocateEarlyTrips(input,date,earlyRequests,plans,issues));
  const active=plans.filter(p=>p.students.length&&!(input.routes.find(r=>r.id===p.routeId)?.routeType==='TEMPORARY'&&issues.some(i=>i.routeId===p.routeId&&i.code==='RESOURCE')));
  for(const [studentId,{child}] of expected){
   if(input.absences.some(a=>a.date===date&&a.studentId===studentId))continue;

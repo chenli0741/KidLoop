@@ -20,9 +20,9 @@ async function mutate(kind: FleetKind, form: FormData, deleting: boolean): Promi
       await changeFleetRecord(client, kind, form, deleting);
       if (kind === "driver" && !deleting) {
         const today = todayInOperationsTimeZone();
+        // A newly preferred backup may not own a trip yet; recheck all generated future dates.
         const dates = await client.query<{ date: string }>(`select distinct t.scheduled_date::text as date from trips t
-          join driver_shifts sh on sh.id=t.shift_id
-          where t.operating_term_id=current_operating_term() and sh.driver_id=$1 and t.scheduled_date >= $2::date`, [String(form.get("id")), today]);
+          where t.operating_term_id=current_operating_term() and t.scheduled_date >= $1::date`, [today]);
         for (const { date } of dates.rows) await materializeRoutes(client, date, today);
       }
     });
@@ -30,6 +30,7 @@ async function mutate(kind: FleetKind, form: FormData, deleting: boolean): Promi
     return { ok: true, message: deleting ? text(locale, "已删除，历史记录已保留。", "Removed. History retained.") : text(locale, "资料已保存。", "Details saved.") };
   } catch (error) {
     const messages: Record<string, [string, string]> = {
+      driverPreferences: ["请检查时间范围、学校偏好和所选学校。", "Check the time range, school preference and selected schools."],
       driverTime: ["请填写有效的最早可接放学时间。", "Enter a valid earliest dismissal time."],
       invalid: ["请检查必填信息和状态。", "Check the required fields and status."],
       missing: ["记录已被删除，请刷新页面。", "This record was removed. Refresh the page."],
