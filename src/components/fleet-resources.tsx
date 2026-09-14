@@ -1,3 +1,4 @@
+import { DriverConditionFields } from "@/components/driver-condition-fields";
 import { requireUser } from "@/lib/auth";
 import { FormPanel } from "@/components/form-panel";
 import { DriverRecordActions, VehicleRecordActions } from "@/components/fleet-record-actions";
@@ -55,7 +56,7 @@ export async function FleetResources() {
               {drivers.map((driver) => (
                 <article className="record-card" key={driver.id}>
                   <div className="record-icon teal"><CircleGauge size={21} /></div>
-                  <div className="record-main"><strong>{driver.name}</strong><span><Phone size={13} /> {driver.phone}</span></div>
+                  <div className="record-main"><strong>{driver.name}</strong><span><Phone size={13} /> {driver.phone}</span><span>{driver.earliestDismissalTime ? text(locale, `仅接 ${driver.earliestDismissalTime} 及以后放学`, `Dismissals at or after ${driver.earliestDismissalTime}`) : text(locale, "放学时间不限", "No dismissal time restriction")}</span></div>
                   <StatusBadge status={driver.status} />
                   <DriverRecordActions driver={driver} locale={locale} />
                 </article>
@@ -67,7 +68,8 @@ export async function FleetResources() {
         <FormPanel heading={<div className="panel-heading"><CircleGauge size={19} /><div><h2>{text(locale, "添加司机", "Add driver")}</h2><p>{text(locale, "基本联系方式", "Basic contact details")}</p></div></div>}>
           <ActionForm action={createDriver} submitLabel={text(locale, "添加司机", "Add driver")}>
             <label><span>{text(locale, "司机姓名", "Driver name")}</span><input name="name" placeholder={text(locale, "姓名", "Full name")} required /></label>
-            <label><span>{text(locale, "电话", "Phone")}</span><input name="phone" type="tel" placeholder="(555) 123-4567" required /></label>
+            <label><span>{text(locale, "电话", "Phone")}</span><input name="phone" type="tel" placeholder="(555) 123-4567" /></label>
+            <DriverConditionFields locale={locale} />
           </ActionForm>
         </FormPanel>
       </div>

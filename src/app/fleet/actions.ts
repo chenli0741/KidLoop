@@ -1,5 +1,7 @@
 "use server";
 
+import { lockRoutes, materializeRoutes } from "@/lib/fixed-routes";
+import { todayInOperationsTimeZone } from "@/lib/date";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { transaction } from "@/lib/db";
@@ -12,11 +14,23 @@ async function mutate(kind: FleetKind, form: FormData, deleting: boolean): Promi
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
   try {
-    await transaction((client) => changeFleetRecord(client, kind, form, deleting));
+    await transaction(async (client) => {
+      // Use the same lock order as schedule generation.
+      await lockRoutes(client);
+      await changeFleetRecord(client, kind, form, deleting);
+      if (kind === "driver" && !deleting) {
+        const today = todayInOperationsTimeZone();
+        const dates = await client.query<{ date: string }>(`select distinct t.scheduled_date::text as date from trips t
+          join driver_shifts sh on sh.id=t.shift_id
+          where t.operating_term_id=current_operating_term() and sh.driver_id=$1 and t.scheduled_date >= $2::date`, [String(form.get("id")), today]);
+        for (const { date } of dates.rows) await materializeRoutes(client, date, today);
+      }
+    });
     for (const path of ["/resources", "/routes", "/schedule", "/schedule/dispatch", "/", "/driver", "/parent"]) revalidatePath(path);
     return { ok: true, message: deleting ? text(locale, "已删除，历史记录已保留。", "Removed. History retained.") : text(locale, "资料已保存。", "Details saved.") };
   } catch (error) {
     const messages: Record<string, [string, string]> = {
+      driverTime: ["请填写有效的最早可接放学时间。", "Enter a valid earliest dismissal time."],
       invalid: ["请检查必填信息和状态。", "Check the required fields and status."],
       missing: ["记录已被删除，请刷新页面。", "This record was removed. Refresh the page."],
       stale: ["资料已发生变化，请刷新后重新编辑。", "Details have changed. Refresh before editing again."],

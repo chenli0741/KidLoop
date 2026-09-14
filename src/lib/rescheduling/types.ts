@@ -25,6 +25,7 @@ export type Resource = {
   active: boolean;
   status: string;
   capacity?: number;
+  earliestDismissalTime?: string | null;
 };
 export type TravelTime = { fromName: string; toName: string; minutes: number; originDwellMinutes?: number };
 export type Task = {

@@ -4,7 +4,7 @@ import { planRoute, overlaps } from './route-plan';
 
 export type TrialIssue={code:string;schoolId?:string;studentId?:string;routeId?:string;message:string};
 export type TrialPlan={routeId:string;name:string;driverId:string;vehicleId:string;stops:RouteStop[];students:RouteStudent[];shared:Record<string,string>};
-export type TrialInput={routes:FixedRoute[];children:RosterChild[];rules:DismissalRule[];batches:PickupBatch[];terms:{schoolId:string;startsOn:string;endsOn:string}[];exceptions:{schoolId:string;startsOn:string;endsOn:string;pickupTime:string|null;gradeTimes:{grades:string[];time:string}[]}[];drivers:{id:string;active:boolean;status:string}[];vehicles:{id:string;active:boolean;status:string;capacity:number}[];absences:{date:string;studentId:string}[];travelTimes?:{fromName:string;toName:string;minutes:number}[];existing?:{date:string;routeId:string|null;tripId:string;started:boolean;driverId:string;vehicleId:string;start:string;end:string;students:string[]}[]};
+export type TrialInput={routes:FixedRoute[];children:RosterChild[];rules:DismissalRule[];batches:PickupBatch[];terms:{schoolId:string;startsOn:string;endsOn:string}[];exceptions:{schoolId:string;startsOn:string;endsOn:string;pickupTime:string|null;gradeTimes:{grades:string[];time:string}[]}[];drivers:{id:string;active:boolean;status:string;earliestDismissalTime?:string|null}[];vehicles:{id:string;active:boolean;status:string;capacity:number}[];absences:{date:string;studentId:string}[];travelTimes?:{fromName:string;toName:string;minutes:number}[];existing?:{date:string;routeId:string|null;tripId:string;started:boolean;driverId:string;vehicleId:string;start:string;end:string;students:string[]}[]};
 export type TrialDay={date:string;plans:TrialPlan[];issues:TrialIssue[];expected:number;holiday:boolean;checked:boolean};
 export function trialDay(input:TrialInput,date:string):TrialDay {
  const weekday=new Date(date+'T12:00:00Z').getUTCDay()||7;
@@ -27,6 +27,15 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   if(!route.enabled||route.startsOn>date||route.endsOn<date||!route.weekdays.includes(weekday))continue;
   const roster=automaticRoster(route.stops,input.children,input.rules,[weekday],route.excludedStudentIds,route.routeType==='TEMPORARY'?[]:input.batches).filter(a=>expected.has(a.studentId));
   if(!roster.length)continue;
+  const earliest=input.drivers.find(d=>d.id===route.driverId)?.earliestDismissalTime;
+  // Compare each child's actual dismissal, including grade-specific early days.
+  // Do not shift an early pickup later just to fit the driver's condition.
+  const tooEarly=earliest&&roster.find(a=>!input.absences.some(x=>x.date===date&&x.studentId===a.studentId)&&expected.get(a.studentId)!.time<earliest);
+  if(tooEarly){
+   const dismissal=expected.get(tooEarly.studentId)!.time;
+   issues.push({code:'DRIVER_TIME',routeId:route.id,message:`当天 ${dismissal} 放学，早于司机可接的 ${earliest}，需另安排司机 / Dismissal at ${dismissal} is before the driver's ${earliest} limit; assign another driver`});
+   continue;
+  }
   const r={...route,students:roster};
   const plan=planRoute(r,roster.map(a=>({student_id:a.studentId,school_id:expected.get(a.studentId)!.child.schoolId,time:expected.get(a.studentId)!.time})),input.travelTimes);
   for(let i=1;i<r.stops.length;i++) if(!input.travelTimes?.some(t=>t.fromName===r.stops[i-1].name&&t.toName===r.stops[i].name)) issues.push({code:'TRAVEL_TIME_MISSING',routeId:r.id,message:`缺少 ${r.stops[i-1].name} → ${r.stops[i].name} 的行驶时间 / Missing travel time`});

@@ -23,6 +23,7 @@ export type Driver = {
   name: string;
   phone: string;
   status: DriverStatus;
+  earliestDismissalTime?: string | null;
   updatedAt: string;
 };
 

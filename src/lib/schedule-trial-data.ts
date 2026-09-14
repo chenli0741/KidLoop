@@ -11,7 +11,7 @@ export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end
   readFixedRoutes(c,undefined,rosterPromise),rosterPromise,
   c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn" from school_terms where operating_term_id=current_operating_term() order by id`),
   c.query(`select school_id as "schoolId",starts_on::text as "startsOn",ends_on::text as "endsOn",to_char(pickup_time,'HH24:MI') as "pickupTime",grade_times as "gradeTimes" from school_calendar_schedules where operating_term_id=current_operating_term() and starts_on<=$2 and ends_on>=$1 order by id`,[start,end]),
-  c.query('select id,active,status from drivers order by id'),c.query('select id,active,status,capacity from vehicles order by id'),
+  c.query(`select id,active,status,to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime" from drivers order by id`),c.query('select id,active,status,capacity from vehicles order by id'),
   c.query(`select service_date::text as date,student_id as "studentId" from student_day_plans where service_date between $1 and $2 and absent order by service_date,student_id`,[start,end]),
   c.query(`select t.scheduled_date::text as date,t.fixed_route_id as "routeId",t.id as "tripId",sh.driver_id as "driverId",sh.vehicle_id as "vehicleId",to_char(sh.start_time,'HH24:MI') as start,to_char(sh.end_time,'HH24:MI') as end,
    (t.status in ('IN_PROGRESS','COMPLETED','NEEDS_ATTENTION') or exists(select 1 from trip_segment_completions f where f.trip_id=t.id) or exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))) as started,

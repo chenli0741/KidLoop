@@ -1,3 +1,4 @@
+import { DriverConditionFields } from "@/components/driver-condition-fields";
 import { RecordActions } from "@/components/record-actions";
 import { deleteDriver, deleteVehicle, updateDriver, updateVehicle } from "@/app/fleet/actions";
 import { text, type Locale } from "@/lib/i18n";
@@ -23,6 +24,7 @@ export function DriverRecordActions({ driver, locale }: { driver: Driver; locale
       deleteDescription={text(locale, "司机将移出名册，关联司机账号停用，历史行程保留。如有未完成行程或有效排班，需要先处理后再删除。", "The driver will leave the roster and their driver account will be disabled. Past trips are retained. Open trips and active schedules must be resolved first.")}>
       <label><span>{text(locale, "司机姓名", "Driver name")}</span><input name="name" defaultValue={driver.name} required maxLength={200} /></label>
       <label><span>{text(locale, "电话", "Phone")}</span><input name="phone" type="tel" defaultValue={driver.phone} maxLength={80} /></label>
+      <DriverConditionFields locale={locale} earliestDismissalTime={driver.earliestDismissalTime} />
       <label><span>{text(locale, "状态", "Status")}</span><select name="status" defaultValue={driver.status}><option value="AVAILABLE">{text(locale, "可用", "Available")}</option><option value="OFF_DUTY">{text(locale, "休息", "Off duty")}</option></select></label>
     </RecordActions>
   );

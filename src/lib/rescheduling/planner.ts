@@ -260,7 +260,8 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
       ) {
         if (
           !snapshot.drivers.some(
-            (d) => d.id === r.driverId && d.active && d.status === "AVAILABLE",
+            (d) => d.id === r.driverId && d.active && d.status === "AVAILABLE" &&
+              (!d.earliestDismissalTime || !before.students.some(s => changedMatches.some(m => m.student_id === s.studentId && minutes(m.time) < minutes(d.earliestDismissalTime!)))),
           ) ||
           !snapshot.vehicles.some(
             (v) =>
@@ -391,7 +392,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
           task.stops.some((s) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time))
         )
           return;
-        const ds = [...drivers].sort(
+        const ds = drivers.filter(d => !d.earliestDismissalTime || !task.students.some(s => matches.some(m => m.student_id === s.studentId && minutes(m.time) < minutes(d.earliestDismissalTime!)))).sort(
           (a, b) =>
             Number(b.id === task.driverId) - Number(a.id === task.driverId) ||
             (intent.preferExistingDrivers

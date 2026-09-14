@@ -24,7 +24,7 @@ export async function getVehicles() {
 export async function getDrivers() {
   await requireUser(["ADMIN"]);
   const result = await query<Driver>(`
-    select id, name, phone, status, updated_at::text as "updatedAt"
+    select id, name, phone, status, to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime", updated_at::text as "updatedAt"
     from drivers
     where active = true
     order by name

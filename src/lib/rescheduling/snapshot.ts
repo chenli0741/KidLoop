@@ -33,7 +33,7 @@ export async function readSnapshot(
   ).rows;
   const drivers = (
     await c.query<Resource>(
-      "select id,name,active,status from drivers order by id",
+      `select id,name,active,status,to_char(earliest_dismissal_time,'HH24:MI') as "earliestDismissalTime" from drivers order by id`,
     )
   ).rows;
   const vehicles = (

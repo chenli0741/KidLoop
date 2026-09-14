@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { parseEarliestDismissalTime } from "./driver-conditions";
 
 export class FleetEditError extends Error {}
 export type FleetKind = "vehicle" | "driver";
@@ -46,6 +47,9 @@ export async function changeFleetRecord(client: PoolClient, kind: FleetKind, for
     if (full.rowCount) throw new FleetEditError("seats");
     await client.query("update vehicles set name=$2,plate=$3,capacity=$4,status=$5,updated_at=clock_timestamp() where id=$1", [id, name, plate, capacity, status]);
   } else {
-    await client.query("update drivers set name=$2,phone=$3,status=$4,updated_at=clock_timestamp() where id=$1", [id, name, field(form, "phone", 80), status]);
+    let earliest: string | null;
+    try { earliest = parseEarliestDismissalTime(form.get("earliestDismissalTime")); }
+    catch { throw new FleetEditError("driverTime"); }
+    await client.query("update drivers set name=$2,phone=$3,status=$4,earliest_dismissal_time=$5,updated_at=clock_timestamp() where id=$1", [id, name, field(form, "phone", 80), status, earliest]);
   }
 }
