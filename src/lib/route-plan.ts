@@ -1,3 +1,4 @@
+import {DEFAULT_TRAVEL_MINUTES} from './travel-defaults';
 import type { PoolClient } from "pg";
 import type { FixedRoute, RouteStop, RouteStudent } from "./fixed-route-types";
 
@@ -72,8 +73,7 @@ export function planRoute(
         ? minutes(stops[i - 1].time) + dwell + configured
         : minutes(stops[i - 1].time) +
           dwell +
-          minutes(r.stops[i].time) -
-          minutes(r.stops[i - 1].time);
+          DEFAULT_TRAVEL_MINUTES;
     stops[i].time = clockTime(
       Math.max(
         arrival,

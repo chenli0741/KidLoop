@@ -36,7 +36,7 @@ export async function readTrialRange(c:Pick<PoolClient,'query'>,dates:string[],d
   const weekday=new Date(date+'T12:00:00Z').getUTCDay()||7;
   const routes=input.routes.filter(r=>r.enabled&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday));
   const dayInput={...input,routes,rules:input.rules.filter(r=>r.weekdays?.includes(weekday)),batches:input.batches.filter(b=>b.weekday===weekday),children:input.children.filter(s=>!s.noPickupWeekdays?.includes(weekday)),drivers:input.drivers,vehicles:input.vehicles,exceptions:input.exceptions.filter(e=>e.startsOn<=date&&e.endsOn>=date),absences:input.absences.filter(a=>a.date===date),existing:input.existing?.filter(t=>t.date===date)};
-  const revision=createHash('sha256').update('school-batches-extra-v2:').update(JSON.stringify(dayInput)).digest('hex');
+  const revision=createHash('sha256').update('school-batches-extra-v3-transfer-warnings:').update(JSON.stringify(dayInput)).digest('hex');
   const prior=cached.find(r=>r.service_date===date&&r.revision===revision);
   if(prior&&!details){summaries.push(prior.payload);continue;}
   const day=trialDay(dayInput,date);if(details)days.push(day);

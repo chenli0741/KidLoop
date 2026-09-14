@@ -59,7 +59,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   }
   const r={...route,students:roster};
   const plan=planRoute(r,roster.map(a=>({student_id:a.studentId,school_id:expected.get(a.studentId)!.child.schoolId,time:expected.get(a.studentId)!.time})),input.travelTimes);
-  for(let i=1;i<r.stops.length;i++) if(!input.travelTimes?.some(t=>t.fromName===r.stops[i-1].name&&t.toName===r.stops[i].name)) issues.push({code:'TRAVEL_TIME_MISSING',routeId:r.id,message:`缺少 ${r.stops[i-1].name} → ${r.stops[i].name} 的行驶时间 / Missing travel time`});
+  for(let i=1;i<r.stops.length;i++) if(!input.travelTimes?.some(t=>t.fromName===r.stops[i-1].name&&t.toName===r.stops[i].name)) issues.push({code:'TRAVEL_TIME_DEFAULT',advisory:true,routeId:r.id,message:`缺少 ${r.stops[i-1].name} → ${r.stops[i].name} 的行驶时间，按默认 10 分钟 / Missing travel time; using default 10 minutes`});
   const shared:Record<string,string>={};
   for(const a of roster){
    const stop=r.stops.find(s=>s.id===a.pickupStopId)!;

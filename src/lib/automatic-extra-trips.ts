@@ -1,3 +1,4 @@
+import {DEFAULT_TRAVEL_MINUTES} from './travel-defaults';
 import {driverAllowsSchools,driverAllowsTime,schoolPreferenceScore} from './driver-preferences';
 import { createHash } from 'node:crypto';
 import { clockTime, minutes } from './route-plan';
@@ -12,23 +13,12 @@ function identity(value: string) {
 }
 function place(s: RouteStop) { return s.schoolId ? `school:${s.schoolId}` : `program:${s.programId}`; }
 
-/** Directed shortest journey using configured travel times; never invent an edge. */
-export function transferMinutes(input: TrialInput, from: RouteStop, to: RouteStop): number | null {
+/** Exact recorded direction wins; otherwise use the user-confirmed ten-minute default. */
+export function transferMinutes(input: TrialInput, from: RouteStop, to: RouteStop): number {
   if(place(from)===place(to)) return 0;
-  const edges=input.travelTimes??[];
-  const distance=new Map<string,number>([[from.name,0]]),visited=new Set<string>();
-  while(true){
-    const next=[...distance].filter(([name])=>!visited.has(name)).sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0]))[0];
-    if(!next)return null;
-    if(next[0]===to.name)return next[1];
-    visited.add(next[0]);
-    for(const edge of edges.filter(e=>e.fromName===next[0])){
-      if(edge.minutes<0)continue;
-      const cost=next[1]+edge.minutes;
-      if(cost<(distance.get(edge.toName)??Infinity))distance.set(edge.toName,cost);
-    }
-  }
+  return input.travelTimes?.find(t=>t.fromName===from.name&&t.toName===to.name)?.minutes ?? DEFAULT_TRAVEL_MINUTES;
 }
+
 function dwell(input: TrialInput, stop: RouteStop) {
   return stop.dwellMinutes || input.travelTimes?.find(t=>t.fromName===stop.name)?.originDwellMinutes || 0;
 }
@@ -111,5 +101,24 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
     message:task.end===null?`${task.g.time} 提前接送缺少学校至目的地行驶时间 / Missing travel time for ${task.g.time} early pickup`:`${task.g.time} 提前接送未找到满足时间、座位和衔接条件的司机车辆，正常行程保留 / No feasible driver and vehicle found for ${task.g.time} early pickup; regular trip retained`,
   });
   if(visits>20000)issues.push({code:'EXTRA_SEARCH_LIMIT',advisory:true,message:'加开接送搜索达到上限，需核对剩余安排 / Extra pickup search reached its limit; review remaining assignments'});
+  // Report defaults actually used by the selected plan, not rejected search branches.
+  for(const plan of best){
+    const defaults=new Set<string>();
+    const note=(from:RouteStop,to:RouteStop)=>{
+      if(place(from)!==place(to)&&!input.travelTimes?.some(t=>t.fromName===from.name&&t.toName===to.name)) defaults.add(`${from.name} → ${to.name}`);
+    };
+    note(plan.stops[0],plan.stops[1]);
+    const others=[...busy,...best.filter(p=>p!==plan).map(p=>({driverId:p.driverId,vehicleId:p.vehicleId,start:p.stops[0].time,end:p.stops.at(-1)!.time,stops:p.stops}))];
+    for(const other of others){
+      if((other.driverId!==plan.driverId&&other.vehicleId!==plan.vehicleId)||!other.stops?.length)continue;
+      if(other.end<=plan.stops[0].time)note(other.stops.at(-1)!,plan.stops[0]);
+      else if(other.start>=plan.stops.at(-1)!.time)note(plan.stops.at(-1)!,other.stops[0]);
+    }
+    for(const leg of defaults){
+      const message=`${leg}：转场/行驶时间未确认，暂按 10 分钟计算，请核对 / Travel time unconfirmed; using 10 minutes, please verify`;
+      issues.push({code:'TRAVEL_TIME_DEFAULT',routeId:plan.routeId,advisory:true,message});
+      plan.assignmentReason+=`；${message}`;
+    }
+  }
   return best;
 }

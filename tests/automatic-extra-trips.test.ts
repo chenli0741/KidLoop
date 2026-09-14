@@ -47,8 +47,8 @@ test('return travel and vehicle conflicts are hard constraints even with high fa
  const extra=trialDay(input,date).plans.find(p=>p.sourceRouteId)!;assert.equal(extra.driverId,'backup');assert.equal(extra.vehicleId,'spare');
  input.vehicles=input.vehicles.slice(0,1);assert.ok(!trialDay(input,date).plans.some(p=>p.sourceRouteId));
 });
-test('missing outbound travel never fabricates an extra run; absent and weekly-off children do not trigger it',()=>{
- const input=extraFixture();input.travelTimes=[];assert.ok(trialDay(input,date).issues.some(i=>i.code==='EXTRA_TRAVEL_MISSING'));
+test('unrecorded journeys use the user-confirmed ten-minute default; absent and weekly-off children do not trigger it',()=>{
+ const input=extraFixture();input.travelTimes=[];assert.equal(trialDay(input,date).plans.find(p=>p.sourceRouteId)?.stops[1].time,'12:55');
  input.absences=[{date,studentId:'k'}];assert.ok(!trialDay(input,date).plans.some(p=>p.sourceRouteId));
  input.absences=[];input.children[0].noPickupWeekdays=[2];assert.ok(!trialDay(input,date).plans.some(p=>p.sourceRouteId));
 });
@@ -92,4 +92,14 @@ test('latest dismissal bound is inclusive and applies to extra and normal trips'
  assert.equal(trialDay(input,date).plans.find(p=>p.sourceRouteId)?.driverId,'backup');
  input.drivers[1].latestDismissalTime='12:44';assert.ok(trialDay(input,date).issues.some(i=>i.code==='EXTRA_UNASSIGNED'));
  input.drivers[0].latestDismissalTime='14:00';assert.ok(trialDay(input,date).issues.some(i=>i.code==='DRIVER_TIME'));
+});
+
+test('unknown repositioning uses ten minutes and reports a non-blocking named warning',()=>{
+ const input=extraFixture();input.travelTimes=input.travelTimes!.filter(t=>t.fromName!=='Program');
+ const day=trialDay(input,date),extra=day.plans.find(p=>p.sourceRouteId)!;
+ assert.equal(extra.driverId,'usual');
+ assert.ok(day.issues.some(i=>i.code==='TRAVEL_TIME_DEFAULT'&&i.advisory&&i.message.includes('Program → A')));
+ assert.match(extra.assignmentReason!,/10 分钟/);
+ input.travelTimes.push({fromName:'Program',toName:'A',minutes:10});
+ assert.ok(!trialDay(input,date).issues.some(i=>i.code==='TRAVEL_TIME_DEFAULT'));
 });

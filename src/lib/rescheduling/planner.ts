@@ -1,3 +1,4 @@
+import {DEFAULT_TRAVEL_MINUTES} from '../travel-defaults';
 import {driverAllowsSchools,driverAllowsTime,schoolPreferenceScore} from '../driver-preferences';
 import { familiarityScore } from '../driver-familiarity';
 import { allocateEarlyTrips, type EarlyRequest } from '../automatic-extra-trips';
@@ -175,9 +176,8 @@ function merge(
       if (previous) {
         const profile = travelTimes.find(t => t.fromName === previous.name && t.toName === stop.name);
         const configured = profile?.minutes;
-        const fallback = edges.get(`${place(previous)}>${place(stop)}`);
         const dwell = previous.dwellMinutes || profile?.originDwellMinutes || 0;
-        duration = (configured ?? fallback) === undefined ? undefined : (configured ?? fallback)! + dwell;
+        duration = (configured ?? DEFAULT_TRAVEL_MINUTES) + dwell;
       }
       if (duration === undefined) continue;
       const releases = students
@@ -210,7 +210,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     candidates: [],
     conflicts: [],
     warnings: [
-      "优先使用已配置的地点间行驶时间；未配置的相邻地点沿用线路模板间隔，均不代表实时路况 / Uses configured point-to-point travel times first; template intervals are used only when missing and do not represent live traffic.",
+      "优先使用已配置的地点间行驶时间；未配置的路段默认 10 分钟，均不代表实时路况 / Uses configured point-to-point travel times first; a 10-minute default is used when missing and do not represent live traffic.",
     ],
     examined: 0,
   };
@@ -328,7 +328,9 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         existing:blockers.map(t=>({...t,date:day.date,students:t.students.map(s=>s.studentId)}))};
       const extraIssues:TrialIssue[]=[];
       const extras=allocateEarlyTrips(extraInput,day.date,earlyRequests,normal.map(p=>({...p,routeId:p.sourceIds[0],shared:{}})),extraIssues);
-      if(extraIssues.length){result.conflicts.push(...extraIssues.map(i=>`${day.date}: ${i.message}`));return result;}
+      result.warnings.push(...extraIssues.filter(i=>i.code==='TRAVEL_TIME_DEFAULT').map(i=>`${day.date}: ${i.message}`));
+      const blockingExtraIssues=extraIssues.filter(i=>i.code!=='TRAVEL_TIME_DEFAULT');
+      if(blockingExtraIssues.length){result.conflicts.push(...blockingExtraIssues.map(i=>`${day.date}: ${i.message}`));return result;}
       base=[...normal,...extras.map(p=>({sourceIds:[p.sourceRouteId!],name:p.name,driverId:p.driverId,vehicleId:p.vehicleId,students:p.students,stops:p.stops,automaticExtra:true,preserveAssignment:true}))];
     }
     if (base.length > 30) {

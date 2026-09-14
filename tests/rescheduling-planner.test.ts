@@ -35,7 +35,7 @@ test("invalid dates, duplicated grade times and unknown resources cannot enter t
   ])
     assert.throws(() => validateIntent(value, snapshot, "2026-09-08"));
 });
-test("cross-school merge uses known directed template intervals and preserves capacity", () => {
+test("cross-school merge uses recorded durations and the ten-minute default and preserves capacity", () => {
   const { snapshot, intent } = fixture();
   snapshot.drivers = snapshot.drivers.slice(0, 1);
   snapshot.vehicles = [{ ...snapshot.vehicles[0], capacity: 2 }];
@@ -65,11 +65,8 @@ test("cross-school merge uses known directed template intervals and preserves ca
   assert.equal(calculatePlan(snapshot, intent).candidates.length, 0);
   snapshot.routes.pop();
   snapshot.vehicles[0].capacity = 2;
-  assert.equal(
-    calculatePlan(snapshot, intent).candidates.length,
-    0,
-    "no invented edge between schools",
-  );
+  assert.ok(calculatePlan(snapshot, intent).candidates.length > 0,
+    "the user-confirmed default permits an unrecorded school-to-school journey");
 });
 
 test("locked unavailable resources report a conflict instead of silently dropping students", () => {

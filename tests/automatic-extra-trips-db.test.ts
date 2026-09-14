@@ -52,6 +52,16 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   assert.equal((await c.query('select count(*)::int n from trip_students where student_id=$1',[children[0]])).rows[0].n,1);
   assert.equal((await c.query("select count(*)::int n from trips where fixed_route_id=$1 and status='PUBLISHED'",[route])).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id where t.fixed_route_id=$1',[route])).rows[0].n,2);
+  const actor=await id("insert into app_users(email,password_hash,role,driver_id) values('driver@example.test','unused','DRIVER',$1)",[driver]);
+  const tripId=extra.id;
+  await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,created_at) values($1,0,'GO',$2,'2026-09-15 12:45:00-07'),($1,1,'ARRIVED',$2,'2026-09-15 13:00:00-07')",[tripId,actor]);
+  assert.equal((await c.query('select count(*)::int n from execution_observations where trip_id=$1',[tripId])).rows[0].n,2);
+  assert.equal(Number((await c.query('select minutes from observed_travel_samples where trip_id=$1',[tripId])).rows[0].minutes),15);
+  await c.query("update drivers set name='Renamed' where id=$1",[driver]);
+  assert.equal((await c.query('select driver_name from execution_observations where trip_id=$1 limit 1',[tripId])).rows[0].driver_name,'Usual','snapshot is not rewritten by profile edits');
+  const admin=await id("insert into app_users(email,name,password_hash,role) values('admin@example.test','Admin','unused','ADMIN')");
+  await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,created_at) values($1,0,'GO',$2,'2026-09-15 14:00:00-07'),($1,1,'ARRIVED',$2,'2026-09-15 14:10:00-07')",[tripId,admin]);
+  assert.equal((await c.query('select count(*)::int n from observed_travel_samples where trip_id=$1',[tripId])).rows[0].n,1,'admin corrections never train travel time');
   await saveDriverPreferences(c as unknown as pg.PoolClient,driver,{schoolPreferenceMode:'ONLY',preferredSchoolIds:[other]});
   await generate();
   assert.equal((await c.query('select status from trips where id=$1',[extra.id])).rows[0].status,'IN_PROGRESS','new restrictions retain started execution');
