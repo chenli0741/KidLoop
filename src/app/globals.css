@@ -621,6 +621,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .workweek-stop { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: baseline; margin: 0; font-size: 13px; line-height: 1.35; }
 .workweek-stop time { color: var(--green); font-variant-numeric: tabular-nums; }
 .workweek-stop strong { min-width: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.workweek-completion { margin-top: 8px; }
+.workweek-actual { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .workweek-vehicle { display: flex; gap: 5px; color: var(--muted); font-size: 11px; line-height: 1.5; margin: 12px 0; }
 .workweek-vehicle svg { flex-shrink: 0; margin-top: 2px; }
 .workweek-vehicle span { overflow-wrap: anywhere; }
