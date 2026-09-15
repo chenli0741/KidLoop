@@ -11,7 +11,7 @@ import type { RiderStatus } from "@/lib/types";
 import { missedPickupReasons, type StudentStatusReason } from "@/lib/missed-pickup";
 import type { TripExecution } from "@/lib/trip-execution";
 
-export function StatusActions({ assignmentId, status, parentAbsent = false, onUpdated, targetTripId, role = "DRIVER" }: { targetTripId?: string; assignmentId: string; status: RiderStatus; parentAbsent?: boolean; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
+export function StatusActions({ assignmentId, status, parentAbsent = false, atDropoff = false, onUpdated, targetTripId, role = "DRIVER" }: { atDropoff?: boolean; targetTripId?: string; assignmentId: string; status: RiderStatus; parentAbsent?: boolean; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -33,7 +33,9 @@ export function StatusActions({ assignmentId, status, parentAbsent = false, onUp
         onUpdated(result);
       } catch {
         router.refresh();
-        setError(text(locale, "未能登记，名单已刷新。孩子可能已被另一车接走，或本车座位已满。", "Could not save. Refreshing: rider may be on another vehicle or seats are full."));
+        setError(atDropoff
+          ? text(locale, "未能保存送达状态，名单已刷新。请确认仍在当前送达站，行程尚未结束。", "Could not save drop-off status. List refreshed; check that you are still at this stop and the trip is active.")
+          : text(locale, "未能登记，名单已刷新。孩子可能已被另一车接走，或本车座位已满。", "Could not save. Refreshing: rider may be on another vehicle or seats are full."));
       }
     });
   }
@@ -45,12 +47,13 @@ export function StatusActions({ assignmentId, status, parentAbsent = false, onUp
   return (
     <div className="status-actions">
       <div className="status-button-row">
+        {atDropoff && status === "PICKED_UP" ? <button type="button" className="button compact primary" disabled={pending} onClick={() => update("DROPPED_OFF")}><Check size={16}/>{text(locale,"送达","Drop off")}</button> : null}
         {role === "DRIVER" && status === "SCHEDULED" ? (
           <button type="button" className="button compact primary" disabled={pending} onClick={() => update("PICKED_UP")}>
             <UserCheck size={16} /> {text(locale, "已接到", "Picked up")}
           </button>
         ) : null}
-        {role === "DRIVER" && status === "PICKED_UP" ? (
+        {role === "DRIVER" && status === "PICKED_UP" && !atDropoff ? (
           <button type="button" className="icon-button" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} aria-label={text(locale, "撤销接到", "Undo pickup")} disabled={pending} onClick={() => update("SCHEDULED")}>
             <RotateCcw size={17} />
           </button>

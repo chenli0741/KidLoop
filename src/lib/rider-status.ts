@@ -33,16 +33,19 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   );
   const rider = current.rows[0];
   if(!rider || rider.trip_id!==tripId)throw new Error('Assignment changed. Refresh before updating.');
-  if (user.role === "DRIVER" && nextStatus !== "DROPPED_OFF") {
-    const currentStop = trip.rows[0].route_stops?.[trip.rows[0].current_stop_index];
-    if (trip.rows[0].progress_state !== "AT_STOP" || !currentStop || currentStop.id !== rider.pickup_stop_id) throw new Error("Handle the current stop first.");
-  }
   const undo = rider.status === "DROPPED_OFF" && nextStatus === "PICKED_UP";
+  const deliveryChange = nextStatus === "DROPPED_OFF" || undo;
+  const currentStop = trip.rows[0].route_stops?.[trip.rows[0].current_stop_index];
+  if(deliveryChange){
+    if(trip.rows[0].progress_state!=="AT_STOP" || !currentStop?.programId || currentStop.id!==rider.dropoff_stop_id) throw new Error("Arrive at this student's destination first.");
+  } else if(user.role === "DRIVER") {
+    if(trip.rows[0].progress_state!=="AT_STOP" || !currentStop || currentStop.id!==rider.pickup_stop_id) throw new Error("Handle the current stop first.");
+  }
   if (["DRAFT", "CANCELED", "COMPLETED"].includes(trip.rows[0].status)) throw new Error("Trip is not active.");
   if ((await client.query("select 1 from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id])).rowCount) throw new Error("Segment already completed.");
   const allowed: Record<RiderStatus, RiderStatus[]> = {
     SCHEDULED: ["PICKED_UP", "ABSENT", "EXCEPTION"],
-    PICKED_UP: ["SCHEDULED", "ABSENT"],
+    PICKED_UP: ["SCHEDULED", "ABSENT", "DROPPED_OFF"],
     DROPPED_OFF: ["PICKED_UP"], ABSENT: [], EXCEPTION: ["PICKED_UP", "ABSENT"],
   };
   if (rider.parent_absence || !allowed[rider.status].includes(nextStatus)) throw new Error("This status change is not allowed.");
@@ -63,14 +66,18 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
     update trip_students set status = $2,
       parent_absence = case when $2 = 'ABSENT' and $4 = 'ADMIN' then true else parent_absence end,
       picked_up_at = case when $2 = 'SCHEDULED' then null when $2 = 'PICKED_UP' and not $3 then now() else picked_up_at end,
-      dropped_off_at = case when $3 or $2 = 'SCHEDULED' then null else dropped_off_at end,
+      dropped_off_at = case when $3 or $2 = 'SCHEDULED' then null when $2 = 'DROPPED_OFF' then clock_timestamp() else dropped_off_at end,
       updated_at = now() where id = $1
   `, [assignmentId, nextStatus, undo, user.role]);
   if (undo) {
     await client.query("delete from trip_segment_completions where trip_id = $1 and pickup_stop_id = $2 and dropoff_stop_id = $3", [tripId, rider.pickup_stop_id, rider.dropoff_stop_id]);
   }
   await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, reason_id, note, operation_location) values ($1, $2, $3, $4, $5, $6, $7::jsonb)", [assignmentId, rider.status, nextStatus, user.id, reasonId, nextStatus === "EXCEPTION" ? "Driver recorded a special reason" : nextStatus === "ABSENT" ? "Admin recorded an absence" : "", JSON.stringify(normalizeOperationLocation(location))]);
-  await recomputeTrip(client, tripId);
+  if(deliveryChange){
+    // Delivery is not Finish: retain the explicit final-stop completion action.
+    await client.query("update trips set status='IN_PROGRESS',updated_at=clock_timestamp() where id=$1",[tripId]);
+    if(nextStatus==='DROPPED_OFF')await client.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,operation_location) values($1,$2,'DROP_OFF',$3,$4::jsonb)",[tripId,trip.rows[0].current_stop_index,user.id,JSON.stringify(normalizeOperationLocation(location))]);
+  } else await recomputeTrip(client, tripId);
   if(oldTripId && oldTripId!==tripId) await recomputeTrip(client,oldTripId);
   await client.query(`update trips set updated_at=clock_timestamp() where id in (select trip_id from shared_pickup_members where assignment_id=$1)`,[assignmentId]);
   return tripId;

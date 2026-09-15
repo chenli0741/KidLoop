@@ -1,17 +1,24 @@
 import {query} from '@/lib/db';
 import {text,type Locale} from '@/lib/i18n';
 export async function ExecutionHistory({locale}:{locale:Locale}){
- const [summary,events]=await Promise.all([
+ const [summary,events,completed]=await Promise.all([
  query<{from_name:string;to_name:string;n:number;median:string;p90:string;recent:string|null;previous:string|null}>(`select from_id,to_id,max(from_name) from_name,max(to_name) to_name,count(*)::int n,
  round((percentile_cont(0.5) within group(order by minutes))::numeric,1)::text median,
  round((percentile_cont(0.9) within group(order by minutes))::numeric,1)::text p90,
  round((percentile_cont(0.5) within group(order by minutes) filter(where service_date>=current_date-30))::numeric,1)::text recent,
  round((percentile_cont(0.5) within group(order by minutes) filter(where service_date<current_date-30))::numeric,1)::text previous
- from observed_travel_samples where service_date>=current_date-90 group by from_id,to_id order by n desc limit 50`),
+ from completed_trip_legs where service_date>=current_date-90 group by from_id,to_id order by n desc limit 50`),
  query<{driver_name:string;vehicle_name:string;route_name:string;name:string;event_type:string;time:string;is_test:boolean;snapshot_backfilled:boolean}>(`select driver_name,vehicle_name,route_name,stop_snapshot->>'name' as name,event_type,to_char(occurred_at at time zone 'America/Los_Angeles','YYYY-MM-DD HH24:MI:SS') time,is_test,snapshot_backfilled from execution_observations order by occurred_at desc limit 100`)
+,
+ query<{trip_id:string;route_name:string;driver_name:string;date:string;finished:string|null;elapsed:string|null;rider_count:number;dropped_off_count:number;quality_flags:string[];actual_stops:{name:string;plannedTime:string;arrivedAt:string|null;departedAt:string|null;finishedAt:string|null;dropOffAt:string|null;dwellMinutes:number|null}[]}>(`select trip_id,route_name,driver_name,service_date::text as date,to_char(actual_finished_at at time zone 'America/Los_Angeles','HH24:MI:SS') finished,round(total_elapsed_minutes,1)::text elapsed,rider_count,dropped_off_count,quality_flags,actual_stops from completed_trip_summaries order by service_date desc,extracted_at desc limit 50`)
  ]);
+ const actualTime=(value:string|null)=>value?new Intl.DateTimeFormat(locale==='zh'?'zh-CN':'en-US',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value)):'—';
  return <section className="content-section"><h2>{text(locale,'实际运行记录','Actual operations')}</h2>
  <p>{text(locale,'记录司机点击出发、到达、送达的实际操作时间。不是 GPS 自动测量；漏点或补点会影响用时。首站到达、跨车次空驶尚无完整打点时不推算。','Records departure, arrival and drop-off button timestamps, not automatic GPS measurements. Missing or late taps affect accuracy; incomplete first-stop and between-trip timing is not inferred.')}</p>
+ <h3>{text(locale,'已结束行程核心汇总','Completed trip summaries')}</h3>
+ <p>{text(locale,'结束行程时自动提取并独立保存；缺少的实际时间保持未知，不用计划时间补齐。','Automatically extracted and stored at completion. Missing actual times remain unknown; planned times are never substituted.')}</p>
+ <div className="table-wrap"><table><thead><tr><th>{text(locale,'日期 / 行程','Date / trip')}</th><th>{text(locale,'司机','Driver')}</th><th>{text(locale,'结束 / 总分钟','Finish / elapsed min')}</th><th>{text(locale,'送达 / 名单人数','Dropped off / roster')}</th><th>{text(locale,'记录完整性','Completeness')}</th></tr></thead><tbody>{completed.rows.map(r=><tr key={r.trip_id}><td><details><summary>{r.date} · {r.route_name}</summary>{r.actual_stops.map((s,i)=><p key={i}>{s.name}<br/>{text(locale,'计划','Planned')} {s.plannedTime??'—'} · {text(locale,'到达','Arrived')} {actualTime(s.arrivedAt)} · {text(locale,'出发','Departed')} {actualTime(s.departedAt)} · {text(locale,'送达','Drop off')} {actualTime(s.dropOffAt)} · {text(locale,'结束','Finished')} {actualTime(s.finishedAt)}</p>)}</details></td><td>{r.driver_name}</td><td>{r.finished??'—'} / {r.elapsed??'—'}</td><td>{r.dropped_off_count} / {r.rider_count}</td><td>{r.quality_flags.length?text(locale,'有缺失或需核对记录','Missing or review required'):text(locale,'完整','Complete')}</td></tr>)}</tbody></table></div>
+ {!completed.rows.length&&<p>{text(locale,'暂无已结束行程汇总。','No completed trip summaries yet.')}</p>}
  <h3>{text(locale,'近 90 天路段用时参考','Last 90 days: measured journey times')}</h3>
  <p>{text(locale,'仅配对司机同车次相邻站的出发与到达；排除测试账号、管理员操作、跨日及小于 1 分钟或超过 6 小时的样本。少于 5 次仅供观察，不自动覆盖配置。','Pairs driver departure and arrival at adjacent stops in one trip. Excludes test accounts, admin actions, cross-day and durations outside 1–360 minutes. Fewer than 5 samples is preliminary; settings are not automatically overwritten.')}</p>
  <div className="table-wrap"><table><thead><tr>{[text(locale,'路段','Journey'),text(locale,'样本数','Samples'),text(locale,'中位数 / P90（分钟）','Median / P90 (min)'),text(locale,'近30天 / 前60天','Recent 30 / prior 60 days')].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{summary.rows.map((r,i)=><tr key={i}><td>{r.from_name} → {r.to_name}</td><td>{r.n}{r.n<5?text(locale,'（样本少）',' (limited)'):''}</td><td>{r.median} / {r.p90}</td><td>{r.recent??'—'} / {r.previous??'—'}</td></tr>)}</tbody></table></div>
