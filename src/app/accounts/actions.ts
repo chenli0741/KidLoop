@@ -3,26 +3,9 @@ import { AccountEditError, saveAccount } from "@/lib/account-management";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { transaction } from "@/lib/db";
-import { identityTransaction } from "@/lib/identity-db";
-import { bindAccount } from "@/lib/tenant-service";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
-
-export async function createAccount(_: FormState, form: FormData): Promise<FormState> {
-  const admin = await requireUser(["ADMIN"], true), locale = await getLocale();
-  try {
-    await identityTransaction(c => bindAccount(c,admin.id,{
-      email:String(form.get("email") ?? ""),role:String(form.get("role") ?? ""),
-      driverId:String(form.get("driverId") ?? "") || null,studentIds:form.getAll("studentIds").map(String),
-      requestId:String(form.get("requestId") ?? "") || undefined,
-    }));
-    revalidatePath("/admin/accounts"); revalidatePath("/organizations");
-    return {ok:true,message:text(locale,"账号已绑定到本机构。","Account bound to this institution.")};
-  } catch {
-    return {ok:false,message:text(locale,"绑定失败。请确认用户已注册、尚未绑定本机构，并选择本机构的司机或孩子。","Could not bind. Check that the account is registered, not already bound, and its driver or children belong to this institution.")};
-  }
-}
 
 export async function setAccountActive(form: FormData) {
   const admin = await requireUser(["ADMIN"], true);

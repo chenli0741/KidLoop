@@ -51,6 +51,8 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
     jar.delete(LOGIN_EMAIL_COOKIE);
   }
   await query("delete from login_limits where key_hash = $1", [tokenHash(email)]);
+  const invitation=String(form.get("invitation")??"");
+  if(/^[a-f0-9]{64}$/.test(invitation)){revalidatePath("/","layout");redirect(`/invite/${invitation}`);}
   const memberships = await query<{tenant_id:string}>("select u.tenant_id from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 and u.active and t.active",[user.id]);
   if (memberships.rows.length === 1) {
     const role = await identityTransaction(c => selectTenant(c,tokenHash(token),memberships.rows[0].tenant_id));
@@ -61,11 +63,12 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   redirect("/organizations");
 }
 
-export async function logout() {
+export async function logout(form?:FormData) {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(token)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(token)]); });
   jar.delete(SESSION_COOKIE);
   revalidatePath("/","layout");
-  redirect("/login");
+  const invitation=String(form?.get("invitation")??"");
+  redirect(/^[a-f0-9]{64}$/.test(invitation)?`/login?invitation=${invitation}`:"/login");
 }

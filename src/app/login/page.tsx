@@ -9,11 +9,12 @@ import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import { LoginForm } from "@/components/login-form";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ passwordChanged?: string; registered?: string }> }) {
-  const { passwordChanged, registered } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ passwordChanged?: string; registered?: string; invitation?:string }> }) {
+  const { passwordChanged, registered, invitation } = await searchParams;
   const [user, locale] = await Promise.all([getUser(), getLocale()]);
-  if (user) redirect(homeFor(user.role));
-  if (await getIdentity()) redirect("/organizations");
+  const invitationPath=invitation&&/^[a-f0-9]{64}$/.test(invitation)?`/invite/${invitation}`:null;
+  if (user) redirect(invitationPath??homeFor(user.role));
+  if (await getIdentity()) redirect(invitationPath??"/organizations");
   const rememberedEmail = readLoginEmail((await cookies()).get(LOGIN_EMAIL_COOKIE)?.value);
   return <main className="login-page"><section className="login-card">
     <div className="login-brand"><span className="brand-mark"><BusFront size={25} /></span><strong>Kid Loop Rides</strong></div>
@@ -22,8 +23,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <p>{text(locale, "登录后查看属于你的接送安排。", "Sign in to see your transportation plans.")}</p>
     {passwordChanged === "1" && <p className="form-message success" role="status">{text(locale, "密码已更新，请使用新密码登录。", "Password updated. Sign in with your new password.")}</p>}
     {registered === "1" && <p role="status">{text(locale,"注册成功，请登录继续。","Registered. Sign in to continue.")}</p>}
-    <LoginForm rememberedEmail={rememberedEmail} />
-    <p className="login-help"><ShieldCheck size={16} />{text(locale, "管理员 · 司机 · 家长", "Admin · Driver · Parent")}</p>
-    <p><Link href="/register">{text(locale,"注册账号","Register")}</Link></p><div className="institution-entry"><Link href="/register?intent=create">{text(locale,"创建机构","Create institution")}</Link><Link href="/register?intent=join">{text(locale,"加入机构","Join institution")}</Link></div><p>{text(locale,"创建或加入机构前，请先注册或登录。","Register or sign in before creating or joining an institution.")}</p>
+    <LoginForm rememberedEmail={rememberedEmail} invitation={invitationPath?invitation:""} />
+    <p className="login-help"><ShieldCheck size={16} />{text(locale, "公司工作人员 · 司机 · 家长", "Company staff · Driver · Parent")}</p>
+    <p><Link href="/register">{text(locale,"注册并开通服务公司","Register your company")}</Link></p><p>{text(locale,"加入已有公司的工作人员、司机和家长，请通过邀请邮件激活账号。","Staff, drivers and parents joining an existing company activate their accounts through an invitation email.")}</p>
   </section></main>;
 }

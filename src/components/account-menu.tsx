@@ -17,7 +17,7 @@ export function AccountMenu({ user }: { user: AuthUser }) {
   const titleId = useId();
   const locale = useLocale();
   const close = () => dialog.current?.close();
-  const role = { ADMIN: text(locale, "管理员", "Admin"), DRIVER: text(locale, "司机", "Driver"), PARENT: text(locale, "家长", "Parent") }[user.role];
+  const role = { ADMIN: text(locale, "公司工作人员", "Company staff"), DRIVER: text(locale, "司机", "Driver"), PARENT: text(locale, "家长", "Parent") }[user.role];
   return <>
     <button className="account-trigger" type="button" aria-label={text(locale, "账号菜单", "Account menu")} aria-haspopup="dialog" aria-expanded={open} onClick={() => { dialog.current?.showModal(); setOpen(true); }}><>{user.photoUrl && failedPhoto !== user.photoUrl ? <Image className="account-avatar" src={user.photoUrl} alt="" width={40} height={40} unoptimized onError={() => setFailedPhoto(user.photoUrl ?? null)} /> : <CircleUserRound size={24} />}</><span>{user.name}</span></button>
     <dialog ref={dialog} className="account-menu" aria-labelledby={titleId} onClose={() => setOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
