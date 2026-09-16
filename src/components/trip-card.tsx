@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {PickupCamera} from './pickup-camera';
 import {StudentPhotoPreview} from './student-photo-preview';
-import { BusFront, Clock3, UsersRound } from "lucide-react";
+import { BusFront, ChevronDown, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
 import { formatTime } from "@/lib/date";
 import type { Trip } from "@/lib/types";
@@ -77,13 +77,14 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
 
 function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showStops=true,cameraEnabled=false,showParentContact=true,role,selectedStopIndex,onSelectStop}:{trip:Trip;journeyTrip?:Trip;locale:Locale;interactive:boolean;onUpdated:(update:TripExecution)=>void;showStops?:boolean;cameraEnabled?:boolean;showParentContact?:boolean;role:"ADMIN"|"DRIVER";selectedStopIndex?:number;onSelectStop?:(index:number)=>void}) {
   const currentIndex = trip.currentStopIndex ?? 0;
+  const inTransit = trip.progressState === "IN_TRANSIT" && trip.status !== "COMPLETED" && currentIndex < (trip.routeStops?.length ?? 0) - 1;
   const currentStop = trip.routeStops?.[selectedStopIndex ?? currentIndex];
   const visibleRiders = (currentStop ? trip.riders.filter(rider => currentStop.schoolId ? rider.pickupStopId === currentStop.id : rider.dropoffStopId === currentStop.id) : trip.riders)
     .filter(rider => role !== "DRIVER" || (!rider.parentAbsent && rider.status !== "ABSENT"));
   const countedRiders = visibleRiders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   return <>
 
-      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li className={`${i < currentIndex ? "is-passed " : i === currentIndex ? "is-current " : "is-upcoming "}${i === (selectedStopIndex ?? currentIndex) ? "is-selected" : ""}`} aria-current={i === currentIndex ? "step" : undefined} key={stop.id}><div className="fixed-stop-select"><button type="button" className="fixed-stop-main" disabled={!onSelectStop} onClick={() => onSelectStop?.(i)}><span className="fixed-stop-marker"><span className="fixed-stop-number">{i+1}</span>{i === currentIndex && <BusFront className="fixed-stop-current-icon" size={15} aria-label={text(locale, "当前行程位置", "Current trip position")} />}</span><span className="fixed-stop-copy"><span className="fixed-stop-title"><small>{stop.time}</small><strong>{stop.name}</strong>{i === currentIndex && <em className="fixed-stop-current">{text(locale, "当前", "Current")}</em>}</span><span className="fixed-stop-address">{stop.address}</span></span></button><LocationMap compact name={stop.name} address={stop.address}/></div></li>)}</ol> : <div className="route-strip">
+      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li className={`${i < currentIndex ? "is-passed " : i === currentIndex ? (inTransit ? "is-in-transit " : "is-current ") : "is-upcoming "}${i === (selectedStopIndex ?? currentIndex) ? "is-selected" : ""}`} aria-current={i === currentIndex && !inTransit ? "step" : undefined} key={stop.id}><div className="fixed-stop-select"><button type="button" className="fixed-stop-main" disabled={!onSelectStop} onClick={() => onSelectStop?.(i)}><span className="fixed-stop-marker"><span className="fixed-stop-number">{i+1}</span>{i === currentIndex && <BusFront className={`fixed-stop-current-icon${inTransit ? " is-travelling" : ""}`} size={15} aria-label={text(locale, "当前行程位置", "Current trip position")} />}</span><span className="fixed-stop-copy"><span className="fixed-stop-title"><small>{stop.time}</small><strong>{stop.name}</strong>{i === currentIndex && <em className="fixed-stop-current">{inTransit ? text(locale, "行驶中", "En route") : text(locale, "当前", "Current")}</em>}</span><span className="fixed-stop-address">{stop.address}</span></span></button><LocationMap compact name={stop.name} address={stop.address}/></div>{i === currentIndex && inTransit && <span className="fixed-stop-transit-track" role="img" aria-label={text(locale, `正在从 ${stop.name} 前往 ${trip.routeStops?.[i+1]?.name}`, `Travelling from ${stop.name} to ${trip.routeStops?.[i+1]?.name}`)}>{[0,1,2].map(n=><ChevronDown key={n} className="fixed-stop-transit-arrow" size={14} aria-hidden="true"/>)}</span>}</li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
           <span className="route-dot pickup" />
           <div>
