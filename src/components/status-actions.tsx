@@ -1,8 +1,9 @@
 "use client";
 
+import {withOperationTimeout} from "@/lib/operation-timeout";
 import {captureOperationLocation} from "@/lib/capture-operation-location";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState } from "react";
 import { AlertTriangle, Check, RotateCcw, UserCheck, UserX } from "lucide-react";
 import { listStudentStatusReasons, updateRiderStatus } from "@/app/actions";
 import { useLocale } from "@/components/locale-provider";
@@ -14,30 +15,32 @@ import type { TripExecution } from "@/lib/trip-execution";
 export function StatusActions({ assignmentId, status, parentAbsent = false, atDropoff = false, onUpdated, targetTripId, role = "DRIVER" }: { atDropoff?: boolean; targetTripId?: string; assignmentId: string; status: RiderStatus; parentAbsent?: boolean; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
   const locale = useLocale();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const saving = useRef(false);
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [reason, setReason] = useState<string>(missedPickupReasons[0].id);
   const [reasons, setReasons] = useState<StudentStatusReason[]>([...missedPickupReasons]);
   const reasonStatus: RiderStatus = role === "ADMIN" ? "ABSENT" : "EXCEPTION";
-  useEffect(() => { void listStudentStatusReasons().then(setReasons).catch(() => undefined); }, []);
+  function openReasonDialog(){
+    setError("");setReason(reasons[0]?.id ?? "OTHER");dialog.current?.showModal();
+    void listStudentStatusReasons().then(setReasons).catch(()=>undefined);
+  }
 
-  function update(next: RiderStatus) {
-    setError("");
-    startTransition(async () => {
+  async function update(next: RiderStatus) {
+    if(saving.current)return;
+    saving.current=true;setPending(true);setError("");
       try {
         const location = await captureOperationLocation();
-        const result = await updateRiderStatus(assignmentId, next, next === "EXCEPTION" || next === "ABSENT" ? { reason } : undefined, targetTripId, location);
+        const result = await withOperationTimeout(updateRiderStatus(assignmentId, next, next === "EXCEPTION" || next === "ABSENT" ? { reason } : undefined, targetTripId, location));
         dialog.current?.close();
         onUpdated(result);
       } catch {
         router.refresh();
-        setError(atDropoff
-          ? text(locale, "未能保存送达状态，名单已刷新。请确认仍在当前送达站，行程尚未结束。", "Could not save drop-off status. List refreshed; check that you are still at this stop and the trip is active.")
-          : text(locale, "未能登记，名单已刷新。孩子可能已被另一车接走，或本车座位已满。", "Could not save. Refreshing: rider may be on another vehicle or seats are full."));
-      }
-    });
+        window.dispatchEvent(new Event('kidloop:execution-refresh'));
+        setError(text(locale,"尚未确认操作结果，正在核对状态。请先核对名单；若仍未更新，请点刷新页面，不必关闭 App。","Result not confirmed. Checking status; verify the roster before retrying. Reload this page if it does not update."));
+      } finally {saving.current=false;setPending(false);}
   }
 
   if (status === "ABSENT" || status === "EXCEPTION" || (role === "DRIVER" && parentAbsent)) {
@@ -64,17 +67,18 @@ export function StatusActions({ assignmentId, status, parentAbsent = false, atDr
           </button>
         ) : null}
         {role === "ADMIN" && (status === "SCHEDULED" || status === "PICKED_UP") ? (
-          <button type="button" className="icon-button" title={text(locale, "标记缺席", "Mark absent")} aria-label={text(locale, "标记缺席", "Mark absent")} disabled={pending} onClick={() => { setError(""); setReason(reasons[0]?.id ?? "OTHER"); dialog.current?.showModal(); }}>
+          <button type="button" className="icon-button" title={text(locale, "标记缺席", "Mark absent")} aria-label={text(locale, "标记缺席", "Mark absent")} disabled={pending} onClick={openReasonDialog}>
             <UserX size={17} />
           </button>
         ) : null}
         {role === "DRIVER" && status === "SCHEDULED" ? (
-          <button type="button" className="icon-button danger" title={text(locale, "特殊原因", "Special reason")} aria-label={text(locale, "特殊原因", "Special reason")} disabled={pending} onClick={() => { setError(""); setReason(reasons[0]?.id ?? "OTHER"); dialog.current?.showModal(); }}>
+          <button type="button" className="icon-button danger" title={text(locale, "特殊原因", "Special reason")} aria-label={text(locale, "特殊原因", "Special reason")} disabled={pending} onClick={openReasonDialog}>
             <AlertTriangle size={17} />
           </button>
         ) : null}
       </div>
-      {error ? <span className="inline-error">{error}</span> : null}
+      {pending && <span role="status">{text(locale,"正在保存…","Saving…")}</span>}
+      {error ? <span className="inline-error" role="alert">{error} <button type="button" className="button compact secondary" onClick={()=>window.location.reload()}>{text(locale,"刷新页面","Reload page")}</button></span> : null}
       <dialog ref={dialog} className="record-dialog" aria-labelledby={`${id}-title`} onCancel={event => { if (pending) event.preventDefault(); }}>
         <h2 id={`${id}-title`}>{text(locale, role === "ADMIN" ? "缺席原因" : "特殊原因", role === "ADMIN" ? "Absence reason" : "Special reason")}</h2>
         <label htmlFor={`${id}-reason`}>{text(locale, "原因", "Reason")}</label>

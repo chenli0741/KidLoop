@@ -15,3 +15,12 @@ test('execution response updates the whole trip without losing roster details or
  const undone=applyTripExecution(done,{...update,version:'2026-09-08T00:00:00.000004'});
  assert.deepEqual(undone.completedSegments,[]);assert.equal(undone.riders[0].status,'PICKED_UP');
 });
+
+test('server reconciliation recovers a lost last-pickup response and rejects older snapshots',()=>{
+ const trip={id:'trip',executionVersion:'2026-09-16T00:00:00.000001',status:'IN_PROGRESS',currentStopIndex:2,progressState:'AT_STOP',riders:[{id:'last',status:'SCHEDULED',pickupStopId:'school'}]} as unknown as Trip;
+ const confirmed:TripExecution={tripId:'trip',version:'2026-09-16T00:00:01.000001',status:'IN_PROGRESS',currentStopIndex:2,progressState:'AT_STOP',completedSegments:[],riders:[{id:'last',status:'PICKED_UP'}]};
+ const recovered=applyTripExecution(trip,confirmed);
+ assert.equal(recovered.riders.filter(r=>r.pickupStopId==='school'&&r.status==='SCHEDULED').length,0);
+ assert.equal(recovered.currentStopIndex,2);
+ assert.equal(applyTripExecution(recovered,{...confirmed,version:trip.executionVersion!,riders:[{id:'last',status:'SCHEDULED'}]}),recovered);
+});

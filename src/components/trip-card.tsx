@@ -39,6 +39,33 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
     const timer=setInterval(()=>{void refresh().catch(()=>{});},2000);
     return ()=>{stopped=true;clearInterval(timer);};
   },[source.id,source.hasSharedPickups]);
+  const [executionSyncFailed,setExecutionSyncFailed]=useState(false);
+  const executionActive=interactive && ['PUBLISHED','IN_PROGRESS'].includes(trip.status);
+  useEffect(()=>{
+    if(!executionActive)return;
+    let stopped=false,busy=false;
+    let controller:AbortController|undefined;
+    async function refresh(){
+      if(busy||document.visibilityState!=="visible")return;
+      busy=true;controller=new AbortController();
+      const timeout=setTimeout(()=>controller?.abort(),10000);
+      try{
+        const response=await fetch(`/api/trip-execution?trip=${source.id}`,{cache:"no-store",signal:controller.signal});
+        if(!response.ok)throw new Error('Execution sync failed');
+        const update:TripExecution=await response.json();
+        if(!stopped){setExecutionSyncFailed(false);setState(previous=>({...previous,trip:applyTripExecution(previous.trip,update)}));}
+      }catch{if(!stopped)setExecutionSyncFailed(true);}
+      finally{clearTimeout(timeout);busy=false;}
+    }
+    const requestRefresh=()=>{void refresh();};
+    const timer=setInterval(requestRefresh,5000);
+    window.addEventListener('online',requestRefresh);
+    window.addEventListener('focus',requestRefresh);
+    window.addEventListener('kidloop:execution-refresh',requestRefresh);
+    document.addEventListener('visibilitychange',requestRefresh);
+    requestRefresh();
+    return ()=>{stopped=true;controller?.abort();clearInterval(timer);window.removeEventListener('online',requestRefresh);window.removeEventListener('focus',requestRefresh);window.removeEventListener('kidloop:execution-refresh',requestRefresh);document.removeEventListener('visibilitychange',requestRefresh);};
+  },[source.id,executionActive]);
   function onUpdated(update: TripExecution) {
     refreshEpoch.current++;
     setSelectedStopIndex(update.currentStopIndex ?? null);
@@ -49,7 +76,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
 
   return (
     <article className="trip-card">
-      {syncFailed&&<p role="alert">{text(locale,"名单同步中断，正在重试。请联网后核对再操作。","Manifest sync interrupted. Retrying; reconnect and verify before updating.")}</p>}
+      {(syncFailed||executionSyncFailed)&&<p role="alert">{text(locale,"名单同步中断，正在重试。请联网后核对再操作。","Manifest sync interrupted. Retrying; reconnect and verify before updating.")}</p>}
       <header className="trip-header">
         <div>
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
