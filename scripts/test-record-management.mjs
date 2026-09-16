@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -6,7 +7,7 @@ import { changeFleetRecord } from "../src/lib/fleet-management.ts";
 
 const url = new URL(process.env.DATABASE_URL);
 if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
-const pool = new pg.Pool({ connectionString: url.toString() });
+const pool = new pg.Pool({ options: tenantOptions(), connectionString: url.toString() });
 const c = await pool.connect();
 let passed = 0;
 const form = (values) => { const f = new FormData(); for (const [key, value] of Object.entries(values)) f.set(key, value ?? ""); return f; };

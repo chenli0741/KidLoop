@@ -1,7 +1,7 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import 'server-only';
-import type {PoolClient} from 'pg';
 import {readTrialRange} from './schedule-trial-data';
-export async function readDriverScheduleOverview(c:Pick<PoolClient,'query'>,driverId:string,dates:string[],today:string){
+export async function readDriverScheduleOverview(c:SqlReader,driverId:string,dates:string[],today:string){
  const future=dates.filter(d=>d>=today),past=dates.filter(d=>d<today);
  const result=new Map<string,boolean>(dates.map(d=>[d,false]));
  if(future.length){const {summaries}=await readTrialRange(c,future);for(const s of summaries)result.set(s.date,s.driverIds.includes(driverId));}

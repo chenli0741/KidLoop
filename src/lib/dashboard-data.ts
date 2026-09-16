@@ -1,8 +1,8 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import "server-only";
-import type { PoolClient } from "pg";
 
 // An explicit alias is required: PostgreSQL names an OR expression ?column?.
-export async function hasDashboardTasks(c: Pick<PoolClient, "query">, date: string) {
+export async function hasDashboardTasks(c: SqlReader, date: string) {
   const result = await c.query<{ exists: boolean }>(`select exists(
     select 1 from trips t
     where t.operating_term_id=current_operating_term()

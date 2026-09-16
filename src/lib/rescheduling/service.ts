@@ -1,3 +1,4 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -10,7 +11,7 @@ import type { DraftView, Intent, PlanResult, PlannedRoute } from "./types";
 import { retireTemporarySources } from "./temporary-replacement";
 
 export async function getDraft(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
   id: string,
   userId: string,
 ): Promise<DraftView> {

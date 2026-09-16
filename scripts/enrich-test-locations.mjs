@@ -1,10 +1,11 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import fs from "node:fs/promises";
 import pg from "pg";
 
 const data = JSON.parse(await fs.readFile(new URL("../docs/test-location-sources.json", import.meta.url), "utf8"));
 const url = new URL(process.env.DATABASE_URL);
 if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
-const pool = new pg.Pool({ connectionString: url.toString() });
+const pool = new pg.Pool({ options: tenantOptions(), connectionString: url.toString() });
 const client = await pool.connect();
 try {
   await client.query("begin");

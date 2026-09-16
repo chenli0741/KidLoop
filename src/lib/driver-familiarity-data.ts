@@ -1,8 +1,8 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import 'server-only';
-import type { PoolClient } from 'pg';
 import type { DriverRun } from './driver-familiarity';
 
-export async function readDriverRuns(c: Pick<PoolClient, 'query'>, start: string, end: string): Promise<DriverRun[]> {
+export async function readDriverRuns(c: SqlReader, start: string, end: string): Promise<DriverRun[]> {
   return (await c.query<DriverRun>(`select sh.driver_id as "driverId", coalesce(t.source_route_id,t.fixed_route_id) as "routeId",t.scheduled_date::text as date,
     array(select distinct stop->>'schoolId' from jsonb_array_elements(coalesce(t.route_stops,'[]'::jsonb)) stop where stop->>'schoolId' is not null) as "schoolIds"
     from trips t join driver_shifts sh on sh.id=t.shift_id

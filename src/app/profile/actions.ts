@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
-import { query, transaction } from "@/lib/db";
+import { transaction } from "@/lib/db";
+import { identityQuery, identityTransaction } from "@/lib/identity-db";
+import { verifyPassword } from "@/lib/password";
 import { tokenHash } from "@/lib/password";
 import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS } from "@/lib/login-preferences";
 import { saveOwnProfile, changeOwnPassword, saveOwnChild, saveOwnFamilyDetails } from "@/lib/profile-management";
@@ -27,7 +29,7 @@ function failure(error: unknown, locale: Locale): FormState {
   return { ok: false, message: message ? text(locale, ...message) : text(locale, "保存失败，请检查资料及邮箱是否已被使用。", "Could not save. Check the details and whether the email is already in use.") };
 }
 async function passwordAttempt(id: string) {
-  const result = await query<{ attempts: number }>(`insert into login_limits(key_hash) values($1)
+  const result = await identityQuery<{ attempts: number }>(`insert into login_limits(key_hash) values($1)
     on conflict(key_hash) do update set
       attempts=case when login_limits.window_start<now()-interval '15 minutes' then 1 else login_limits.attempts+1 end,
       window_start=case when login_limits.window_start<now()-interval '15 minutes' then now() else login_limits.window_start end
@@ -36,10 +38,25 @@ async function passwordAttempt(id: string) {
 }
 
 export async function updateProfile(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser(); const locale = await getLocale();
+  const user = await requireUser(undefined, true); const locale = await getLocale();
   try {
     if (String(form.get("email") ?? "").trim().toLowerCase() !== user.email) await passwordAttempt(user.id);
-    const saved = await transaction((client) => saveOwnProfile(client, user.id, form));
+    const email=String(form.get('email')??'').trim().toLowerCase();
+    const saved=await identityTransaction(async c=>{
+      const a=(await c.query('select email,password_hash from login_accounts where id=$1 and active for update',[user.accountId])).rows[0];
+      if(!a)throw new Error('forbidden');
+      const changed=email!==a.email;
+      if(changed){
+        if(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('invalid');
+        if(!await verifyPassword(String(form.get('currentPassword')??''),a.password_hash))throw new Error('password');
+        await c.query('update login_accounts set email=$2 where id=$1',[user.accountId,email]);
+        await c.query('update app_users set email=$2 where account_id=$1',[user.accountId,email]);
+      }
+      await c.query('set local role kidloop_runtime');
+      await c.query("select set_config('kidloop.tenant_id',$1,true)",[user.tenantId]);
+      const profile=await saveOwnProfile(c,user.id,form);
+      return {...profile,emailChanged:changed};
+    });
     const jar = await cookies();
     if (saved.emailChanged && jar.has(LOGIN_EMAIL_COOKIE)) jar.set(LOGIN_EMAIL_COOKIE, encodeURIComponent(saved.email), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: LOGIN_EMAIL_SECONDS });
     revalidatePath("/", "layout");
@@ -48,10 +65,10 @@ export async function updateProfile(_: FormState, form: FormData): Promise<FormS
 }
 
 export async function updatePassword(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser(); const locale = await getLocale();
+  const user = await requireUser(undefined, true); const locale = await getLocale();
   try {
     await passwordAttempt(user.id);
-    await transaction((client) => changeOwnPassword(client, user.id, form));
+    await identityTransaction(c=>changeOwnPassword(c,user.accountId!,form));
   } catch (error) { return failure(error, locale); }
   (await cookies()).delete(SESSION_COOKIE);
   revalidatePath("/", "layout");
@@ -59,7 +76,7 @@ export async function updatePassword(_: FormState, form: FormData): Promise<Form
 }
 
 export async function updateChild(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser(["PARENT"]); const locale = await getLocale();
+  const user = await requireUser(["PARENT"], true); const locale = await getLocale();
   try {
     await transaction(async client => {
       const term=await requireTerm(client,String(form.get('operatingTermId')));
@@ -72,7 +89,7 @@ export async function updateChild(_: FormState, form: FormData): Promise<FormSta
 }
 
 export async function updateFamilyDetails(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser(["PARENT"]); const locale = await getLocale();
+  const user = await requireUser(["PARENT"], true); const locale = await getLocale();
   try {
     await transaction(client => saveOwnFamilyDetails(client, user, form));
     for (const path of ["/parent", "/parent/children", "/students", "/driver", "/routes", "/schedule", "/schedule/dispatch", "/"]) revalidatePath(path);

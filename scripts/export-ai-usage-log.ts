@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { db } from "../src/lib/db";
+import { db } from "./tenant-db";
 import { todayInOperationsTimeZone } from "../src/lib/date";
 
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
       where created_at >= ($1::date::timestamp at time zone 'America/Los_Angeles')
         and created_at < (($1::date+1)::timestamp at time zone 'America/Los_Angeles')
       order by created_at,id`, [date]);
-    const folder = resolve(".local-data/ai-usage-logs");
+    const folder = resolve(".local-data/ai-usage-logs",process.env.KIDLOOP_TENANT_ID!);
     await mkdir(folder, { recursive: true, mode: 0o700 });
     const output = resolve(folder, `${date}.jsonl`);
     await writeFile(output, rows.map(row => JSON.stringify(row)).join("\n") + (rows.length ? "\n" : ""), { mode: 0o600 });

@@ -1,7 +1,7 @@
 import "server-only";
+import {hashPassword,verifyPassword} from "./password";
 import type { PoolClient } from "pg";
 import { photoPath } from "@/lib/student-photos";
-import { hashPassword, verifyPassword } from "@/lib/password";
 import { editableNote, mergeEditableNote, saveStudent } from "@/lib/student-management";
 import type { AuthUser } from "@/lib/types";
 
@@ -21,8 +21,8 @@ export async function saveOwnProfile(client: PoolClient, userId: string, form: F
   if (!current) throw new ProfileError("forbidden");
   if (!current.fresh) throw new ProfileError("stale");
   const emailChanged = email !== current.email;
-  if (emailChanged && !await verifyPassword(String(form.get("currentPassword") ?? ""), current.password_hash)) throw new ProfileError("password");
-  await client.query("update app_users set name=$2,email=$3,phone=$4,updated_at=clock_timestamp() where id=$1", [userId, current.role === "DRIVER" ? null : name, email, current.role === "DRIVER" ? null : phone]);
+  if (emailChanged) throw new ProfileError("emailImmutable");
+  await client.query("update app_users set name=$2,phone=$3,updated_at=clock_timestamp() where id=$1", [userId, current.role === "DRIVER" ? null : name, current.role === "DRIVER" ? null : phone]);
   if (current.role === "DRIVER" && current.driver_id) {
     await client.query("update drivers set name=$2,phone=$3,updated_at=clock_timestamp() where id=$1", [current.driver_id, name, phone]);
   }
@@ -39,13 +39,16 @@ export async function saveOwnProfile(client: PoolClient, userId: string, form: F
   return { email, emailChanged };
 }
 
-export async function changeOwnPassword(client: PoolClient, userId: string, form: FormData) {
-  const password = form.get("newPassword"), confirm = form.get("confirmPassword");
-  if (typeof password !== "string" || password.length < 12 || password.length > 128 || password !== confirm) throw new ProfileError("newPassword");
-  const result = await client.query<{ password_hash: string }>("select password_hash from app_users where id=$1 and active for update", [userId]);
-  if (!result.rowCount || !await verifyPassword(String(form.get("currentPassword") ?? ""), result.rows[0].password_hash)) throw new ProfileError("password");
-  await client.query("update app_users set password_hash=$2,updated_at=clock_timestamp() where id=$1", [userId, await hashPassword(password)]);
-  await client.query("delete from user_sessions where user_id=$1", [userId]);
+
+/** Identity transaction only: password changes apply to the account across all institutions. */
+export async function changeOwnPassword(client:PoolClient,accountId:string,form:FormData) {
+  const password=String(form.get('newPassword')??'');
+  if(password.length<6||password.length>128||password!==form.get('confirmPassword'))throw new ProfileError('newPassword');
+  const a=(await client.query('select password_hash from login_accounts where id=$1 and active for update',[accountId])).rows[0];
+  if(!a||!await verifyPassword(String(form.get('currentPassword')??''),a.password_hash))throw new ProfileError('password');
+  await client.query('update login_accounts set password_hash=$2 where id=$1',[accountId,await hashPassword(password)]);
+  await client.query('delete from user_sessions where user_id in(select id from app_users where account_id=$1)',[accountId]);
+  await client.query('delete from account_sessions where account_id=$1',[accountId]);
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

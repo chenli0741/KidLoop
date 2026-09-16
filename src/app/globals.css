@@ -755,3 +755,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .schedule-today-section { background:#f7fbf8; }
 .schedule-today-section .pickup-record { background:#fff; }
 @media(max-width:680px) { .schedule-action-groups { align-items:stretch; flex-direction:column; }.schedule-action-group { justify-content:space-between; }.schedule-review-link { margin-left:0; } }
+
+/* Institution onboarding and a single selected workspace. */
+.institution-card { max-width: 760px; width: 100%; }
+.institution-list { display: grid; gap: 16px; margin: 24px 0; }
+.institution-entry { display: flex; flex-wrap: wrap; gap: 20px; }
+.institution-code { display: block; overflow-wrap: anywhere; padding: 12px; background: #f1f5f2; border-radius: 8px; user-select: all; }
+.institution-page .account-card, .institution-card .account-card { margin: 20px 0; }
+.brand-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }

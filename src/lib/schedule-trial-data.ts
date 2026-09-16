@@ -1,12 +1,12 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import { readDriverRuns } from './driver-familiarity-data';
 import 'server-only';
 import {createHash} from 'node:crypto';
-import type {PoolClient} from 'pg';
 import {readFixedRoutes} from './fixed-routes';
 import {readRosterData} from './roster-data';
 import {trialDay,type TrialInput,type TrialDay} from './schedule-trial';
 
-export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end:string):Promise<TrialInput>{
+export async function readTrialInput(c:SqlReader,start:string,end:string):Promise<TrialInput>{
  const rosterPromise=readRosterData(c);
  const [routes,roster,terms,exceptions,drivers,vehicles,absences,existing,travelTimes,driverRuns,shifts]=await Promise.all([
   readFixedRoutes(c,undefined,rosterPromise),rosterPromise,
@@ -26,7 +26,7 @@ export async function readTrialInput(c:Pick<PoolClient,'query'>,start:string,end
  return {routes,...roster,driverRuns,terms:terms.rows,exceptions:exceptions.rows,drivers:drivers.rows,vehicles:vehicles.rows,absences:absences.rows,travelTimes:travelTimes.rows,existing:[...existing.rows,...shifts.rows]};
 }
 export type TrialSummary={date:string;hasTrips:boolean;issueCount:number;holiday:boolean;checked:boolean;driverIds:string[]};
-export async function readTrialRange(c:Pick<PoolClient,'query'>,dates:string[],details=false,sharedInput?:Promise<TrialInput>):Promise<{summaries:TrialSummary[];days:TrialDay[]}> {
+export async function readTrialRange(c:SqlReader,dates:string[],details=false,sharedInput?:Promise<TrialInput>):Promise<{summaries:TrialSummary[];days:TrialDay[]}> {
  if(!dates.length)return {summaries:[],days:[]};
  if(dates.length>62||dates.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw new Error('Invalid preview range');
  const sorted=[...dates].sort(),input=await (sharedInput ?? readTrialInput(c,sorted[0],sorted.at(-1)!));

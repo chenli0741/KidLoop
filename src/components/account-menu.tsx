@@ -22,8 +22,9 @@ export function AccountMenu({ user }: { user: AuthUser }) {
     <button className="account-trigger" type="button" aria-label={text(locale, "账号菜单", "Account menu")} aria-haspopup="dialog" aria-expanded={open} onClick={() => { dialog.current?.showModal(); setOpen(true); }}><>{user.photoUrl && failedPhoto !== user.photoUrl ? <Image className="account-avatar" src={user.photoUrl} alt="" width={40} height={40} unoptimized onError={() => setFailedPhoto(user.photoUrl ?? null)} /> : <CircleUserRound size={24} />}</><span>{user.name}</span></button>
     <dialog ref={dialog} className="account-menu" aria-labelledby={titleId} onClose={() => setOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
       <div className="account-menu-content">
-        <header><div><span className="eyebrow">{role}</span><h2 id={titleId}>{user.name}</h2><p>{user.email}</p></div><button type="button" className="icon-button" aria-label={text(locale, "关闭账号菜单", "Close account menu")} onClick={close}><X size={19} /></button></header>
+        <header><div><span className="eyebrow">{role}</span><h2 id={titleId}>{user.name}</h2><p>{user.email}</p><p>{user.tenantName}</p></div><button type="button" className="icon-button" aria-label={text(locale, "关闭账号菜单", "Close account menu")} onClick={close}><X size={19} /></button></header>
         <nav aria-label={text(locale, "个人账号", "Personal account")}>
+          <Link href="/organizations" onClick={close}>{text(locale,"我的机构 / 创建或加入","My institutions / Create or join")}</Link>
           <Link href="/profile" onClick={close}><Pencil size={19} />{text(locale, "个人资料", "Personal information")}</Link>
           <Link href="/profile#password" onClick={close}><KeyRound size={19} />{text(locale, "修改密码", "Change password")}</Link>
         </nav>

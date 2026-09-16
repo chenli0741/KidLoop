@@ -1,5 +1,5 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import {DEFAULT_TRAVEL_MINUTES} from './travel-defaults';
-import type { PoolClient } from "pg";
 import type { FixedRoute, RouteStop, RouteStudent } from "./fixed-route-types";
 
 export type PickupMatch = {
@@ -8,7 +8,7 @@ export type PickupMatch = {
   time: string;
 };
 export async function readPickupMatches(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
   ids: string[],
   date: string,
 ): Promise<PickupMatch[]> {

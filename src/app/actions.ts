@@ -22,7 +22,7 @@ import { isTestAccount } from '@/lib/test-account';
 import { pickupMapUrl } from "@/lib/map-url";
 
 export async function listStudentStatusReasons() {
-  const user = await requireUser(["ADMIN", "DRIVER", "PARENT"]);
+  const user = await requireUser(["ADMIN", "DRIVER", "PARENT"], true);
   const result = await query<{ id: string; name_zh: string; name_en: string }>(
     "select id,name_zh,name_en from student_status_reasons where active and $1 = any(roles) order by id",
     [user.role],
@@ -39,7 +39,7 @@ export async function createTravelTime(_: FormState, formData: FormData): Promis
     if (from === to || !Number.isInteger(buffer) || buffer < 0 || buffer > 120) throw new Error("Invalid travel time.");
     const dwell = Number(optional(formData, "dwellMinutes") || 0);
     if (!Number.isInteger(dwell) || dwell < 0 || dwell > 120) throw new Error("Invalid dwell time.");
-    await query(`insert into travel_time_profiles(from_name,to_name,estimated_minutes,buffer_minutes,origin_dwell_minutes,notes) values($1,$2,$3,$4,$5,$6) on conflict(from_name,to_name) do update set estimated_minutes=excluded.estimated_minutes,buffer_minutes=excluded.buffer_minutes,origin_dwell_minutes=excluded.origin_dwell_minutes,notes=excluded.notes,active=true,updated_at=now()`, [from, to, minutes, buffer, dwell, optional(formData, "notes")]);
+    await query(`insert into travel_time_profiles(from_name,to_name,estimated_minutes,buffer_minutes,origin_dwell_minutes,notes) values($1,$2,$3,$4,$5,$6) on conflict(tenant_id,from_name,to_name) do update set estimated_minutes=excluded.estimated_minutes,buffer_minutes=excluded.buffer_minutes,origin_dwell_minutes=excluded.origin_dwell_minutes,notes=excluded.notes,active=true,updated_at=now()`, [from, to, minutes, buffer, dwell, optional(formData, "notes")]);
   }, ["/resources"], { zh: "地点间时间已保存。", en: "Travel time saved." });
 }
 
@@ -129,7 +129,7 @@ export async function deleteRouteCombinationGroup(_: FormState, formData: FormDa
 }
 
 export async function setLocale(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireUser(undefined, true);
   if (isTestAccount(user)) return;
   const locale = formData.get("locale");
   if (typeof locale !== "string" || !isLocale(locale)) return;
@@ -191,7 +191,7 @@ function messageFor(error: unknown, locale: Locale) {
 }
 
 async function runMutation(work: () => Promise<void>, paths: string[], success: { zh: string; en: string }): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   const locale = await getLocale();
   try {
     await work();
@@ -271,7 +271,7 @@ export async function createProgram(_: FormState, formData: FormData): Promise<F
 
 export async function createStudent(_: FormState, formData: FormData): Promise<FormState> {
   const success = { zh: "学生已添加。", en: "Student added." };
-  const user = await requireUser(["ADMIN"]);
+  const user = await requireUser(["ADMIN"], true);
   const photo = optional(formData, "photoUrl");
   if (!photoPath.test(photo)) return {ok:false,message:"请选择并上传学生照片。 / Please upload a student photo."};
   return runMutation(async () => {
@@ -318,7 +318,7 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
 }
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
-  const user = await requireUser(["ADMIN", "DRIVER"]);
+  const user = await requireUser(["ADMIN", "DRIVER"], true);
   return transaction(async (client) => {
     const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details, targetTripId, location);
     return readTripExecution(client, tripId);

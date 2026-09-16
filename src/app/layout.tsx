@@ -1,3 +1,4 @@
+import { WorkspaceBoundary } from "@/components/workspace-boundary";
 import { getUser } from "@/lib/auth";
 import type { Metadata, Viewport } from "next";
 import { AppNavigation } from "@/components/app-navigation";
@@ -29,6 +30,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body>
         <LocaleProvider locale={locale}>
           {user ? <div className="app-shell">
+            <WorkspaceBoundary contextKey={user.contextKey!} />
             <AppNavigation user={user} />
             <main className="app-main">{children}</main>
           </div> : children}

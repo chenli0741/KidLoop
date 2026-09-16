@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { put, del } from "@vercel/blob";
-import { getUser } from "@/lib/auth";
+import { getUser, assertWorkspaceRequest } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { normalizePhoto } from "@/lib/student-photos";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const user = await getUser();
+  if(user) { try { await assertWorkspaceRequest(user,true); } catch { return Response.json({error:"登录机构已改变，请刷新 / Workspace changed. Reload."},{status:409}); } }
   const purpose = new URL(request.url).searchParams.get("purpose") === "avatar" ? "avatar" : "student";
   if (!user || (purpose === "student" && !["ADMIN","PARENT"].includes(user.role))) return Response.json({error:"unauthorized"},{status:403});
   const requestUrl = new URL(request.url);
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   if(count.rows[0].n>=100) return Response.json({error:"limit"},{status:429});
   const id=randomUUID();let url:string|undefined;
   try {
-    const blob=await put(`${purpose === "avatar" ? "avatars" : "students"}/${id}.jpg`,bytes,{access:"private",contentType:"image/jpeg",addRandomSuffix:false});url=blob.url;
+    const blob=await put(`${user.tenantId}/${purpose === "avatar" ? "avatars" : "students"}/${id}.jpg`,bytes,{access:"private",contentType:"image/jpeg",addRandomSuffix:false});url=blob.url;
     await query("insert into student_photos(id,uploaded_by,blob_url,purpose) values($1,$2,$3,$4)",[id,user.id,url,purpose]);
     return Response.json({url:`/api/photos/${id}`},{headers:{"Cache-Control":"no-store"}});
   }catch{if(url)await del(url).catch(()=>{});return Response.json({error:"upload"},{status:503});}

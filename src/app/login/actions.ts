@@ -2,14 +2,16 @@
 
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { query } from "@/lib/db";
+import { identityQuery as query, identityTransaction } from "@/lib/identity-db";
+import { selectTenant } from "@/lib/tenant-service";
 import { hashPassword, tokenHash, verifyPassword } from "@/lib/password";
 import { homeFor, SESSION_COOKIE } from "@/lib/auth";
 import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
-import type { FormState, UserRole } from "@/lib/types";
+import type { FormState } from "@/lib/types";
 
 // Unknown accounts perform the same password work as known accounts.
 const dummyHash = hashPassword(randomBytes(32).toString("hex"));
@@ -28,8 +30,8 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
     returning attempts
   `, [tokenHash(email)]);
   if (limit.rows[0].attempts > 10) return fail;
-  const result = await query<{ id: string; role: UserRole; password_hash: string; active: boolean }>(
-    "select id, role, password_hash, active from app_users where email = $1", [email],
+  const result = await query<{ id: string; password_hash: string; active: boolean }>(
+    "select id, password_hash, active from login_accounts where email = $1", [email],
   );
   const user = result.rows[0];
   const valid = await verifyPassword(password, user?.password_hash ?? await dummyHash);
@@ -37,10 +39,10 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const remember = form.get("remember") === "on";
   const sessionSeconds = remember ? REMEMBERED_SESSION_SECONDS : TEMPORARY_SESSION_SECONDS;
   const token = randomBytes(32).toString("hex");
-  await query("insert into user_sessions (token_hash, user_id, expires_at) values ($1, $2, now() + $3 * interval '1 second')", [tokenHash(token), user.id, sessionSeconds]);
+  await query("insert into account_sessions (token_hash, account_id, expires_at) values ($1, $2, now() + $3 * interval '1 second')", [tokenHash(token), user.id, sessionSeconds]);
   const jar = await cookies();
   const old = jar.get(SESSION_COOKIE)?.value;
-  if (old) await query("delete from user_sessions where token_hash = $1", [tokenHash(old)]);
+  if (old) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(old)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(old)]); });
   const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
   jar.set(SESSION_COOKIE, token, { ...cookieOptions, ...(remember ? { maxAge: sessionSeconds } : {}) });
   if (remember) {
@@ -49,13 +51,21 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
     jar.delete(LOGIN_EMAIL_COOKIE);
   }
   await query("delete from login_limits where key_hash = $1", [tokenHash(email)]);
-  redirect(homeFor(user.role));
+  const memberships = await query<{tenant_id:string}>("select u.tenant_id from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 and u.active and t.active",[user.id]);
+  if (memberships.rows.length === 1) {
+    const role = await identityTransaction(c => selectTenant(c,tokenHash(token),memberships.rows[0].tenant_id));
+    revalidatePath("/","layout");
+    redirect(homeFor(role));
+  }
+  revalidatePath("/","layout");
+  redirect("/organizations");
 }
 
 export async function logout() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await query("delete from user_sessions where token_hash = $1", [tokenHash(token)]);
+  if (token) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(token)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(token)]); });
   jar.delete(SESSION_COOKIE);
+  revalidatePath("/","layout");
   redirect("/login");
 }

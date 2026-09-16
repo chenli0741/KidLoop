@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import { createHash } from "node:crypto";
 import pg from "pg";
 
@@ -20,7 +21,7 @@ function idFor(key) {
 }
 const url = new URL(process.env.DATABASE_URL);
 if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
-const pool = new pg.Pool({ connectionString: url.toString() });
+const pool = new pg.Pool({ options: tenantOptions(), connectionString: url.toString() });
 const client = await pool.connect();
 let createdTrips = 0;
 let createdAssignments = 0;

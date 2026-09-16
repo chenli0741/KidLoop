@@ -1,5 +1,5 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import "server-only";
-import type { PoolClient } from "pg";
 import type { Intent } from "./types";
 
 const strings = { type: "array", items: { type: "string" } };
@@ -42,7 +42,7 @@ const intentSchema = {
   },
 };
 export async function recordUsage(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
   requestId: string,
   kind: "TEXT" | "AUDIO",
   model: string,
@@ -105,7 +105,7 @@ export async function recordUsage(
   );
 }
 export async function parseRequest(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
   id: string,
   messages: string[],
   today: string,
@@ -180,7 +180,7 @@ export async function parseRequest(
   }
 }
 export async function transcribe(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
   id: string,
   file: File,
 ) {

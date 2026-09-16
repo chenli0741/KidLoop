@@ -18,7 +18,8 @@
     "reschedule:simulate": "node --conditions=react-server --import tsx scripts/simulate-rescheduling.ts",
     "ai:usage-log": "node --env-file=.env.local --conditions=react-server --import tsx scripts/export-ai-usage-log.ts",
     "postinstall": "node scripts/copy-pickup-runtime.mjs",
-    "ios:check": "node scripts/check-ios-capabilities.mjs"
+    "ios:check": "node scripts/check-ios-capabilities.mjs",
+    "test:tenancy": "node --conditions=react-server --import tsx --test tests/tenancy.test.ts tests/workspace-request.test.ts tests/automatic-extra-trips-db.test.ts"
   },
   "dependencies": {
     "@capacitor/browser": "^8.0.4",

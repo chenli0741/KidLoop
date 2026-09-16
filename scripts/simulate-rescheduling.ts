@@ -33,7 +33,7 @@ async function main() {
   else if (values.snapshot) snapshot = JSON.parse(await readFile(resolve(values.snapshot), "utf8"));
   else {
     // Dynamic imports keep offline simulation independent of any database configuration.
-    const { db } = await import("../src/lib/db");
+    const { db } = await import("./tenant-db");
     try {
       const { readSnapshot } = await import("../src/lib/rescheduling/snapshot");
       const c = await db.connect();

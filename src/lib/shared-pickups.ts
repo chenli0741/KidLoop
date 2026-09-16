@@ -1,3 +1,4 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import 'server-only';
 import type { PoolClient } from 'pg';
 import type { AuthUser, Trip, Rider } from './types';
@@ -5,7 +6,7 @@ import { overCapacity } from './route-plan';
 import { displayedStudentPhoto, recognitionStudentPhoto } from './photo-display';
 
 // Caller supplies authorized trips. The canonical assignment is never duplicated.
-export async function addSharedRiders(c: Pick<PoolClient,'query'>, trips: Trip[], user: AuthUser) {
+export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUser) {
   if (!trips.length) return trips;
   const rows = (await c.query(`select m.trip_id, m.pickup_stop_id,m.dropoff_stop_id,ts.id,ts.trip_id as owner_id,ts.status,
     s.id as student_id,s.name,s.photo_url,(select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=s.id and ca.source_photo_url=coalesce(s.photo_url,'')) as cartoon_url,s.grade,s.age,s.classroom_name,

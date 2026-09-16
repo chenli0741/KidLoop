@@ -11,7 +11,7 @@ export default async function AdjustmentPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const mode = params.mode === "rules" ? "rules" : "schedule";
   const rows = (
-    await db.query(`select
+    await db.query<{schools:Record<string,string>;students:Record<string,string>;drivers:Record<string,string>;vehicles:Record<string,string>;routes:Record<string,string>}>(`select
     (select coalesce(jsonb_object_agg(id,name),'{}') from schools) as schools,
     (select coalesce(jsonb_object_agg(id,name),'{}') from drivers) as drivers,
     (select coalesce(jsonb_object_agg(id,name),'{}') from vehicles) as vehicles,

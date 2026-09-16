@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 /** User-confirmed school roster. Dry run by default; never guesses school locations or times. */
 import pg from 'pg';
 import { initializeSchools, openTerm } from '../src/lib/operating-terms';
@@ -16,7 +17,7 @@ const roster = [
 async function main() {
 const url = new URL(process.env.DATABASE_URL!);
 if (url.searchParams.get('sslmode') === 'require') url.searchParams.set('sslmode','verify-full');
-const c = new pg.Client({connectionString:url.toString()});
+const c = new pg.Client({options:tenantOptions(),connectionString:url.toString()});
 await c.connect();
 try {
   await c.query('begin');

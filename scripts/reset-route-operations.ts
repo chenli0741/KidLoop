@@ -1,6 +1,6 @@
 /** One-time, user-authorized reset of execution data; default mode rolls back. */
 import {createHash} from 'node:crypto';
-import {db} from '../src/lib/db';
+import {db} from './tenant-db';
 import {lockRoutes,materializeRoutes} from '../src/lib/fixed-routes';
 import {todayInOperationsTimeZone} from '../src/lib/date';
 import {readTrialRange} from '../src/lib/schedule-trial-data';

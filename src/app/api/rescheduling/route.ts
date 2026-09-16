@@ -1,4 +1,4 @@
-import { getUser } from "@/lib/auth";
+import { getUser, assertWorkspaceRequest } from "@/lib/auth";
 import { db, transaction } from "@/lib/db";
 import { todayInOperationsTimeZone } from "@/lib/date";
 import { openTerm } from "@/lib/operating-terms";
@@ -30,6 +30,7 @@ async function bodyBytes(request: Request, limit: number) {
 }
 export async function GET(request: Request) {
   const user = await getUser();
+  if(user) { try { await assertWorkspaceRequest(user); } catch { return Response.json({error:"登录机构已改变，请刷新 / Workspace changed. Reload."},{status:409}); } }
   if (user?.role !== "ADMIN")
     return json({ error: "无权访问 / Forbidden" }, 403);
   const id = new URL(request.url).searchParams.get("id");
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   const user = await getUser();
+  if(user) { try { await assertWorkspaceRequest(user,true); } catch { return Response.json({error:"登录机构已改变，请刷新 / Workspace changed. Reload."},{status:409}); } }
   if (user?.role !== "ADMIN")
     return json({ error: "无权访问 / Forbidden" }, 403);
   if (request.headers.get("origin") !== new URL(request.url).origin)

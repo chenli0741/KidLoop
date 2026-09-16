@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import pg from "pg";
@@ -41,7 +42,7 @@ const holidays = [
 const apply = process.argv.includes("--apply");
 const url = new URL(process.env.DATABASE_URL);
 if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
-const pool = new pg.Pool({ connectionString: url.toString() });
+const pool = new pg.Pool({ options: tenantOptions(), connectionString: url.toString() });
 const client = await pool.connect();
 function idFor(key) {
   const h = createHash("sha256").update(`kidloop-calendar-defaults-20260907:${key}`).digest("hex");

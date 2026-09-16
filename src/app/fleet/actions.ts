@@ -11,7 +11,7 @@ import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
 async function mutate(kind: FleetKind, form: FormData, deleting: boolean): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   const locale = await getLocale();
   try {
     await transaction(async (client) => {

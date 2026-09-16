@@ -1,9 +1,9 @@
-import { getUser } from '@/lib/auth';
+import { getUser, assertWorkspaceRequest } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { addSharedRiders } from '@/lib/shared-pickups';
 import type { Trip } from '@/lib/types';
 export async function GET(request:Request) {
- const user=await getUser();
+ const user=await getUser(); if(user) { try { await assertWorkspaceRequest(user); } catch { return Response.json({error:"登录机构已改变，请刷新 / Workspace changed. Reload."},{status:409}); } }
  if(!user||!['ADMIN','DRIVER'].includes(user.role)||(user.role==='DRIVER'&&!user.driverId))return new Response(null,{status:403});
  const id=new URL(request.url).searchParams.get('trip');
  if(!id||!/^[a-f0-9-]{36}$/i.test(id))return new Response(null,{status:400});

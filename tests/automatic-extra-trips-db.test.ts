@@ -20,6 +20,7 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   await c.query(`create schema ${schema}`);await c.query(`set search_path to ${schema}`);
   // 047 is a production-only school data import requiring the real McAuliffe record.
   for(const file of (await readdir('db/migrations')).filter(f=>f.endsWith('.sql')&&!f.startsWith('047_')).sort())await c.query(await readFile(`db/migrations/${file}`,'utf8'));
+  await c.query("select set_config('kidloop.tenant_id','00000000-0000-4000-8000-000000000001',false)");
   await c.query("insert into operating_terms(name,starts_on,ends_on) values('Test','2026-09-01','2026-09-30')");
   const school=await id("insert into schools(name,address) values('A','A')"),other=await id("insert into schools(name,address) values('B','B')"),program=await id("insert into after_school_programs(name,address) values('P','P')");
   const driver=await id("insert into drivers(name,phone) values('Usual','')"),vehicle=await id("insert into vehicles(name,plate,capacity) values('Van','EXTRA-TEST',5)");
@@ -42,7 +43,7 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   assert.deepEqual(reloaded.drivers[0].preferredSchoolIds,[school]);assert.equal(reloaded.drivers[0].schoolPreferenceMode,'PREFER');assert.equal(reloaded.drivers[0].latestDismissalTime,'15:00');
   await assert.rejects(saveDriverPreferences(c as unknown as pg.PoolClient,driver,{schoolPreferenceMode:'ONLY',preferredSchoolIds:[randomUUID()]}));
   const preview=await readTrialRange(c as unknown as pg.PoolClient,['2026-09-15'],true);assert.equal(preview.days[0].plans.length,2);assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
-  const generate=async()=>{await c.query('begin');try{await materializeRoutes(c as unknown as pg.PoolClient,'2026-09-15','2026-09-14');await c.query('commit');}catch(e){await c.query('rollback');throw e;}};
+  const generate=async()=>{await c.query('begin');try{await c.query('set local role kidloop_runtime');await materializeRoutes(c as unknown as pg.PoolClient,'2026-09-15','2026-09-14');await c.query('commit');}catch(e){await c.query('rollback');throw e;}};
   await generate();const first=(await c.query('select id,generated_plan_id,status from trips order by id')).rows;assert.equal(first.length,2);assert.equal(first.filter(t=>t.generated_plan_id).length,1);
   const assignments=(await c.query('select id,student_id,trip_id from trip_students order by id')).rows;assert.equal(assignments.length,3);
   await generate();assert.deepEqual((await c.query('select id,generated_plan_id,status from trips order by id')).rows,first);assert.deepEqual((await c.query('select id,student_id,trip_id from trip_students order by id')).rows,assignments);
@@ -55,14 +56,15 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   assert.equal((await c.query('select count(*)::int n from trip_students where student_id=$1',[children[0]])).rows[0].n,1);
   assert.equal((await c.query("select count(*)::int n from trips where fixed_route_id=$1 and status='PUBLISHED'",[route])).rows[0].n,1);
   assert.equal((await c.query('select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id where t.fixed_route_id=$1',[route])).rows[0].n,2);
-  const actor=await id("insert into app_users(email,password_hash,role,driver_id) values('driver@example.test','unused','DRIVER',$1)",[driver]);
+  await c.query("insert into login_accounts(email,name,password_hash) values('driver@example.test','Driver','unused'),('admin@example.test','Admin','unused')");
+  const actor=await id("insert into app_users(email,account_id,role,driver_id) values('driver@example.test',(select id from login_accounts where email='driver@example.test'),'DRIVER',$1)",[driver]);
   const tripId=extra.id;
   await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,created_at) values($1,0,'GO',$2,'2026-09-15 12:45:00-07'),($1,1,'ARRIVED',$2,'2026-09-15 13:00:00-07')",[tripId,actor]);
   assert.equal((await c.query('select count(*)::int n from execution_observations where trip_id=$1',[tripId])).rows[0].n,2);
   assert.equal(Number((await c.query('select minutes from observed_travel_samples where trip_id=$1',[tripId])).rows[0].minutes),15);
   await c.query("update drivers set name='Renamed' where id=$1",[driver]);
   assert.equal((await c.query('select driver_name from execution_observations where trip_id=$1 limit 1',[tripId])).rows[0].driver_name,'Usual','snapshot is not rewritten by profile edits');
-  const admin=await id("insert into app_users(email,name,password_hash,role) values('admin@example.test','Admin','unused','ADMIN')");
+  const admin=await id("insert into app_users(email,account_id,name,role) values('admin@example.test',(select id from login_accounts where email='admin@example.test'),'Admin','ADMIN')");
   await c.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,created_at) values($1,0,'GO',$2,'2026-09-15 14:00:00-07'),($1,1,'ARRIVED',$2,'2026-09-15 14:10:00-07')",[tripId,admin]);
   assert.equal((await c.query('select count(*)::int n from observed_travel_samples where trip_id=$1',[tripId])).rows[0].n,1,'admin corrections never train travel time');
   await saveDriverPreferences(c as unknown as pg.PoolClient,driver,{schoolPreferenceMode:'ONLY',preferredSchoolIds:[other]});
@@ -90,7 +92,7 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   await c.query("update trips set status='IN_PROGRESS',current_stop_index=0,progress_state='IN_TRANSIT' where id=$1",[regularId]);
   await c.query("update trip_students set status='PICKED_UP',picked_up_at=clock_timestamp() where trip_id=$1",[regularId]);
   const riders=(await c.query('select id from trip_students where trip_id=$1 order by id',[regularId])).rows;assert.equal(riders.length,2);
-  const run=async(work:()=>Promise<unknown>)=>{await c.query('begin');try{const value=await work();await c.query('commit');return value;}catch(e){await c.query('rollback');throw e;}};
+  const run=async(work:()=>Promise<unknown>)=>{await c.query('begin');try{await c.query('set local role kidloop_runtime');const value=await work();await c.query('commit');return value;}catch(e){await c.query('rollback');throw e;}};
   const client=c as unknown as pg.PoolClient;
   await assert.rejects(run(()=>changeRiderStatus(client,user,riders[0].id,'DROPPED_OFF')));
   await c.query("update trips set current_stop_index=1,progress_state='AT_STOP' where id=$1",[regularId]);

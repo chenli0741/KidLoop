@@ -13,7 +13,7 @@ import type { FormState } from "@/lib/types";
 async function run(
   work: Parameters<typeof transaction>[0],
 ): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   try {
     await transaction(work);
     for (const p of [

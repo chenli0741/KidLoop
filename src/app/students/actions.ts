@@ -10,7 +10,7 @@ import { archiveStudent, saveStudent, StudentEditError } from "@/lib/student-man
 import type { FormState } from "@/lib/types";
 
 async function mutate(form: FormData, deleting: boolean): Promise<FormState> {
-  const user = await requireUser(["ADMIN"]);
+  const user = await requireUser(["ADMIN"], true);
   const locale = await getLocale();
   try {
     await transaction(async client => {

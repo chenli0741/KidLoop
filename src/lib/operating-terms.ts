@@ -1,3 +1,4 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -13,7 +14,7 @@ export type OperatingTerm = {
 };
 export class TermError extends Error {}
 export async function openTerm(
-  c: Pick<PoolClient, "query">,
+  c: SqlReader,
 ): Promise<OperatingTerm | undefined> {
   return (
     await c.query(
@@ -22,7 +23,7 @@ export async function openTerm(
   ).rows[0];
 }
 export async function requireTerm(c: PoolClient, expected?: string) {
-  await c.query("select pg_advisory_xact_lock(70919009)");
+  await c.query("select pg_advisory_xact_lock(hashtextextended(current_tenant()::text,70919009))");
   const t = await openTerm(c);
   if (!t || (expected !== undefined && expected !== t.id))
     throw new TermError(
@@ -48,7 +49,7 @@ export async function initializeSchools(c: PoolClient, t: OperatingTerm) {
   }
 }
 export async function createOperatingTerm(c: PoolClient, f: FormData) {
-  await c.query("select pg_advisory_xact_lock(70919009)");
+  await c.query("select pg_advisory_xact_lock(hashtextextended(current_tenant()::text,70919009))");
   if (await openTerm(c))
     throw new TermError("请先归档当前学期 / Archive the current term first");
   const name = String(f.get("name") ?? "").trim(),

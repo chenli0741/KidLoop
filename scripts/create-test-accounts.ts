@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { hashPassword } from "../src/lib/password";
 
 async function main() {
+  throw new Error("Legacy account seeding is retired. Register accounts and bind them in the institution UI.");
   const url = new URL(process.env.DATABASE_URL ?? "");
   if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
   const pool = new pg.Pool({ connectionString: url.toString() });

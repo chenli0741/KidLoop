@@ -1,3 +1,4 @@
+import type { SqlReader } from "@/lib/sql-reader";
 import 'server-only';
 import type {PoolClient} from 'pg';
 import type {FixedRoute,RouteStop} from './fixed-route-types';
@@ -9,8 +10,8 @@ import {validServiceDate} from './day-plans';
 import {routeName} from './route-name';
 import {materializeTrial} from './schedule-materialize';
 const error=(zh:string,en:string):never=>{throw new PickupError(zh,en);};
-export async function lockRoutes(c:PoolClient){await c.query('select pg_advisory_xact_lock(70919009)');}
-export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverId:string;date:string},roster?:Promise<Awaited<ReturnType<typeof readRosterData>>>):Promise<FixedRoute[]> {
+export async function lockRoutes(c:PoolClient){await c.query('select pg_advisory_xact_lock(hashtextextended(current_tenant()::text,70919009))');}
+export async function readFixedRoutes(c:SqlReader,scope?:{driverId:string;date:string},roster?:Promise<Awaited<ReturnType<typeof readRosterData>>>):Promise<FixedRoute[]> {
  const routes:FixedRoute[]=(await c.query(`select r.id,r.name,r.notes,r.excluded_student_ids as "excludedStudentIds",r.route_type as "routeType",r.starts_on::text as "startsOn",r.ends_on::text as "endsOn",r.weekdays,r.driver_id as "driverId",r.vehicle_id as "vehicleId",r.enabled,r.updated_at::text as "updatedAt",
  coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'address',s.address,'schoolId',s.school_id,'programId',s.program_id,'time',coalesce(to_char(s.arrival_time,'HH24:MI'),''),'pickupTime',to_char(s.pickup_time,'HH24:MI'),'dwellMinutes',s.dwell_minutes) order by s.position) from fixed_route_stops s where s.route_id=r.id),'[]') as stops,
  '[]'::jsonb as students
@@ -20,7 +21,7 @@ export async function readFixedRoutes(c:Pick<PoolClient,"query">,scope?:{driverI
  const data=await (roster ?? readRosterData(c));
  return routes.map(r=>({...r,students:automaticRoster(r.stops,data.children,data.rules,r.weekdays,r.excludedStudentIds,r.routeType==='TEMPORARY'?[]:data.batches)}));
 }
-export async function readRouteTaskIssues(c:Pick<PoolClient,"query">,date:string){
+export async function readRouteTaskIssues(c:SqlReader,date:string){
  return (await c.query<{name:string;message:string}>("select r.name,i.message from route_task_issues i join fixed_routes r on r.id=i.route_id where r.operating_term_id=current_operating_term() and i.service_date=$1 order by r.name",[date])).rows;
 }
 export async function saveFixedRoute(c:PoolClient,f:FormData){

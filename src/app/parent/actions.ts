@@ -8,7 +8,7 @@ import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
 export async function updateDayPlan(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser(["PARENT"]);
+  const user = await requireUser(["PARENT"], true);
   const locale = await getLocale();
   try {
     const attendance = form.get("attendance");

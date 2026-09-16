@@ -12,7 +12,7 @@ import type { FormState } from "@/lib/types";
 import { shiftDate, workweek } from "@/lib/workweek";
 
 export async function saveSetting(_: FormState, form: FormData): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   const locale = await getLocale();
   try {
     await transaction(async c => {await requireTerm(c,String(form.get("operatingTermId")));await savePickupSetting(c,form);});
@@ -25,7 +25,7 @@ export async function saveSetting(_: FormState, form: FormData): Promise<FormSta
 }
 
 export async function saveRoute(_: FormState, form: FormData): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   const locale=await getLocale();
   try {
     await transaction(async c=>{
@@ -40,7 +40,7 @@ export async function saveRoute(_: FormState, form: FormData): Promise<FormState
 }
 
 export async function generateSchedule(_: FormState, form: FormData): Promise<FormState> {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN"], true);
   const locale = await getLocale();
   try {
     const today = todayInOperationsTimeZone();

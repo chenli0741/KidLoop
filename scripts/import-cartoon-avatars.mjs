@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
@@ -12,7 +13,7 @@ if(!directory)throw new Error('Usage: node --env-file=.env.local scripts/import-
 const records=JSON.parse(await fs.readFile(path.join(directory,'manifest.json'),'utf8'));
 if(!records.length||new Set(records.map(r=>r.id)).size!==records.length)throw new Error('Invalid manifest');
 const u=new URL(process.env.DATABASE_URL);if(u.searchParams.get('sslmode')==='require')u.searchParams.set('sslmode','verify-full');
-const pool=new pg.Pool({connectionString:u.toString()});
+const pool=new pg.Pool({options:tenantOptions(),connectionString:u.toString()});
 const client=await pool.connect();
 const hashes=new Set();
 try {

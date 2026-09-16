@@ -1,3 +1,4 @@
+import { tenantOptions } from "./tenant-options.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -10,7 +11,7 @@ const restoreFile = restoreIndex >= 0 ? process.argv[restoreIndex + 1] : null;
 if (restoreIndex >= 0 && !restoreFile) throw new Error("--restore requires a backup file");
 const url = new URL(process.env.DATABASE_URL);
 if (url.searchParams.get("sslmode") === "require") url.searchParams.set("sslmode", "verify-full");
-const pool = new pg.Pool({ connectionString: url.toString() });
+const pool = new pg.Pool({ options: tenantOptions(), connectionString: url.toString() });
 const client = await pool.connect();
 try {
   const avatars = await Promise.all(["student-teal.png", "student-glasses.png"].map(async name =>
