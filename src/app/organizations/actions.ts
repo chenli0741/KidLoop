@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireIdentity } from "@/lib/identity";
 import { requireUser, homeFor } from "@/lib/auth";
 import { identityTransaction } from "@/lib/identity-db";
-import { createTenant, requestTenant, selectTenant } from "@/lib/tenant-service";
+import { assertInstitutionAccess, createTenant, requestTenant, selectTenant } from "@/lib/tenant-service";
 import type { FormState } from "@/lib/types";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
@@ -14,6 +14,7 @@ export async function createOrganization(_:FormState, form:FormData):Promise<For
   let role;
   try {
     role=await identityTransaction(async c=>{
+      await assertInstitutionAccess(c,account.id,account.sessionHash,"create");
       const id=await createTenant(c,account.id,String(form.get('name')??''));
       return account.tenantId ? null : selectTenant(c,account.sessionHash,id);
     });
@@ -25,7 +26,10 @@ export async function createOrganization(_:FormState, form:FormData):Promise<For
 export async function joinOrganization(_:FormState,form:FormData):Promise<FormState> {
   const account=await requireIdentity(),l=await getLocale();
   if(form.get("identityContext")!==account.contextKey)return {ok:false,message:text(l,"登录已改变，请刷新后重试。","Your login changed. Reload and retry.")};
-  try { await identityTransaction(c=>requestTenant(c,account.id,String(form.get('code')??'').trim().toLowerCase())); }
+  try { await identityTransaction(async c=>{
+    await assertInstitutionAccess(c,account.id,account.sessionHash,"join");
+    await requestTenant(c,account.id,String(form.get('code')??'').trim().toLowerCase());
+  }); }
   catch { return {ok:false,message:text(l,"申请失败，请检查机构代码。如果已绑定，请联系机构管理员。","Could not request access. Check the institution code; if already bound, contact its administrator.")}; }
   revalidatePath('/organizations');
   return {ok:true,message:text(l,"申请已提交，等待机构管理员批准。","Request submitted. Waiting for institution approval.")};

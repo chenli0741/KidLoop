@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import pg from 'pg';
-import {createTenant,selectTenant,requestTenant,bindAccount} from '../src/lib/tenant-service';
+import {assertInstitutionAccess,createTenant,selectTenant,requestTenant,bindAccount} from '../src/lib/tenant-service';
 import {materializeRoutes} from '../src/lib/fixed-routes';
 import {readTrialRange} from '../src/lib/schedule-trial-data';
 import {changeOwnPassword} from '../src/lib/profile-management';
+import {tenantTransaction} from '../src/lib/tenant-transaction';
+import type {AuthUser} from '../src/lib/types';
 import {hashPassword,verifyPassword} from '../src/lib/password';
 
 test('independent institutions: migration, isolation, membership and scheduling',async t=>{
@@ -30,6 +32,7 @@ test('independent institutions: migration, isolation, membership and scheduling'
   const before=(await c.query('select to_jsonb(s) data from schools s where id=$1',[legacySchool])).rows[0].data;
   await c.query("insert into user_sessions(token_hash,user_id,expires_at) values('legacy-session',$1,now()+interval '1 day')",[legacy]);
   await tx(async()=>c.query(await readFile('db/migrations/054_independent_tenants.sql','utf8')));
+  await tx(async()=>c.query(await readFile('db/migrations/055_registration_roles.sql','utf8')));
   let second='';
   await t.test('migration preserves original records, credentials and selected sessions',async()=>{
    const after=(await c.query('select to_jsonb(s) data from schools s where id=$1',[legacySchool])).rows[0].data;
@@ -115,6 +118,47 @@ test('independent institutions: migration, isolation, membership and scheduling'
    await assert.rejects(tx(()=>selectTenant(c,'applicant-session',second)),/unavailable/);
    await c.query('update app_users set active=false where account_id=$1 and tenant_id=$2',[applicant,first]);
    await assert.rejects(tx(()=>selectTenant(c,'applicant-session',first)),/unavailable/);
+  });
+  await t.test('batched transaction revalidates access, keeps RLS and cleans up after errors',async()=>{
+   const context=(await c.query("select context_key from account_sessions where token_hash='legacy-session'")).rows[0].context_key;
+   const user={id:legacy,accountId:legacy,tenantId:first,contextKey:context,role:'ADMIN',driverId:null,email:'legacy@example.test',name:'Legacy'} as AuthUser;
+   const original=c.query.bind(c);let calls=0;
+   c.query=((...args:unknown[])=>{calls++;return Reflect.apply(original,c,args);}) as typeof c.query;
+   try {
+    const rows=await tenantTransaction(c,user,client=>client.query('select id,tenant_id,current_user from schools'));
+    assert.equal(calls,3,'setup, business query and commit each take one round trip');
+    assert.ok(rows.rows.length);assert.ok(rows.rows.every(r=>r.tenant_id===first && r.current_user==='kidloop_runtime'));
+   } finally {c.query=original;}
+   let ran=false;
+   for(const invalid of [{...user,tenantId:second},{...user,contextKey:randomUUID()},{...user,role:'DRIVER' as const}]) {
+    await assert.rejects(tenantTransaction(c,invalid,async()=>{ran=true;}),/revoked/);
+   }
+   assert.equal(ran,false);
+   await assert.rejects(tenantTransaction(c,user,client=>client.query('select * from login_accounts')),/permission denied/);
+   await c.query('update app_users set active=false where id=$1',[legacy]);
+   await assert.rejects(tenantTransaction(c,user,async()=>{ran=true;}),/revoked/);
+   await c.query('update app_users set active=true where id=$1',[legacy]);
+   await assert.rejects(tenantTransaction(c,{...user,contextKey:"'; select 1; --"},async()=>{ran=true;}),/uuid/);
+   assert.equal(ran,false);
+   const clean=(await c.query("select current_user,nullif(current_setting('kidloop.tenant_id',true),'') tenant")).rows[0];
+   assert.notEqual(clean.current_user,'kidloop_runtime');assert.equal(clean.tenant,null);
+  });
+  await t.test('registration role gates onboarding and selected drivers or parents cannot manage institutions',async()=>{
+   for(const role of ['ADMIN','DRIVER','PARENT']) {
+    const account=await id("insert into login_accounts(name,email,password_hash,registration_role) values('New',$1,$2,$3)",[role.toLowerCase()+'@onboarding.test',password,role]);
+    const session='onboarding-'+role;
+    await c.query("insert into account_sessions(token_hash,account_id,expires_at) values($1,$2,now()+interval '1 day')",[session,account]);
+    await tx(()=>assertInstitutionAccess(c,account,session,'join'));
+    if(role==='ADMIN')await tx(()=>assertInstitutionAccess(c,account,session,'create'));
+    else await assert.rejects(tx(()=>assertInstitutionAccess(c,account,session,'create')),/unavailable/);
+    const driver=role==='DRIVER'?await scoped(first,()=>id("insert into drivers(name,phone) values('Onboarding driver','')")):null;
+    await tx(()=>bindAccount(c,legacy,{email:role.toLowerCase()+'@onboarding.test',role:driver?'DRIVER':'PARENT',driverId:driver,studentIds:[]}));
+    for(const operation of ['create','join'] as const)await assert.rejects(tx(()=>assertInstitutionAccess(c,account,session,operation)),/unavailable/);
+    await tx(()=>selectTenant(c,session,first));
+    for(const operation of ['create','join'] as const)await assert.rejects(tx(()=>assertInstitutionAccess(c,account,session,operation)),/unavailable/);
+   }
+   await tx(()=>assertInstitutionAccess(c,legacy,'legacy-session','create'));
+   await tx(()=>assertInstitutionAccess(c,legacy,'legacy-session','join'));
   });
   await t.test('global password changes invalidate sessions in all institutions',async()=>{
    const form=new FormData();form.set('currentPassword','tenant-test-password');form.set('newPassword','changed-test-password');form.set('confirmPassword','changed-test-password');

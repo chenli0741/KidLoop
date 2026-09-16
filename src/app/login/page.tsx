@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <h1>{text(locale, "欢迎回来", "Welcome back")}</h1>
     <p>{text(locale, "登录后查看属于你的接送安排。", "Sign in to see your transportation plans.")}</p>
     {passwordChanged === "1" && <p className="form-message success" role="status">{text(locale, "密码已更新，请使用新密码登录。", "Password updated. Sign in with your new password.")}</p>}
-    {registered === "1" && <p role="status">{text(locale,"注册成功，请登录后创建或加入机构。","Registered. Sign in to create or join an institution.")}</p>}
+    {registered === "1" && <p role="status">{text(locale,"注册成功，请登录继续。","Registered. Sign in to continue.")}</p>}
     <LoginForm rememberedEmail={rememberedEmail} />
     <p className="login-help"><ShieldCheck size={16} />{text(locale, "管理员 · 司机 · 家长", "Admin · Driver · Parent")}</p>
     <p><Link href="/register">{text(locale,"注册账号","Register")}</Link></p><div className="institution-entry"><Link href="/register?intent=create">{text(locale,"创建机构","Create institution")}</Link><Link href="/register?intent=join">{text(locale,"加入机构","Join institution")}</Link></div><p>{text(locale,"创建或加入机构前，请先注册或登录。","Register or sign in before creating or joining an institution.")}</p>

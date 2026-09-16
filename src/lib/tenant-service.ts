@@ -1,6 +1,19 @@
 import "server-only";
 import type { PoolClient } from "pg";
 import type { UserRole } from "./types";
+import { institutionAccess } from "./institution-access";
+
+export async function assertInstitutionAccess(c: PoolClient, accountId: string, sessionHash: string, operation: "create" | "join") {
+  const account = (await c.query(`select s.selected_tenant_id as "tenantId",a.registration_role as "registrationRole"
+    from login_accounts a join account_sessions s on s.account_id=a.id
+    where a.id=$1 and s.token_hash=$2 and a.active and s.expires_at>now() for update of a,s`,[accountId,sessionHash])).rows[0];
+  if (!account) throw new Error("Institution management unavailable");
+  const memberships = (await c.query(`select t.id,u.role,(u.active and t.active) as active
+    from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 for share of u,t`,[accountId])).rows;
+  if (!institutionAccess(account,memberships)[operation]) throw new Error("Institution management unavailable");
+  if (account.tenantId && !(await c.query(`select 1 from user_sessions us join app_users u on u.id=us.user_id
+    where us.token_hash=$1 and us.expires_at>now() and u.account_id=$2 and u.tenant_id=$3`,[sessionHash,accountId,account.tenantId])).rowCount) throw new Error("Institution management unavailable");
+}
 
 export async function createTenant(c: PoolClient, accountId: string, name: string) {
   name = name.trim();

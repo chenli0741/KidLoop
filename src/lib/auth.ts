@@ -4,12 +4,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { identityQuery } from "./identity-db";
 import { workspaceRequestAllowed } from "./workspace-request";
-import { getIdentity } from "./identity";
+import { getIdentity, getSessionHash } from "./identity";
 import type { AuthUser, UserRole } from "./types";
 export { SESSION_COOKIE } from "./identity";
 export const getUser = cache(async (): Promise<AuthUser | null> => {
-  const identity = await getIdentity();
-  if (!identity) return null;
+  const sessionHash = await getSessionHash();
+  if (!sessionHash) return null;
   return (await identityQuery<AuthUser>(`
     select u.id,a.email,case when u.role='DRIVER' then d.name else u.name end as name,
     u.role,u.driver_id as "driverId",case when u.role='DRIVER' then d.photo_url else u.photo_url end as "photoUrl",
@@ -20,7 +20,7 @@ export const getUser = cache(async (): Promise<AuthUser | null> => {
     join tenants t on t.id=u.tenant_id
     left join drivers d on d.id=u.driver_id and d.tenant_id=u.tenant_id
     where s.token_hash=$1 and s.expires_at>now() and us.expires_at>now() and a.active and u.active and t.active`,
-    [identity.sessionHash])).rows[0] ?? null;
+    [sessionHash])).rows[0] ?? null;
 });
 export function homeFor(role: UserRole) { return role === "PARENT" ? "/parent" : role === "DRIVER" ? "/driver" : "/"; }
 export async function assertWorkspaceRequest(user: AuthUser, mutation = false) {

@@ -24,7 +24,7 @@ export function AccountMenu({ user }: { user: AuthUser }) {
       <div className="account-menu-content">
         <header><div><span className="eyebrow">{role}</span><h2 id={titleId}>{user.name}</h2><p>{user.email}</p><p>{user.tenantName}</p></div><button type="button" className="icon-button" aria-label={text(locale, "关闭账号菜单", "Close account menu")} onClick={close}><X size={19} /></button></header>
         <nav aria-label={text(locale, "个人账号", "Personal account")}>
-          <Link href="/organizations" onClick={close}>{text(locale,"我的机构 / 创建或加入","My institutions / Create or join")}</Link>
+          {user.role === "ADMIN" && <Link href="/organizations" onClick={close}>{text(locale,"机构管理","Institution management")}</Link>}
           <Link href="/profile" onClick={close}><Pencil size={19} />{text(locale, "个人资料", "Personal information")}</Link>
           <Link href="/profile#password" onClick={close}><KeyRound size={19} />{text(locale, "修改密码", "Change password")}</Link>
         </nav>
