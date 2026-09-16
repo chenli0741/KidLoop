@@ -26,5 +26,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 class KidLoopBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(KidLoopOCRPlugin())
+        bridge?.registerPluginInstance(KidLoopMailAuthPlugin())
     }
 }

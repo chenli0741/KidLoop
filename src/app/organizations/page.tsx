@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { invitationMailConfig } from "@/lib/invitation-email";
+import { companyMailStatus, companyMailHistory } from "@/lib/company-mail/service";
+import { CompanyMailSettings } from "@/components/company-mail-settings";
 import { redirect } from "next/navigation";
 import { requireIdentity } from "@/lib/identity";
 import { getUser,homeFor } from "@/lib/auth";
@@ -13,7 +14,7 @@ export default async function OrganizationsPage() {
  const account=await requireIdentity(),user=await getUser(),l=await getLocale();
  if(user&&user.role!=='ADMIN')redirect(homeFor(user.role));
  const memberships=(await identityQuery<{id:string;name:string;active:boolean}>(`select t.id,t.name,(u.active and t.active) active from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 order by t.name`,[account.id])).rows;
- let mailConfigured=false;try{invitationMailConfig();mailConfigured=true;}catch{}
+ const [mailConnection,mailHistory]=await Promise.all([user?companyMailStatus(user):Promise.resolve(null),user?companyMailHistory(user):Promise.resolve([])]);
  const company=user?(await identityQuery<{name:string;contact_name:string;contact_email:string;phone:string;address:string}>('select name,contact_name,contact_email,phone,address from tenants where id=$1',[user.tenantId])).rows[0]:null;
  return <div className={user?'page-container institution-page':'login-page'}><section className={user?'':'login-card institution-card'}>
  <h1>{user?text(l,'公司管理','Company settings'):text(l,'选择本次登录的公司','Choose a company for this login')}</h1>
@@ -28,7 +29,15 @@ export default async function OrganizationsPage() {
  <label><span>{text(l,'联系电话','Contact phone')}</span><input name="phone" type="tel" defaultValue={company.phone} maxLength={80} required/></label>
  <label className="full"><span>{text(l,'公司地址','Company address')}</span><input name="address" defaultValue={company.address} maxLength={500} required/></label>
  </ActionForm><Link href="/admin/accounts">{text(l,'邀请和管理公司成员','Invite and manage company members')}</Link></section>}
- {user&&<section className="account-card"><h2>{text(l,'邮件服务','Email service')}</h2><p>{mailConfigured?text(l,'平台邮件服务已配置。发送结果将在邀请记录中显示。','Platform email service is configured. Sending status appears in invitation records.'):text(l,'平台邮件服务尚未配置，暂不能发送邀请。请联系平台维护人员配置发信服务、发件地址和系统网址。','Platform email service is not configured. Ask the platform operator to configure the email service, sender address and application URL before sending invitations.')}</p></section>}
+ {mailConnection&&<CompanyMailSettings connection={mailConnection}/>}
+ {user&&mailHistory.length>0&&<section className="account-card"><h2>{text(l,'最近发送记录','Recent sending history')}</h2>
+ <p>{text(l,'已发送表示 Gmail 接受了发送请求，不代表对方已收到。结果未知时请先确认收件情况。','Sent means Gmail accepted the request, not confirmed inbox delivery. For unknown results, check with the recipient first.')}</p>
+ {mailHistory.map((entry,index)=><article key={index}><p>{entry.recipient} · {entry.status==='SENT'?text(l,'已发送','Sent'):entry.status==='FAILED'?text(l,'发送失败','Failed'):entry.status==='UNKNOWN'?text(l,'结果未知','Unknown'):text(l,'发送中','Sending')}</p>
+ <small>{entry.sender} · {entry.created_at}</small>
+ {entry.error_code==='RECONNECT'&&<p>{text(l,'需要重新连接 Gmail','Reconnect Gmail')}</p>}
+ {entry.error_code==='RATE_LIMIT'&&<p>{text(l,'Gmail 暂时限制发送，请稍后再试','Gmail sending limit reached. Try again later.')}</p>}
+ </article>)}
+ </section>}
  <form action={logout}><button className="button secondary">{text(l,'退出登录','Sign out')}</button></form>
  </section></div>;
 }

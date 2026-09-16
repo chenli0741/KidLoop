@@ -55,3 +55,8 @@ Apple API reference: https://developer.apple.com/documentation/vision/vnrecogniz
 依据：[Apple — Resolving the Privacy-Sensitive Data App Rejection](https://developer.apple.com/library/archive/qa/qa1937/_index.html)。
 
 验证结果：`plutil -lint`、`npm run ios:check`、Release iOS Simulator 无签名构建通过；检查生成的 KidLoop.app，确认中英文资源各包含完整 7 项权限，英文资源与包内默认文案一致。尚未验证真机系统弹窗、生成签名包或上传送审。
+
+
+## Gmail 系统授权窗口（2026-09-16，未编译验收）
+
+新增 `KidLoopMailAuthPlugin` 并在 `KidLoopBridgeViewController` 注册，通过 ASWebAuthenticationSession 展示系统授权窗口，完成或取消均回到 App。只接受 Google 授权地址及固定 `kidloop-mail://complete` 回调，无外部 Safari 降级路径。服务端只在原 App 会话携带独立 proof 完成时绑定邮箱。旧安装包提示更新或使用电脑连接。按用户要求未运行构建、模拟器或设备测试；此能力必须包含在下一次原生发布中。详见 [邮箱模块](connected-mail.md)。
