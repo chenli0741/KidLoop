@@ -6,6 +6,7 @@ import {StudentPhotoPreview} from './student-photo-preview';
 import { BusFront, ChevronDown, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
 import { formatTime } from "@/lib/date";
+import {rideManifest} from "@/lib/ride-manifest";
 import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
@@ -106,8 +107,9 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
   const currentIndex = trip.currentStopIndex ?? 0;
   const inTransit = trip.progressState === "IN_TRANSIT" && trip.status !== "COMPLETED" && currentIndex < (trip.routeStops?.length ?? 0) - 1;
   const currentStop = trip.routeStops?.[selectedStopIndex ?? currentIndex];
-  const visibleRiders = (currentStop ? trip.riders.filter(rider => currentStop.schoolId ? rider.pickupStopId === currentStop.id : rider.dropoffStopId === currentStop.id) : trip.riders)
-    .filter(rider => role !== "DRIVER" || (!rider.parentAbsent && rider.status !== "ABSENT"));
+  const manifest=rideManifest(trip,role,selectedStopIndex);
+  const visibleRiders=manifest.riders;
+  const sortedRiders=[...visibleRiders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name));
   const countedRiders = visibleRiders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   return <>
 
@@ -144,16 +146,17 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
       </div>)}
 
       {journeyTrip && cameraEnabled && <TripJourneyControls trip={journeyTrip} locale={locale} onUpdated={onUpdated} />}
-      {cameraEnabled && interactive && selectedStopIndex === currentIndex && currentStop?.schoolId && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={{...trip, riders: visibleRiders}} locale={locale} onUpdated={onUpdated}/>}
+      {cameraEnabled && interactive && !inTransit && selectedStopIndex === currentIndex && currentStop?.schoolId && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={{...trip, riders: visibleRiders}} locale={locale} onUpdated={onUpdated}/>}
       <div className="manifest-header">
-        <h4>{text(locale, "接送学生清单", "Pickup manifest")}</h4>
-        <span>{trip.hasSharedPickups ? text(locale,`共享接送：本车应接 ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} 人 · ${trip.capacity} 座`,`Shared pickup: this vehicle should take ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} riders · ${trip.capacity} seats`) : trip.routeName ? text(locale, `Pickup ${countedRiders.length} 人 · ${trip.capacity} 座`, `Pickup ${countedRiders.length} · ${trip.capacity} seats`) : text(locale, `Pickup ${countedRiders.length}/${trip.capacity} 个座位`, `Pickup ${countedRiders.length} of ${trip.capacity} seats`)}</span>
+        <h4>{manifest.mode==='completed'?text(locale,"本趟全部学生","All riders in this ride"):manifest.mode==='onboard'?text(locale,"当前车上学生","Students on board"):text(locale, "接送学生清单", "Pickup manifest")}</h4>
+        <span>{manifest.mode==='completed'?text(locale,`共 ${visibleRiders.length} 名学生`,`${visibleRiders.length} students`):manifest.mode==='onboard'?text(locale,`车上 ${visibleRiders.length} 人 · ${trip.capacity} 座`,`${visibleRiders.length} on board · ${trip.capacity} seats`):trip.hasSharedPickups ? text(locale,`共享接送：本车应接 ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} 人 · ${trip.capacity} 座`,`Shared pickup: this vehicle should take ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} riders · ${trip.capacity} seats`) : trip.routeName ? text(locale, `Pickup ${countedRiders.length} 人 · ${trip.capacity} 座`, `Pickup ${countedRiders.length} · ${trip.capacity} seats`) : text(locale, `Pickup ${countedRiders.length}/${trip.capacity} 个座位`, `Pickup ${countedRiders.length} of ${trip.capacity} seats`)}</span>
       </div>
+      {manifest.mode==='onboard' && !visibleRiders.length && <p className="form-hint">{text(locale,"当前车上无学生","No students on board")}</p>}
       <div className="manifest-list">
-        {[...visibleRiders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name)).map((rider) => (
+        {sortedRiders.map((rider) => (
           <div className="rider-row" style={rider.otherVehicle ? {opacity:0.55,background:"#f2f3f3"}:undefined} key={rider.id}>
             <div className="student-photo">
-              {rider.photoUrl ? <StudentPhotoPreview src={rider.photoUrl} name={rider.name} locale={locale} sizes="80px"/> : <UsersRound size={28} aria-label={text(locale, "照片待补充", "Photo pending")} />}
+              <StudentPhotoPreview src={rider.photoUrl} name={rider.name} locale={locale} sizes="80px" students={sortedRiders} studentId={rider.id}/>
             </div>
             <div className="rider-primary">
               <strong>{rider.name}</strong>
@@ -164,7 +167,7 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
               <span>{rider.parentPhone ? <a href={`tel:${rider.parentPhone}`}>{rider.parentName} · {rider.parentPhone}</a> : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
             </div>}
             {rider.otherVehicle ? <span>{text(locale,`已由 ${rider.otherVehicle} ${["ABSENT","EXCEPTION"].includes(rider.status)?"处理":"接走"}`,`${["ABSENT","EXCEPTION"].includes(rider.status)?"Handled":"Picked up"} by ${rider.otherVehicle}`)}</span> : <StatusBadge status={rider.status} />}
-            {interactive && selectedStopIndex === currentIndex && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions atDropoff={trip.progressState === "AT_STOP" && Boolean(currentStop?.programId) && rider.dropoffStopId === currentStop?.id} role={role} targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} parentAbsent={rider.parentAbsent} onUpdated={onUpdated} /> : null}
+            {interactive && !inTransit && selectedStopIndex === currentIndex && !rider.otherVehicle && !["DRAFT", "CANCELED", "COMPLETED"].includes(trip.status) && !trip.completedSegments?.includes(`${rider.pickupStopId}:${rider.dropoffStopId}`) ? <StatusActions atDropoff={trip.progressState === "AT_STOP" && Boolean(currentStop?.programId) && rider.dropoffStopId === currentStop?.id} role={role} targetTripId={rider.shared ? trip.id : undefined} assignmentId={rider.id} status={rider.status} parentAbsent={rider.parentAbsent} onUpdated={onUpdated} /> : null}
             {rider.status === 'EXCEPTION' && rider.missedPickupNote && <div className="rider-parent-note">{rider.missedPickupNote}</div>}
             {(rider.parentNote || rider.parentAbsent) && <div className="rider-parent-note">{rider.parentAbsent && <strong>{text(locale, "家长请假", "Parent absence")} · </strong>}{rider.parentNote}</div>}
           </div>

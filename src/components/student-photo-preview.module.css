@@ -7,3 +7,10 @@
 .close {display:grid;place-items:center;flex:none;min-width:44px;min-height:44px;border:1px solid #dce5df;border-radius:50%;background:white;color:#176b52;cursor:pointer}
 .photo {position:relative;width:100%;height:min(65dvh,680px)}
 .photo img {object-fit:contain}
+.identity {min-width:0;flex:1}
+.identity p {margin:6px 0 0;font-size:14px;line-height:1.5;color:#58665f;overflow-wrap:anywhere}
+.galleryPhoto {height:min(55dvh,560px);touch-action:pan-y pinch-zoom}
+.paging {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}
+.paging span {font-variant-numeric:tabular-nums;color:#58665f}
+.close:disabled {opacity:.35;cursor:default}
+.placeholder {height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#718078}
