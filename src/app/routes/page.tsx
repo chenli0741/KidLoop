@@ -48,7 +48,7 @@ export default async function RoutesPage() {
       {!routes.length && <p>{text(locale, "暂无线路。", "No routes.")}</p>}
       {routes.map(route => <article className="pickup-record" key={route.id}>
         <div><h3>{route.name} · {text(locale,`已选 ${route.students.length} 人`,`${route.students.length} selected`)} · {route.enabled ? text(locale, "已启用", "Enabled") : text(locale, "未启用", "Draft")}</h3>
-          <p>{route.routeType==='TEMPORARY'?text(locale,'临时行程','Temporary trip'):text(locale,'固定线路','Recurring route')} · {route.startsOn} — {route.endsOn} · {weekdays(route.weekdays)}</p>
+          <p>{route.routeType==='TEMPORARY'?text(locale,'临时行程','Temporary ride'):text(locale,'固定线路','Recurring route')} · {route.startsOn} — {route.endsOn} · {weekdays(route.weekdays)}</p>
           <p>{drivers.find(d => d.id === route.driverId)?.name ?? text(locale, "司机待绑定", "Driver unassigned")} · {vehicles.find(v => v.id === route.vehicleId)?.name ?? text(locale, "车辆待绑定", "Vehicle unassigned")}</p>
           <p className="form-hint">{text(locale,"常跑司机权重：","Driver familiarity: ")}{drivers.map(d=>({name:d.name,score:familiarityScore(input.driverRuns??[],d.id,[route.id],undefined,today)})).filter(d=>d.score>0).sort((a,b)=>b.score-a.score).map(d=>`${d.name} ${d.score.toFixed(1)}`).join(" · ") || text(locale,"暂无实际执行记录，优先使用已绑定司机","No completed service history; prefer the assigned driver")}</p>
           <p style={{whiteSpace:"pre-line"}}>{route.notes}</p>

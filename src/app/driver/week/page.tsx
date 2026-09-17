@@ -11,7 +11,6 @@ import {readTrialRange} from '@/lib/schedule-trial-data';
 import {db} from '@/lib/db';
 import {getTrips} from '@/lib/data';
 import {DriverWeekTabs} from '@/components/driver-week-tabs';
-import {PageHeader} from '@/components/page-header';
 import {scheduleDatePeriod,schedulePeriodLabels} from '@/lib/schedule-day-status';
 export const dynamic='force-dynamic';
 type Params={week?:string|string[];day?:string;view?:string};
@@ -26,7 +25,7 @@ export default async function DriverWeekPage({searchParams}:{searchParams:Promis
  const date=driverScheduleDate(params.week,today),monthly=params.view==='month',month=calendarMonth(date),dates=monthly?month.days:workweek(date).days;
  const selected=dates.includes(params.day??'')?params.day!:dates.includes(today)?today:dates[0];
  const props={today,monthly,month,dates,locale,initialDate:selected};
- return <div className="page-container driver-week-page"><PageHeader title={text(locale,'我的日程','My schedule')} description={text(locale,'选择日期，查看当天接送计划。','Choose a date to view your plans.')}/>
+ return <div className="page-container driver-week-page">
   <Suspense key={monthly+'-'+date+'-'+selected} fallback={<DriverWeekTabs {...props} loading statuses={dates.map(()=>'loading')}>{dates.map(d=><p key={d}>{text(locale,'正在加载日程…','Loading schedule…')}</p>)}</DriverWeekTabs>}>
    <Calendar {...props} driverId={user.driverId??''}/>
   </Suspense>
@@ -58,8 +57,8 @@ async function Day({date,today,locale,driverId,monthly}:{date:string;today:strin
   for(const event of events){if(!actualStops.has(event.trip_id))actualStops.set(event.trip_id,new Map());actualStops.get(event.trip_id)!.set(event.stopId,event);}
  }
  const rows=future?plans.map(p=>({id:p.routeId,name:p.name,stops:p.stops,count:p.students.length,status:'PUBLISHED'})):trips.map(t=>({id:t.id,name:t.routeName??'',stops:t.routeStops??[],count:t.riders.length,status:t.status}));
- return <section className={`workweek-day is-${scheduleDatePeriod(date,today)}`}><header className="workweek-day-header"><h2>{formatDate(date,locale)}</h2><span>{schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} · {rows.length} {text(locale,'个行程','trips')}</span></header>
-  {!rows.length&&<p className="workweek-empty">{text(locale,'暂无接送计划','No trips planned')}</p>}
+ return <section className={`workweek-day is-${scheduleDatePeriod(date,today)}`}><header className="workweek-day-header"><h2>{formatDate(date,locale)}</h2><span>{schedulePeriodLabels[scheduleDatePeriod(date,today)][locale]} · {rows.length} {text(locale,'个行程',rows.length===1?'ride':'rides')}</span></header>
+  {!rows.length&&<p className="workweek-empty">{text(locale,'暂无接送计划','No rides planned')}</p>}
   {rows.map(row=><article className="workweek-trip" key={row.id}>
    <div className="workweek-trip-heading"><h3>{row.name}</h3><span>{row.count} {text(locale,'名学生','students')}</span></div>
    <div className="workweek-completion"><span className={`status-badge status-${row.status.toLowerCase()}`}>{row.status==='COMPLETED'?text(locale,'已完成','Completed'):row.status==='IN_PROGRESS'?text(locale,'进行中','In progress'):row.status==='CANCELED'?text(locale,'已取消','Canceled'):text(locale,'未开始','Not started')}</span></div>

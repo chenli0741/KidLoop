@@ -770,3 +770,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .institution-code { display: block; overflow-wrap: anywhere; padding: 12px; background: #f1f5f2; border-radius: 8px; user-select: all; }
 .institution-page .account-card, .institution-card .account-card { margin: 20px 0; }
 .brand-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+.driver-date-trigger { display: inline-grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; color: inherit; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
+.driver-date-dialog { width: min(380px, calc(100vw - 32px)); }
+.driver-date-dialog h2 { margin: 0 0 18px; font-size: 20px; }
+.driver-date-dialog input { width: 100%; min-width: 0; }

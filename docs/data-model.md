@@ -4,6 +4,10 @@
 >
 > Updated: 2026-09-09
 
+## Display terminology (2026-09-17)
+
+User-facing English uses **Ride / Rides** for a passenger transport execution. Existing table names (`trips`, `trip_students`), code identifiers and API paths remain unchanged. Schedule and Route retain their separate meanings. Company branding reads `tenants.name`; the original company now uses **KidLoop Rides Service**, with its existing tenant ID and records retained.
+
 ## Core records
 
 | Table | Purpose |

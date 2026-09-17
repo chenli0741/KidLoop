@@ -10,7 +10,7 @@ export function StudentRecordActions({ student, schools, programs, locale, opera
   return (
     <RecordActions hiddenFields={{operatingTermId}} id={student.id} name={student.name} updatedAt={student.updatedAt} update={updateStudent} remove={deleteStudent}
       editTitle={text(locale, "编辑学生", "Edit student")}
-      deleteDescription={text(locale, "删除后，该学生将从名册中移除，不能再安排新行程。已有接送行程和历史记录会保留，删除不会取消已有行程。", "The student will leave the roster and cannot be assigned new trips. Existing trips and history are retained; deletion does not cancel existing trips.")}>
+      deleteDescription={text(locale, "删除后，该学生将从名册中移除，不能再安排新行程。已有接送行程和历史记录会保留，删除不会取消已有行程。", "The student will leave the roster and cannot be assigned new rides. Existing rides and history are retained; deletion does not cancel existing rides.")}>
       <label><span>{text(locale, "学生姓名", "Student name")}</span><input name="name" defaultValue={student.name} maxLength={200} required /></label>
       <label><span>{text(locale, "学校", "School")}</span><select name="schoolId" defaultValue={student.schoolId} required>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>
       <label><span>{text(locale, "班级", "Class")}</span><input name="classroomName" defaultValue={student.classroomName} maxLength={100}/></label>

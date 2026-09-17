@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   if (!await hasDashboardTasks(db, today)) await ensureRouteTasks(today);
   const [counts, trips] = await Promise.all([getDashboardCounts(today, {ensure:false}), getTrips(today, {ensure:false})]);
   const stats = [
-    { label: text(locale, "进行中行程", "Active trips"), value: counts.activeTrips, icon: Route, tone: "green" },
+    { label: text(locale, "进行中行程", "Active rides"), value: counts.activeTrips, icon: Route, tone: "green" },
     { label: text(locale, "今日学生", "Today’s riders"), value: counts.students, icon: UsersRound, tone: "blue" },
     { label: text(locale, "今日车辆", "Today’s vehicles"), value: counts.vehicles, icon: BusFront, tone: "yellow" },
     { label: text(locale, "需要处理", "Needs attention"), value: counts.attention, icon: AlertTriangle, tone: "red" },
@@ -58,12 +58,12 @@ export default async function DashboardPage() {
       <ParentRequests date={today} locale={locale} />
       <section className="content-section">
         <div className="section-heading">
-          <div><span className="eyebrow">{text(locale, "实时清单", "Live manifest")}</span><h2>{text(locale, "今日行程", "Today’s trips")}</h2></div>
+          <div><span className="eyebrow">{text(locale, "实时清单", "Live manifest")}</span><h2>{text(locale, "今日行程", "Today’s rides")}</h2></div>
           <span className="section-count">{trips.length} {text(locale, "条路线", "routes")}</span>
         </div>
         <div className="trip-list">
           {trips.length ? trips.map((trip) => <TripCard key={trip.id} trip={trip} locale={locale} />) : (
-            <EmptyState title={text(locale, "今天暂无行程", "No trips scheduled today")} body={text(locale, "已启用的固定线路会按学校日历自动显示每日任务。", "Enabled recurring routes generate daily tasks using school calendars.")} href="/routes" action={text(locale, "固定线路", "Recurring routes")} />
+            <EmptyState title={text(locale, "今天暂无行程", "No rides scheduled today")} body={text(locale, "已启用的固定线路会按学校日历自动显示每日任务。", "Enabled recurring routes generate daily tasks using school calendars.")} href="/routes" action={text(locale, "固定线路", "Recurring routes")} />
           )}
         </div>
       </section>

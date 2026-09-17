@@ -120,7 +120,7 @@ export default async function TermsPage({
           [
             "trips",
             "行程",
-            "Trips",
+            "Rides",
             ["route_name", "scheduled_date", "status"],
           ],
           [

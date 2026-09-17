@@ -31,7 +31,7 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
   for(const request of [...requests].sort((a,b)=>a.sourceRouteId.localeCompare(b.sourceRouteId))){
     const students=request.students.filter(s=>!absent.has(s.studentId)&&!temporary.has(s.studentId));
     if(students.some(s=>protectedStudents.has(s.studentId))){
-      issues.push({code:'EXTRA_STARTED',routeId:request.sourceRouteId,advisory:true,message:'提前接送涉及已执行学生，保留原行程并待人工核对 / Early pickup includes students already served; original trip retained for review'});
+      issues.push({code:'EXTRA_STARTED',routeId:request.sourceRouteId,advisory:true,message:'提前接送涉及已执行学生，保留原行程并待人工核对 / Early pickup includes students already served; original ride retained for review'});
     }
     const remaining=students.filter(s=>!protectedStudents.has(s.studentId));
     // Shared school-batch candidates become one request, not two duplicate pickups.
@@ -98,7 +98,7 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
   search(0,[],0,0);
   for(const task of tasks)if(!best.some(p=>p.routeId===task.routeId))issues.push({
     code:task.end===null?'EXTRA_TRAVEL_MISSING':'EXTRA_UNASSIGNED',routeId:task.g.sourceRouteId,advisory:true,
-    message:task.end===null?`${task.g.time} 提前接送缺少学校至目的地行驶时间 / Missing travel time for ${task.g.time} early pickup`:`${task.g.time} 提前接送未找到满足时间、座位和衔接条件的司机车辆，正常行程保留 / No feasible driver and vehicle found for ${task.g.time} early pickup; regular trip retained`,
+    message:task.end===null?`${task.g.time} 提前接送缺少学校至目的地行驶时间 / Missing travel time for ${task.g.time} early pickup`:`${task.g.time} 提前接送未找到满足时间、座位和衔接条件的司机车辆，正常行程保留 / No feasible driver and vehicle found for ${task.g.time} early pickup; regular ride retained`,
   });
   if(visits>20000)issues.push({code:'EXTRA_SEARCH_LIMIT',advisory:true,message:'加开接送搜索达到上限，需核对剩余安排 / Extra pickup search reached its limit; review remaining assignments'});
   // Report defaults actually used by the selected plan, not rejected search branches.

@@ -53,7 +53,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
     { href: "/parent", label: text(locale, "我的孩子", "My children"), icon: UsersRound },
     { href: "/parent/children", label: text(locale, "资料", "Details"), icon: ContactRound },
   ] : user.role === "DRIVER" ? [
-    { href: "/driver", label: text(locale, "行程", "Trips"), icon: BusFront },
+    { href: "/driver", label: text(locale, "行程", "Rides"), icon: BusFront },
     { href: "/driver/week", label: text(locale, "日程", "Schedule"), icon: CalendarDays },
   ] : [
     { href: "/", label: text(locale, "今日", "Today"), icon: Gauge },
