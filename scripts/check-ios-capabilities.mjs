@@ -15,3 +15,5 @@ const delegate=readFileSync(root+'ios/App/App/SceneDelegate.swift','utf8');
 const project=readFileSync(root+'ios/App/KidLoop.xcodeproj/project.pbxproj','utf8');
 if(!delegate.includes('registerPluginInstance(KidLoopOCRPlugin())')||!delegate.includes('rootViewController = KidLoopBridgeViewController()')||!project.includes('KidLoopOCRPlugin.swift in Sources')||!project.includes('DeviceVision.swift in Sources'))throw new Error('Native OCR bridge not registered or linked');
 console.log('Native OCR bridge source and registration check passed.');
+if(!delegate.includes('registerPluginInstance(KidLoopNavigationPlugin())')||!project.includes('KidLoopNavigationPlugin.swift in Sources')||!info.LSApplicationQueriesSchemes?.includes('comgooglemaps'))throw new Error('Native map navigation bridge not registered, linked or configured');
+console.log('Native Apple Maps / Google Maps navigation bridge check passed.');

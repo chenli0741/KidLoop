@@ -1,4 +1,10 @@
-import type {Trip} from './types';
+import type {Rider,Trip} from './types';
+
+export function pickupProgress(riders:Rider[]){
+ const eligible=riders.filter(rider=>!rider.otherVehicle&&!['ABSENT','EXCEPTION'].includes(rider.status));
+ const pickedUp=eligible.filter(rider=>['PICKED_UP','DROPPED_OFF'].includes(rider.status)).length;
+ return {pickedUp,waiting:eligible.length-pickedUp};
+}
 
 export function rideManifest(trip:Trip,role:'ADMIN'|'DRIVER',selectedStopIndex?:number){
  if(trip.status==='COMPLETED')return {mode:'completed' as const,riders:trip.riders};

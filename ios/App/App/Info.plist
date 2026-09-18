@@ -29,6 +29,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Convert your spoken scheduling request into editable text.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

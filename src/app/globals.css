@@ -133,6 +133,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .trip-list { display: grid; gap: 16px; }
 
 .trip-card { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.trip-card.is-collapsed { opacity: .92; }
+.trip-card-toggle { display: flex; width: calc(100% - 40px); min-height: 40px; align-items: center; justify-content: center; gap: 5px; margin: 0 20px 16px; color: var(--green); background: var(--green-soft); border: 0; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
 .trip-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 19px 20px 13px; }
 .trip-header h3 { margin: 5px 0 0; font-size: 18px; }
 .trip-header h3 span { color: #839089; font-weight: 500; }
@@ -161,7 +163,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 
 .manifest-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 9px; }
 .manifest-header h4 { margin: 0; font-size: 13px; }
-.manifest-header span { color: var(--muted); font-size: 11px; }
+.manifest-header span { color: var(--muted); font-size: 11px; text-align: right; }
 .manifest-list { padding: 0 12px 12px; }
 .rider-row { display: grid; grid-template-columns: 48px minmax(140px, 1fr) minmax(170px, 1fr) auto minmax(150px, auto); align-items: center; gap: 12px; min-height: 68px; padding: 9px 8px; border-top: 1px solid #edf0ee; }
 .student-photo { position: relative; overflow: hidden; width: 46px; height: 46px; background: transparent; border-radius: 6px; }
@@ -256,6 +258,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .record-photo-preview { display: flex; gap: 14px; align-items: center; }
 .record-photo-preview img { object-fit: contain; border-radius: 5px; }
 .record-dialog .record-checkbox { display: flex; align-items: center; gap: 8px; }
+.navigation-dialog { width: min(440px, calc(100vw - 24px)); }
+.navigation-dialog .record-dialog-heading { align-items: flex-start; }
+.navigation-dialog .map-address { margin: 5px 0 0; }
+.navigation-provider-list { display: grid; gap: 10px; }
 .record-checkbox input { width: 18px; height: 18px; min-height: 18px; }
 .student-weekdays { display: flex; flex-wrap: wrap; gap: 8px 16px; min-width: 0; margin: 0; padding: 8px 0; border: 0; }
 .student-weekdays legend { font-size: 13px; font-weight: 600; }

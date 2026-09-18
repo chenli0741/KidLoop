@@ -27,5 +27,6 @@ class KidLoopBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(KidLoopOCRPlugin())
         bridge?.registerPluginInstance(KidLoopMailAuthPlugin())
+        bridge?.registerPluginInstance(KidLoopNavigationPlugin())
     }
 }

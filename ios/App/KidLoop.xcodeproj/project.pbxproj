@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A91800010000000000000001 /* KidLoopNavigationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91800010000000000000002 /* KidLoopNavigationPlugin.swift */; };
 		570057005700570057005701 /* KidLoopMailAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570057005700570057005702 /* KidLoopMailAuthPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		33A3BAA403CB4156887A0A69 /* KidLoopOCRPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8264DD725DBF4400AAC745C3 /* KidLoopOCRPlugin.swift */; };
@@ -23,6 +24,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A91800010000000000000002 /* KidLoopNavigationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopNavigationPlugin.swift; sourceTree = "<group>"; };
 		570057005700570057005702 /* KidLoopMailAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopMailAuthPlugin.swift; sourceTree = "<group>"; };
 		201BC8A0ABD54DF9AF782FE2 /* DeviceVision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceVision.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
+				A91800010000000000000002 /* KidLoopNavigationPlugin.swift */,
 				570057005700570057005702 /* KidLoopMailAuthPlugin.swift */,
 				8264DD725DBF4400AAC745C3 /* KidLoopOCRPlugin.swift */,
 				201BC8A0ABD54DF9AF782FE2 /* DeviceVision.swift */,
@@ -174,6 +177,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				A91800010000000000000001 /* KidLoopNavigationPlugin.swift in Sources */,
 				570057005700570057005701 /* KidLoopMailAuthPlugin.swift in Sources */,
 				33A3BAA403CB4156887A0A69 /* KidLoopOCRPlugin.swift in Sources */,
 				9F3AE0131FFF42019733235B /* DeviceVision.swift in Sources */,

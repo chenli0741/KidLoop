@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import {PickupCamera} from './pickup-camera';
 import {StudentPhotoPreview} from './student-photo-preview';
-import { BusFront, ChevronDown, Clock3, UsersRound } from "lucide-react";
+import { BusFront, ChevronDown, ChevronRight, Clock3, UsersRound } from "lucide-react";
 import { LocationMap } from "@/components/location-map";
 import { formatTime } from "@/lib/date";
-import {rideManifest} from "@/lib/ride-manifest";
+import {pickupProgress,rideManifest} from "@/lib/ride-manifest";
+import {driverRideOrder} from "@/lib/ride-order";
 import type { Trip } from "@/lib/types";
 import { StatusActions } from "@/components/status-actions";
 import { StatusBadge } from "@/components/status-badge";
@@ -23,6 +24,7 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
   }
   const refreshEpoch = useRef(0);
   const [selectedStopIndex, setSelectedStopIndex] = useState<number | null>(null);
+  const [completedExpanded,setCompletedExpanded]=useState(false);
   const [syncFailed,setSyncFailed]=useState(false);
   useEffect(()=>{
     if(!source.hasSharedPickups)return;
@@ -74,9 +76,11 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
   }
   const countedRiders = trip.riders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
   const completed = countedRiders.filter((rider) => rider.status === 'DROPPED_OFF').length;
+  const isCompleted=trip.status==='COMPLETED';
+  const showDetails=!isCompleted||completedExpanded;
 
   return (
-    <article className="trip-card">
+    <article className={`trip-card${isCompleted&&!completedExpanded?' is-collapsed':''}`} style={{order:driverRideOrder(trip.status)}}>
       {(syncFailed||executionSyncFailed)&&<p role="alert">{text(locale,"名单同步中断，正在重试。请联网后核对再操作。","Manifest sync interrupted. Retrying; reconnect and verify before updating.")}</p>}
       <header className="trip-header">
         <div>
@@ -92,13 +96,16 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
         <span><Clock3 size={16} /> {completed}/{countedRiders.length} {text(locale, "已完成", "complete")}</span>
       </div>
 
-      <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Ride completion")} aria-valuemin={0} aria-valuemax={countedRiders.length || 1} aria-valuenow={completed}>
-        <span style={{ width: `${countedRiders.length ? completed / countedRiders.length * 100 : 0}%` }} />
-      </div>
+      {isCompleted&&<button type="button" className="trip-card-toggle" aria-expanded={completedExpanded} onClick={()=>setCompletedExpanded(value=>!value)}>{completedExpanded?<ChevronDown size={17}/>:<ChevronRight size={17}/>} {completedExpanded?text(locale,"收起详情","Hide details"):text(locale,"查看详情","View details")}</button>}
 
-      <section className="trip-segment">
-        <TripSegmentContent role={role} selectedStopIndex={selectedStopIndex ?? trip.currentStopIndex ?? 0} onSelectStop={setSelectedStopIndex} showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} journeyTrip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>
-      </section>
+      {showDetails&&<>
+        <div className="trip-progress" role="progressbar" aria-label={text(locale, "行程完成进度", "Ride completion")} aria-valuemin={0} aria-valuemax={countedRiders.length || 1} aria-valuenow={completed}>
+          <span style={{ width: `${countedRiders.length ? completed / countedRiders.length * 100 : 0}%` }} />
+        </div>
+        <section className="trip-segment">
+          <TripSegmentContent role={role} selectedStopIndex={selectedStopIndex ?? trip.currentStopIndex ?? 0} onSelectStop={setSelectedStopIndex} showParentContact={showParentContact} cameraEnabled={cameraEnabled} trip={trip} journeyTrip={trip} locale={locale} interactive={interactive} onUpdated={onUpdated}/>
+        </section>
+      </>}
     </article>
   );
 }
@@ -111,9 +118,11 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
   const visibleRiders=manifest.riders;
   const sortedRiders=[...visibleRiders].sort((a,b)=>Number(Boolean(a.otherVehicle))-Number(Boolean(b.otherVehicle)) || a.classroomName.localeCompare(b.classroomName) || a.name.localeCompare(b.name));
   const countedRiders = visibleRiders.filter((rider) => !rider.otherVehicle && !['ABSENT','EXCEPTION'].includes(rider.status));
+  const pickup=pickupProgress(visibleRiders);
+  const showPickupProgress=manifest.mode==='stop'&&Boolean(currentStop?.schoolId);
   return <>
 
-      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li className={`${i < currentIndex ? "is-passed " : i === currentIndex ? (inTransit ? "is-in-transit " : "is-current ") : "is-upcoming "}${i === (selectedStopIndex ?? currentIndex) ? "is-selected" : ""}`} aria-current={i === currentIndex && !inTransit ? "step" : undefined} key={stop.id}><div className="fixed-stop-select"><button type="button" className="fixed-stop-main" disabled={!onSelectStop} onClick={() => onSelectStop?.(i)}><span className="fixed-stop-marker"><span className="fixed-stop-number">{i+1}</span>{i === currentIndex && <BusFront className={`fixed-stop-current-icon${inTransit ? " is-travelling" : ""}`} size={15} aria-label={text(locale, "当前行程位置", "Current ride position")} />}</span><span className="fixed-stop-copy"><span className="fixed-stop-title"><small>{stop.time}</small><strong>{stop.name}</strong>{i === currentIndex && <em className="fixed-stop-current">{inTransit ? text(locale, "行驶中", "En route") : text(locale, "当前", "Current")}</em>}</span><span className="fixed-stop-address">{stop.address}</span></span></button><LocationMap compact name={stop.name} address={stop.address}/></div>{i === currentIndex && inTransit && <span className="fixed-stop-transit-track" role="img" aria-label={text(locale, `正在从 ${stop.name} 前往 ${trip.routeStops?.[i+1]?.name}`, `Travelling from ${stop.name} to ${trip.routeStops?.[i+1]?.name}`)}>{[0,1,2].map(n=><ChevronDown key={n} className="fixed-stop-transit-arrow" size={14} aria-hidden="true"/>)}</span>}</li>)}</ol> : <div className="route-strip">
+      {showStops && (trip.routeStops?.length ? <ol className="fixed-trip-stops">{trip.routeStops.map((stop,i)=><li className={`${i < currentIndex ? "is-passed " : i === currentIndex ? (inTransit ? "is-in-transit " : "is-current ") : "is-upcoming "}${i === (selectedStopIndex ?? currentIndex) ? "is-selected" : ""}`} aria-current={i === currentIndex && !inTransit ? "step" : undefined} key={stop.id}><div className="fixed-stop-select"><button type="button" className="fixed-stop-main" disabled={!onSelectStop} onClick={() => onSelectStop?.(i)}><span className="fixed-stop-marker"><span className="fixed-stop-number">{i+1}</span>{i === currentIndex && <BusFront className={`fixed-stop-current-icon${inTransit ? " is-travelling" : ""}`} size={15} aria-label={text(locale, "当前行程位置", "Current ride position")} />}</span><span className="fixed-stop-copy"><span className="fixed-stop-title"><small>{stop.time}</small><strong>{stop.name}</strong>{i === currentIndex && <em className="fixed-stop-current">{inTransit ? text(locale, "行驶中", "En route") : text(locale, "当前", "Current")}</em>}</span><span className="fixed-stop-address">{stop.address}</span></span></button><LocationMap compact navigate name={stop.name} address={stop.address}/></div>{i === currentIndex && inTransit && <span className="fixed-stop-transit-track" role="img" aria-label={text(locale, `正在从 ${stop.name} 前往 ${trip.routeStops?.[i+1]?.name}`, `Travelling from ${stop.name} to ${trip.routeStops?.[i+1]?.name}`)}>{[0,1,2].map(n=><ChevronDown key={n} className="fixed-stop-transit-arrow" size={14} aria-hidden="true"/>)}</span>}</li>)}</ol> : <div className="route-strip">
         <div className="route-stop">
           <span className="route-dot pickup" />
           <div>
@@ -149,7 +158,7 @@ function TripSegmentContent({trip,journeyTrip,locale,interactive,onUpdated,showS
       {cameraEnabled && interactive && !inTransit && selectedStopIndex === currentIndex && currentStop?.schoolId && !["DRAFT","CANCELED","COMPLETED"].includes(trip.status) && <PickupCamera trip={{...trip, riders: visibleRiders}} locale={locale} onUpdated={onUpdated}/>}
       <div className="manifest-header">
         <h4>{manifest.mode==='completed'?text(locale,"本趟全部学生","All riders in this ride"):manifest.mode==='onboard'?text(locale,"当前车上学生","Students on board"):text(locale, "接送学生清单", "Pickup manifest")}</h4>
-        <span>{manifest.mode==='completed'?text(locale,`共 ${visibleRiders.length} 名学生`,`${visibleRiders.length} students`):manifest.mode==='onboard'?text(locale,`车上 ${visibleRiders.length} 人 · ${trip.capacity} 座`,`${visibleRiders.length} on board · ${trip.capacity} seats`):trip.hasSharedPickups ? text(locale,`共享接送：本车应接 ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} 人 · ${trip.capacity} 座`,`Shared pickup: this vehicle should take ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} riders · ${trip.capacity} seats`) : trip.routeName ? text(locale, `Pickup ${countedRiders.length} 人 · ${trip.capacity} 座`, `Pickup ${countedRiders.length} · ${trip.capacity} seats`) : text(locale, `Pickup ${countedRiders.length}/${trip.capacity} 个座位`, `Pickup ${countedRiders.length} of ${trip.capacity} seats`)}</span>
+        <span>{manifest.mode==='completed'?text(locale,`共 ${visibleRiders.length} 名学生`,`${visibleRiders.length} students`):manifest.mode==='onboard'?text(locale,`车上 ${visibleRiders.length} 人 · ${trip.capacity} 座`,`${visibleRiders.length} on board · ${trip.capacity} seats`):showPickupProgress?text(locale,`已接 ${pickup.pickedUp} · 待接 ${pickup.waiting} · ${trip.capacity} 座`,`Picked up ${pickup.pickedUp} · Waiting ${pickup.waiting} · ${trip.capacity} seats`):trip.hasSharedPickups ? text(locale,`共享接送：本车应接 ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} 人 · ${trip.capacity} 座`,`Shared pickup: this vehicle should take ${trip.sharedPickupMin ?? 0}–${trip.sharedPickupMax ?? trip.capacity} riders · ${trip.capacity} seats`) : trip.routeName ? text(locale, `Pickup ${countedRiders.length} 人 · ${trip.capacity} 座`, `Pickup ${countedRiders.length} · ${trip.capacity} seats`) : text(locale, `Pickup ${countedRiders.length}/${trip.capacity} 个座位`, `Pickup ${countedRiders.length} of ${trip.capacity} seats`)}</span>
       </div>
       {manifest.mode==='onboard' && !visibleRiders.length && <p className="form-hint">{text(locale,"当前车上无学生","No students on board")}</p>}
       <div className="manifest-list">

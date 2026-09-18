@@ -11,6 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## App 内链接跳转规范
 
 - KidLoop App 内的所有链接跳转必须始终留在 App 内，不得唤起 Safari、Chrome 或其他外部浏览器。
+- 司机行程 stop 点的导航按钮属于明确例外：它应让司机选择已安装的 Apple Maps 或 Google Maps，并直接进入驾车导航；它不是普通网页链接，也不得只弹出无导航能力的地图预览。取消或启动失败时留在 KidLoop App 内。
 - 站内页面使用 App 内导航；外部网页、地图链接及图片或文件预览使用 App 内浏览或预览界面，并提供返回或关闭入口。
 - 新增或修改链接时，必须同时检查普通链接、`target="_blank"`、`window.open` 和重定向行为。无法在 App 内打开时，应在 App 内提示，不得自动回退到外部浏览器。
 - 验收须覆盖 iPhone App 内的实际跳转和返回流程，不能只以桌面浏览器测试代替。
