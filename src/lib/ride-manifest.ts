@@ -6,6 +6,12 @@ export function pickupProgress(riders:Rider[]){
  return {pickedUp,waiting:eligible.length-pickedUp};
 }
 
+export function dropoffProgress(riders:Rider[]){
+ const eligible=riders.filter(rider=>!rider.otherVehicle&&['PICKED_UP','DROPPED_OFF'].includes(rider.status));
+ const droppedOff=eligible.filter(rider=>rider.status==='DROPPED_OFF').length;
+ return {droppedOff,waiting:eligible.length-droppedOff};
+}
+
 export function rideManifest(trip:Trip,role:'ADMIN'|'DRIVER',selectedStopIndex?:number){
  if(trip.status==='COMPLETED')return {mode:'completed' as const,riders:trip.riders};
  if(trip.progressState==='IN_TRANSIT')return {mode:'onboard' as const,riders:trip.riders.filter(r=>r.status==='PICKED_UP'&&!r.otherVehicle)};

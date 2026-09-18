@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {pickupProgress,rideManifest} from '../src/lib/ride-manifest';
+import {dropoffProgress,pickupProgress,rideManifest} from '../src/lib/ride-manifest';
 import type {Trip} from '../src/lib/types';
 const trip={status:'IN_PROGRESS',progressState:'AT_STOP',currentStopIndex:1,routeStops:[{id:'school',schoolId:'school'},{id:'program',programId:'program'}],riders:[
  {id:'delivered',status:'DROPPED_OFF',pickupStopId:'school',dropoffStopId:'program'},
@@ -29,4 +29,8 @@ test('at a stop retains current destination delivery roster and partial delivery
 test('pickup progress counts picked and waiting riders without absences, exceptions, or other vehicles',()=>{
  const progress=pickupProgress(trip.riders);
  assert.deepEqual(progress,{pickedUp:2,waiting:1});
+});
+test('dropoff progress counts only riders who boarded this vehicle',()=>{
+ const progress=dropoffProgress(trip.riders);
+ assert.deepEqual(progress,{droppedOff:1,waiting:1});
 });
