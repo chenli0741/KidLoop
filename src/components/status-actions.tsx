@@ -63,7 +63,7 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
   }
 
   return (
-    <div className="status-actions">
+    <div className="status-actions" aria-busy={pending || manifestPending}>
       <div className="status-button-row">
         {atDropoff && status === "PICKED_UP" ? <button type="button" className="button compact primary" disabled={pending||manifestPending} onClick={() => update("DROPPED_OFF")}><Check size={16}/>{text(locale,"送达","Drop off")}</button> : null}
         {role === "DRIVER" && status === "SCHEDULED" ? (

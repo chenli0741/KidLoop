@@ -1,5 +1,7 @@
 import { WorkspaceBoundary } from "@/components/workspace-boundary";
+import { AppVersionRefresh } from "@/components/app-version-refresh";
 import { getUser } from "@/lib/auth";
+import { getAppVersion } from "@/lib/app-version";
 import type { Metadata, Viewport } from "next";
 import { AppNavigation } from "@/components/app-navigation";
 import { LocaleProvider } from "@/components/locale-provider";
@@ -25,12 +27,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const [locale, user] = await Promise.all([getLocale(), getUser()]);
+  const appVersion = getAppVersion();
   return (
     <html lang={locale === "zh" ? "zh-CN" : "en"}>
       <body>
         <LocaleProvider locale={locale}>
           {user ? <div className="app-shell">
             <WorkspaceBoundary contextKey={user.contextKey!} />
+            <AppVersionRefresh version={appVersion} />
             <AppNavigation user={user} />
             <main className="app-main">{children}</main>
           </div> : children}

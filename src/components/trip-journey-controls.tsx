@@ -6,6 +6,7 @@ import {withOperationTimeout} from "@/lib/operation-timeout";
 import { captureOperationLocation } from "@/lib/capture-operation-location";
 import { advanceTripStop } from "@/app/driver/actions";
 import { text, type Locale } from "@/lib/i18n";
+import { sharedRidersNeededAtStop } from "@/lib/shared-pickup-progress";
 import type { Trip } from "@/lib/types";
 import type { TripExecution } from "@/lib/trip-execution";
 
@@ -22,8 +23,7 @@ export function TripJourneyControls({ trip, locale, onUpdated }: { trip: Trip; l
   const atStopRiders = stop ? trip.riders.filter(r => r.pickupStopId === stop.id || r.dropoffStopId === stop.id) : trip.riders;
   const pendingRiders = stop?.schoolId ? atStopRiders.filter(r => r.pickupStopId === stop.id && r.status === "SCHEDULED").length : 0;
   const pendingNonSharedRiders = stop?.schoolId ? atStopRiders.filter(r => !r.shared && r.pickupStopId === stop.id && r.status === "SCHEDULED").length : 0;
-  const pickedSharedRiders = stop?.schoolId ? atStopRiders.filter(r => r.shared&&!r.otherVehicle&&r.pickupStopId===stop.id&&["PICKED_UP","DROPPED_OFF"].includes(r.status)).length : 0;
-  const sharedNeeded = stop?.schoolId&&trip.hasSharedPickups ? Math.max(0,(trip.sharedPickupMin??0)-pickedSharedRiders) : 0;
+  const sharedNeeded = stop?.schoolId&&trip.hasSharedPickups ? sharedRidersNeededAtStop(trip.riders,stop.id,trip.sharedPickupMin??0) : 0;
   const blockingPickupRiders=pendingNonSharedRiders+sharedNeeded;
   const dropoffRiders = stop?.programId ? atStopRiders.filter(r => r.dropoffStopId === stop.id && r.status === "PICKED_UP").length : 0;
   const finishing = !inTransit && index === trip.routeStops.length - 1 && dropoffRiders === 0 && pendingRiders === 0;
@@ -31,7 +31,7 @@ export function TripJourneyControls({ trip, locale, onUpdated }: { trip: Trip; l
   const target = dropoffRiders ? stop : trip.routeStops[Math.min(index + 1, trip.routeStops.length - 1)];
   const targetName = target?.name ?? "";
   const label = finishing ? { zh: "结束行程", en: "Finish ride" } : inTransit ? { zh: `到达 · ${targetName}`, en: `Arrive · ${targetName}` } : dropoffRiders ? { zh: `全部送达 · ${targetName}`, en: `Drop off all · ${targetName}` } : { zh: `出发 · ${targetName}`, en: `GO · ${targetName}` };
-  return <div className="trip-journey-controls">
+  return <div className="trip-journey-controls" aria-busy={pending}>
     <button type="button" className="button primary trip-start-button" disabled={pending || blockingPickupRiders > 0} onClick={async () => {
       if(saving.current)return;
       saving.current=true;setPending(true);setError("");
