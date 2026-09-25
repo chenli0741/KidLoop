@@ -318,9 +318,17 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
 }
 
 export async function updateRiderStatus(tripStudentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
+  const startedAt = Date.now();
   const user = await requireUser(["ADMIN", "DRIVER"], true);
-  return transaction(async (client) => {
-    const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details, targetTripId, location);
-    return readTripExecution(client, tripId);
-  });
+  try {
+    const result = await transaction(async (client) => {
+      const tripId = await changeRiderStatus(client, user, tripStudentId, nextStatus, details, targetTripId, location);
+      return readTripExecution(client, tripId);
+    });
+    console.log(JSON.stringify({level:"info",message:"Rider status updated",operation:"updateRiderStatus",durationMs:Date.now()-startedAt,shared:Boolean(targetTripId),nextStatus}));
+    return result;
+  } catch (error) {
+    console.error(JSON.stringify({level:"error",message:"Rider status update failed",operation:"updateRiderStatus",durationMs:Date.now()-startedAt,shared:Boolean(targetTripId),nextStatus,error:error instanceof Error?error.message:String(error)}));
+    throw error;
+  }
 }

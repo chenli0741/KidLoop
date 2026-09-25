@@ -4,6 +4,7 @@ import type {AuthUser} from './types';
 import type {RouteStop} from './fixed-route-types';
 import {readTripExecution} from './read-trip-execution';
 import {normalizeOperationLocation} from './operation-location';
+import {sharedPickupDeparture} from './shared-pickups';
 export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:string,action:'GO'|'ARRIVE'|'DROP_OFF',location?:unknown){
  if(!['DRIVER','ADMIN'].includes(user.role)||(user.role==='DRIVER'&&!user.driverId))throw new Error('Trip unavailable.');
 
@@ -21,7 +22,7 @@ export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:st
       return readTripExecution(c,tripId);
     }
     if(row.progress_state!=='AT_STOP') throw new Error('Arrive at the current stop first.');
-    const riders=(await c.query<{id:string;status:string;pickup_stop_id:string|null;dropoff_stop_id:string|null}>("select id,status,pickup_stop_id,dropoff_stop_id from trip_students where trip_id=$1 for update",[tripId])).rows;
+    const riders=(await c.query<{id:string;status:string;pickup_stop_id:string|null;dropoff_stop_id:string|null;shared:boolean}>("select id,status,pickup_stop_id,dropoff_stop_id,exists(select 1 from shared_pickup_members m where m.assignment_id=trip_students.id) as shared from trip_students where trip_id=$1 for update",[tripId])).rows;
     const atPickup=riders.filter(r=>r.pickup_stop_id===stop.id);
     const atDropoff=riders.filter(r=>r.dropoff_stop_id===stop.id);
     if(action==='DROP_OFF') {
@@ -34,7 +35,10 @@ export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:st
       await c.query("update trips set updated_at=clock_timestamp() where id=$1",[tripId]);
       return readTripExecution(c,tripId);
     }
-    if(stop.schoolId && atPickup.some(r=>r.status==='SCHEDULED')) throw new Error('Resolve all students at this school first.');
+    if(stop.schoolId) {
+      const shared=await sharedPickupDeparture(c,tripId,stop.id);
+      if(atPickup.some(r=>r.status==='SCHEDULED'&&!r.shared)||shared&&(!shared.feasible||shared.picked<shared.min)) throw new Error('Resolve the required students at this school first.');
+    }
     if(stop.programId && atDropoff.some(r=>r.status==='PICKED_UP')) throw new Error('Drop off all students at this stop first.');
     if(index===row.route_stops.length-1) await c.query("update trips set status='COMPLETED',progress_state='AT_STOP',updated_at=clock_timestamp() where id=$1",[tripId]);
     else await c.query("update trips set status='IN_PROGRESS',progress_state='IN_TRANSIT',updated_at=clock_timestamp() where id=$1",[tripId]);

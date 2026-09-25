@@ -87,6 +87,7 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
 
 export async function claimSharedPickup(c:PoolClient,user:AuthUser,assignmentId:string,targetId:string,nextStatus:string) {
   const row=(await c.query(`select ts.trip_id,ts.status,
+    ts.pickup_stop_id as owner_pickup_stop_id,ts.dropoff_stop_id as owner_dropoff_stop_id,
     case when ts.trip_id=$2 then ts.pickup_stop_id else m.pickup_stop_id end as pickup_stop_id,
     case when ts.trip_id=$2 then ts.dropoff_stop_id else m.dropoff_stop_id end as dropoff_stop_id,
     t.route_stops,t.status as trip_status,v.capacity
@@ -111,7 +112,39 @@ export async function claimSharedPickup(c:PoolClient,user:AuthUser,assignmentId:
     if(overCapacity(row.route_stops,riders,row.capacity))throw new Error('CAPACITY_EXCEEDED');
   }
   if(row.trip_id!==targetId) {
+    // Keep the former owner as a participant after the canonical assignment moves.
+    // Otherwise that vehicle loses the rider from its live shared-pool projection.
+    await c.query(`insert into shared_pickup_members(assignment_id,trip_id,pickup_stop_id,dropoff_stop_id)
+      values($1,$2,$3,$4) on conflict do nothing`,[assignmentId,row.trip_id,row.owner_pickup_stop_id,row.owner_dropoff_stop_id]);
     await c.query('update trip_students set trip_id=$2,pickup_stop_id=$3,dropoff_stop_id=$4 where id=$1',[assignmentId,targetId,row.pickup_stop_id,row.dropoff_stop_id]);
   }
   return row.trip_id as string;
+}
+
+export async function sharedPickupDeparture(c:SqlReader,tripId:string,pickupStopId:string){
+  const pool=(await c.query<{total:number;picked:number}>(`with pool as (
+    select distinct ts.id,ts.status,ts.trip_id
+    from trip_students ts
+    left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
+    where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
+      and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
+   ) select count(*) filter(where status not in ('ABSENT','EXCEPTION'))::int as total,
+     count(*) filter(where trip_id=$1 and status in ('PICKED_UP','DROPPED_OFF'))::int as picked from pool`,[tripId,pickupStopId])).rows[0];
+  if(!pool?.total)return null;
+  const vehicles=(await c.query<{tripId:string;capacity:number;fixed:number}>(`with pool as (
+    select distinct ts.id
+    from trip_students ts
+    left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
+    where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
+      and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
+   ), participants as (
+    select ts.trip_id from trip_students ts join pool on pool.id=ts.id
+    union select m.trip_id from shared_pickup_members m join pool on pool.id=m.assignment_id
+   ) select t.id as "tripId",v.capacity,
+    count(ts.id) filter(where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
+   from participants p join trips t on t.id=p.trip_id join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
+   left join trip_students ts on ts.trip_id=t.id group by t.id,v.capacity`,[tripId,pickupStopId])).rows;
+  const bounds=sharedPickupBounds(pool.total,vehicles.map(vehicle=>({tripId:vehicle.tripId,availableSeats:vehicle.capacity-vehicle.fixed})));
+  const current=bounds.vehicles.find(vehicle=>vehicle.tripId===tripId);
+  return current?{...current,picked:pool.picked,total:pool.total,feasible:bounds.feasible}:null;
 }

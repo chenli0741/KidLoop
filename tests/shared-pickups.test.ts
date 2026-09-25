@@ -9,6 +9,7 @@ import {addSharedRiders} from '../src/lib/shared-pickups';
 import {finishTripSegment} from '../src/lib/finish-trip-segment';
 import {photoAccessSql} from '../src/lib/student-photos';
 import {changeRiderStatus} from '../src/lib/rider-status';
+import {advanceTripStopRecord} from '../src/lib/advance-trip-stop';
 import type {AuthUser,Trip} from '../src/lib/types';
 
 test('shared pickups: simultaneous claim, authorization, undo, fixed seat reservation, canonical history',async()=>{
@@ -54,6 +55,12 @@ test('shared pickups: simultaneous claim, authorization, undo, fixed seat reserv
  assert.equal(canonicalManifest[0].sharedPickupMin,1);
  assert.equal(canonicalManifest[0].sharedPickupMax,8);
  const gps={status:'CAPTURED',latitude:37.4,longitude:-122.1,accuracyMeters:15,capturedAt:'2026-09-08T20:00:00.000Z'};
+ await assert.rejects(txn(async c=>{
+  await changeRiderStatus(c,drivers[1],assignments[0],'PICKED_UP',undefined,tripIds[1],gps);
+  await advanceTripStopRecord(c,drivers[1],tripIds[1],'GO',gps);
+  assert.equal((await c.query('select progress_state from trips where id=$1',[tripIds[1]])).rows[0].progress_state,'IN_TRANSIT','vehicle may depart at its shared minimum');
+  throw new Error('ROLLBACK_DEPARTURE_CHECK');
+ }),/ROLLBACK_DEPARTURE_CHECK/);
  await txn(c=>changeRiderStatus(c,drivers[1],assignments[0],'PICKED_UP',undefined,tripIds[1],gps));
  assert.equal((await setup.query('select status from trip_students where id=$1',[assignments[0]])).rows[0].status,'PICKED_UP','canonical shared owner can confirm pickup');
  await txn(c=>changeRiderStatus(c,drivers[1],assignments[0],'SCHEDULED',undefined,tripIds[1],gps));
@@ -62,6 +69,7 @@ test('shared pickups: simultaneous claim, authorization, undo, fixed seat reserv
  await assert.rejects(txn(c=>confirmCameraPickup(c,drivers[0],tripIds[0],assignments,gps)),/CAPACITY_EXCEEDED/);
  assert.equal((await setup.query("select count(*)::int n from status_history")).rows[0].n,0,'failed batch rolls back all riders and history');
  await txn(c=>confirmCameraPickup(c,drivers[0],tripIds[0],assignments.slice(0,2),gps));
+ assert.equal((await setup.query('select count(*)::int n from shared_pickup_members where assignment_id=$1',[assignments[0]])).rows[0].n,2,'moving the canonical assignment retains both vehicle memberships');
  await assert.rejects(txn(c=>confirmCameraPickup(c,drivers[1],tripIds[1],assignments.slice(0,2),gps)));
  for(const id of assignments.slice(0,2))await txn(c=>changeRiderStatus(c,drivers[0],id,'SCHEDULED',undefined,tripIds[0],gps));
  const claim=(driver:number,id:string,next:'PICKED_UP'|'SCHEDULED'='PICKED_UP')=>txn(c=>changeRiderStatus(c,drivers[driver],id,next,undefined,tripIds[driver],gps));
