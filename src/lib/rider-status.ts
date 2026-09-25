@@ -4,19 +4,19 @@ import "server-only";
 import type { PoolClient } from "pg";
 import type { AuthUser, RiderStatus } from "./types";
 import { requireTerm } from "./operating-terms";
-import { recomputeTrip } from "./day-plans";
 import type { MissedPickupDetails } from "./missed-pickup";
 
 export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
   if (!["ADMIN", "DRIVER"].includes(user.role) || (user.role === "DRIVER" && !user.driverId)) throw new Error("Assignment unavailable.");
-  await client.query("select pg_advisory_xact_lock(70919009)");
+  // Different riders must remain independent. Only serialize attempts to mutate
+  // the same assignment, which is the shared-pickup double-claim boundary.
+  await client.query("select pg_advisory_xact_lock(hashtextextended($1::text,70919010))", [assignmentId]);
   await requireTerm(client);
   if(!targetTripId) {
     const shared=(await client.query("select ts.trip_id from trip_students ts where ts.id=$1 and exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id)",[assignmentId])).rows[0];
     if(shared) targetTripId=shared.trip_id;
   }
-  let oldTripId: string | undefined;
-  if(targetTripId) oldTripId = await claimSharedPickup(client,user,assignmentId,targetTripId,nextStatus);
+  if(targetTripId) await claimSharedPickup(client,user,assignmentId,targetTripId,nextStatus);
   const target = await client.query<{ student_id: string; trip_id: string }>(`
     select ts.student_id, ts.trip_id from trip_students ts
     join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
@@ -27,12 +27,14 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   const { student_id: studentId, trip_id: tripId } = target.rows[0];
   // Match parent-plan and route-completion lock order.
   await client.query("select id from students where id = $1 for update", [studentId]);
-  const trip = await client.query<{ status: string; scheduled_date: string; current_stop_index: number; progress_state: string; route_stops: Array<{id:string;schoolId:string|null;programId:string|null}> | null }>("select status,scheduled_date::text,current_stop_index,progress_state,route_stops from trips where id = $1 for update", [tripId]);
   const current = await client.query<{ trip_id:string; status: RiderStatus; parent_absence: boolean; pickup_stop_id: string; dropoff_stop_id: string }>(
     "select trip_id, status, parent_absence, pickup_stop_id, dropoff_stop_id from trip_students where id = $1 for update", [assignmentId],
   );
   const rider = current.rows[0];
   if(!rider || rider.trip_id!==tripId)throw new Error('Assignment changed. Refresh before updating.');
+  // Read the trip after locking this assignment. If GO won the race, this sees
+  // the new stop and rejects the stale pickup; if pickup won, GO waits for it.
+  const trip = await client.query<{ status: string; scheduled_date: string; current_stop_index: number; progress_state: string; route_stops: Array<{id:string;schoolId:string|null;programId:string|null}> | null }>("select status,scheduled_date::text,current_stop_index,progress_state,route_stops from trips where id = $1", [tripId]);
   const undo = rider.status === "DROPPED_OFF" && nextStatus === "PICKED_UP";
   const deliveryChange = nextStatus === "DROPPED_OFF" || undo;
   const currentStop = trip.rows[0].route_stops?.[trip.rows[0].current_stop_index];
@@ -75,10 +77,7 @@ export async function changeRiderStatus(client: PoolClient, user: AuthUser, assi
   await client.query("insert into status_history (trip_student_id, from_status, to_status, actor_id, reason_id, note, operation_location) values ($1, $2, $3, $4, $5, $6, $7::jsonb)", [assignmentId, rider.status, nextStatus, user.id, reasonId, nextStatus === "EXCEPTION" ? "Driver recorded a special reason" : nextStatus === "ABSENT" ? "Admin recorded an absence" : "", JSON.stringify(normalizeOperationLocation(location))]);
   if(deliveryChange){
     // Delivery is not Finish: retain the explicit final-stop completion action.
-    await client.query("update trips set status='IN_PROGRESS',updated_at=clock_timestamp() where id=$1",[tripId]);
     if(nextStatus==='DROPPED_OFF')await client.query("insert into trip_stop_events(trip_id,stop_index,event_type,actor_id,operation_location) values($1,$2,'DROP_OFF',$3,$4::jsonb)",[tripId,trip.rows[0].current_stop_index,user.id,JSON.stringify(normalizeOperationLocation(location))]);
-  } else await recomputeTrip(client, tripId);
-  if(oldTripId && oldTripId!==tripId) await recomputeTrip(client,oldTripId);
-  await client.query(`update trips set updated_at=clock_timestamp() where id in (select trip_id from shared_pickup_members where assignment_id=$1)`,[assignmentId]);
+  }
   return tripId;
 }

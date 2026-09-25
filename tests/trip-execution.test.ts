@@ -24,3 +24,13 @@ test('server reconciliation recovers a lost last-pickup response and rejects old
  assert.equal(recovered.currentStopIndex,2);
  assert.equal(applyTripExecution(recovered,{...confirmed,version:trip.executionVersion!,riders:[{id:'last',status:'SCHEDULED'}]}),recovered);
 });
+
+test('independent rider saves merge even when their responses arrive out of order',()=>{
+ const trip={id:'trip',executionVersion:'2026-09-25T20:00:00.000001',status:'IN_PROGRESS',completedSegments:[],riders:[
+  {id:'one',status:'SCHEDULED'},{id:'two',status:'SCHEDULED'},
+ ]} as unknown as Trip;
+ const second=applyTripExecution(trip,{tripId:'trip',version:'2026-09-25T20:00:02.000001',status:'IN_PROGRESS',completedSegments:[],partial:true,riders:[{id:'two',status:'PICKED_UP'}]});
+ const first=applyTripExecution(second,{tripId:'trip',version:'2026-09-25T20:00:01.000001',status:'IN_PROGRESS',completedSegments:[],partial:true,riders:[{id:'one',status:'PICKED_UP'}]});
+ assert.deepEqual(first.riders.map(rider=>rider.status),['PICKED_UP','PICKED_UP']);
+ assert.equal(first.executionVersion,'2026-09-25T20:00:02.000001');
+});
