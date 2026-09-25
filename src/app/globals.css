@@ -164,6 +164,12 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .manifest-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 9px; }
 .manifest-header h4 { margin: 0; font-size: 13px; }
 .manifest-header span { color: var(--muted); font-size: 11px; text-align: right; }
+.shared-pickup-allocation { margin: 0 20px 12px; padding: 11px 12px; color: #285c4a; background: #eef8f2; border: 1px solid #cfe5d7; border-radius: 9px; font-size: 11px; line-height: 1.45; }
+.shared-pickup-allocation > strong { display: block; margin-bottom: 8px; font-size: 12px; }
+.shared-pickup-allocation > div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.shared-pickup-allocation span { display: grid; gap: 2px; padding: 8px; background: white; border: 1px solid #dcebe1; border-radius: 7px; }
+.shared-pickup-allocation span[data-current="true"] { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+.shared-pickup-allocation b { color: var(--ink); overflow-wrap: anywhere; }
 .manifest-list { padding: 0 12px 12px; }
 .rider-row { display: grid; grid-template-columns: 48px minmax(140px, 1fr) minmax(170px, 1fr) auto minmax(150px, auto); align-items: center; gap: 12px; min-height: 68px; padding: 9px 8px; border-top: 1px solid #edf0ee; }
 .student-photo { position: relative; overflow: hidden; width: 46px; height: 46px; background: transparent; border-radius: 6px; }

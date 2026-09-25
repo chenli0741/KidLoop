@@ -122,6 +122,8 @@ export type Trip = {
   hasSharedPickups?: boolean;
   sharedPickupMin?: number;
   sharedPickupMax?: number;
+  sharedPickupTotal?: number;
+  sharedPickupVehicles?: { tripId: string; vehicleName: string; min: number; max: number; capacity: number }[];
   executionVersion?: string;
   completedSegments?: string[];
   currentStopIndex?: number;

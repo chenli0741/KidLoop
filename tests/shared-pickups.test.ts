@@ -48,6 +48,11 @@ test('shared pickups: simultaneous claim, authorization, undo, fixed seat reserv
  assert.ok(driverManifest[0].riders.every(r=>r.parentPhone===''&&r.parentName===''));
  const adminManifest=await addSharedRiders(setup,[{id:tripIds[0],riders:[]} as unknown as Trip],admin);
  assert.ok(adminManifest[0].riders.every(r=>r.parentPhone==='555-private'&&r.parentName==='Parent private'));
+ const canonicalManifest=await addSharedRiders(setup,[{id:tripIds[1],capacity:12,routeStops:(await setup.query('select route_stops from trips where id=$1',[tripIds[1]])).rows[0].route_stops,riders:[]} as unknown as Trip],drivers[1]);
+ assert.equal(canonicalManifest[0].hasSharedPickups,true,'canonical owner must also recognize the shared pool');
+ assert.ok(canonicalManifest[0].riders.every(r=>r.shared));
+ assert.equal(canonicalManifest[0].sharedPickupMin,1);
+ assert.equal(canonicalManifest[0].sharedPickupMax,8);
  const gps={status:'CAPTURED',latitude:37.4,longitude:-122.1,accuracyMeters:15,capturedAt:'2026-09-08T20:00:00.000Z'};
  await assert.rejects(txn(c=>confirmCameraPickup(c,admin,tripIds[0],[assignments[0]],gps)));
  await assert.rejects(txn(c=>confirmCameraPickup(c,drivers[0],tripIds[1],[assignments[0]],gps)));

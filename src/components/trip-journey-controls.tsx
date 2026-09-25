@@ -21,6 +21,7 @@ export function TripJourneyControls({ trip, locale, onUpdated }: { trip: Trip; l
   const inTransit = trip.progressState === "IN_TRANSIT";
   const atStopRiders = stop ? trip.riders.filter(r => r.pickupStopId === stop.id || r.dropoffStopId === stop.id) : trip.riders;
   const pendingRiders = stop?.schoolId ? atStopRiders.filter(r => r.pickupStopId === stop.id && r.status === "SCHEDULED").length : 0;
+  const pendingSharedRiders = stop?.schoolId ? atStopRiders.filter(r => r.shared && r.pickupStopId === stop.id && r.status === "SCHEDULED").length : 0;
   const dropoffRiders = stop?.programId ? atStopRiders.filter(r => r.dropoffStopId === stop.id && r.status === "PICKED_UP").length : 0;
   const finishing = !inTransit && index === trip.routeStops.length - 1 && dropoffRiders === 0 && pendingRiders === 0;
   const action = inTransit ? "ARRIVE" : dropoffRiders ? "DROP_OFF" : "GO";
@@ -33,7 +34,7 @@ export function TripJourneyControls({ trip, locale, onUpdated }: { trip: Trip; l
       saving.current=true;setPending(true);setError("");
       try { const location=await captureOperationLocation(); onUpdated(await withOperationTimeout(advanceTripStop(trip.id,action,location))); } catch { setError(text(locale, "尚未确认操作结果，正在核对状态。请先刷新核对，不要连续重复操作。", "Result not confirmed. Checking status. Refresh and verify before retrying.")); window.dispatchEvent(new Event("kidloop:execution-refresh")); router.refresh(); } finally {saving.current=false;setPending(false);}
     }}><>{finishing ? <Flag size={18}/> : inTransit ? <MapPin size={18}/> : dropoffRiders ? <Check size={18}/> : <Play size={18}/>}</>{pending ? text(locale, "处理中…", "Saving…") : text(locale, label.zh, label.en)}</button>
-    {pendingRiders > 0 && <span className="form-hint">{text(locale, `还有 ${pendingRiders} 名学生待接到`, `${pendingRiders} rider(s) still waiting for pickup`)}</span>}
+    {pendingRiders > 0 && <span className="form-hint">{pendingSharedRiders===pendingRiders?text(locale,`共享名单还有 ${pendingRiders} 人待两辆车确认，全部确认后可出发`,`The shared pool has ${pendingRiders} unconfirmed rider(s); depart after both vehicles finish`):text(locale, `还有 ${pendingRiders} 名学生待接到`, `${pendingRiders} rider(s) still waiting for pickup`)}</span>}
     {error && <p className="inline-error" role="alert">{error} <button type="button" className="button compact secondary" onClick={()=>window.location.reload()}>{text(locale,"刷新页面","Reload page")}</button></p>}
   </div>;
 }

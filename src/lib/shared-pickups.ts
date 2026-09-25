@@ -8,30 +8,44 @@ import { displayedStudentPhoto, recognitionStudentPhoto } from './photo-display'
 // Caller supplies authorized trips. The canonical assignment is never duplicated.
 export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUser) {
   if (!trips.length) return trips;
-  const rows = (await c.query(`select m.trip_id, m.pickup_stop_id,m.dropoff_stop_id,ts.id,ts.trip_id as owner_id,ts.status,
+  // A shared assignment must be visible as shared on both its canonical trip and every
+  // participating trip. Previously only the secondary membership was marked shared,
+  // so the canonical driver's screen incorrectly treated the whole pool as fixed riders.
+  const rows = (await c.query(`with candidates as (
+    select ts.trip_id as target_trip_id,ts.id as assignment_id,ts.pickup_stop_id,ts.dropoff_stop_id
+    from trip_students ts where ts.trip_id=any($1::uuid[])
+      and exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id)
+    union
+    select m.trip_id,m.assignment_id,m.pickup_stop_id,m.dropoff_stop_id
+    from shared_pickup_members m where m.trip_id=any($1::uuid[])
+   )
+   select c.target_trip_id as trip_id,c.pickup_stop_id,c.dropoff_stop_id,ts.id,ts.trip_id as owner_id,ts.status,
     s.id as student_id,s.name,s.photo_url,(select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=s.id and ca.source_photo_url=coalesce(s.photo_url,'')) as cartoon_url,s.grade,s.age,s.classroom_name,
     case when $2::boolean then coalesce(p.name,'') else '' end as parent_name,
     case when $2::boolean then coalesce(p.phone,'') else '' end as parent_phone,
     coalesce(dp.note,'') as parent_note,coalesce(dp.absent,false) as parent_absent,v.name as vehicle_name
-    from shared_pickup_members m join trip_students ts on ts.id=m.assignment_id
+    from candidates c join trip_students ts on ts.id=c.assignment_id
     join students s on s.id=ts.student_id join trips owner on owner.id=ts.trip_id
     join driver_shifts sh on sh.id=owner.shift_id join vehicles v on v.id=sh.vehicle_id
     left join parents p on p.id=s.parent_id
     left join student_day_plans dp on dp.student_id=s.id and dp.service_date=owner.scheduled_date
-    where m.trip_id=any($1::uuid[]) and m.trip_id<>ts.trip_id`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
-  const allSharedTripIds = [...new Set(rows.flatMap(row => [row.trip_id, row.owner_id]))];
-  const capacityRows = allSharedTripIds.length ? (await c.query<{id:string;capacity:number;fixed:number}>(`select t.id,v.capacity,
+    order by c.target_trip_id,s.classroom_name,s.name`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
+  const assignmentIds = [...new Set(rows.map(row => row.id as string))];
+  const participantRows = assignmentIds.length ? (await c.query<{assignment_id:string;trip_id:string}>(`select ts.id as assignment_id,ts.trip_id
+    from trip_students ts where ts.id=any($1::uuid[])
+    union select m.assignment_id,m.trip_id from shared_pickup_members m where m.assignment_id=any($1::uuid[])`,[assignmentIds])).rows : [];
+  const allSharedTripIds = [...new Set(participantRows.map(row => row.trip_id))];
+  const capacityRows = allSharedTripIds.length ? (await c.query<{id:string;vehicleName:string;capacity:number;fixed:number}>(`select t.id,v.name as "vehicleName",v.capacity,
     count(ts.id) filter (where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
     from trips t join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
-    left join trip_students ts on ts.trip_id=t.id where t.id=any($1::uuid[]) group by t.id,v.capacity`,[allSharedTripIds])).rows : [];
-  const capacityByTrip = new Map(capacityRows.map(row => [row.id, { capacity: row.capacity, fixed: row.fixed }]));
+    left join trip_students ts on ts.trip_id=t.id where t.id=any($1::uuid[]) group by t.id,v.name,v.capacity`,[allSharedTripIds])).rows : [];
+  const capacityByTrip = new Map(capacityRows.map(row => [row.id, { vehicleName: row.vehicleName, capacity: row.capacity, fixed: row.fixed }]));
   const baseByTrip = new Map(trips.map(trip => [trip.id, trip]));
   const participants = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const set = participants.get(row.id) ?? new Set<string>();
+  for (const row of participantRows) {
+    const set = participants.get(row.assignment_id) ?? new Set<string>();
     set.add(row.trip_id);
-    set.add(row.owner_id);
-    participants.set(row.id, set);
+    participants.set(row.assignment_id, set);
   }
   return trips.map(trip=>{
     const shared=rows.filter(r=>r.trip_id===trip.id);
@@ -53,13 +67,20 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
       }).length));
       return candidate.capacity - maxLoad;
     };
-    const availableElsewhere = [...new Set(shared.flatMap(r => [...(participants.get(r.id) ?? [])]))]
-      .filter(id => id !== trip.id && (baseByTrip.has(id) || capacityByTrip.has(id)))
-      .reduce((sum, id) => {
-        const capacity = capacityByTrip.get(id);
-        return sum + Math.max(0, capacity ? capacity.capacity - capacity.fixed : capacityLeft(baseByTrip.get(id)!));
-      }, 0);
-    return {...trip,hasSharedPickups:true,sharedPickupMin:Math.max(0,sharedCount-availableElsewhere),sharedPickupMax:Math.min(sharedCount,Math.max(0,capacityLeft(trip))),riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
+    const normalizedTrip={...trip,riders:trip.riders.map(r=>ids.has(r.id)?{...r,shared:true}:r)};
+    const participantIds=[...new Set(shared.flatMap(r => [...(participants.get(r.id) ?? [])]))]
+      .filter(id => baseByTrip.has(id) || capacityByTrip.has(id));
+    const vehicleCapacity = (id:string) => {
+      const capacity=capacityByTrip.get(id);
+      return Math.max(0,capacity?capacity.capacity-capacity.fixed:capacityLeft(id===trip.id?normalizedTrip:baseByTrip.get(id)!));
+    };
+    const allocations=participantIds.map(id=>{
+      const capacity=capacityByTrip.get(id),available=vehicleCapacity(id);
+      const elsewhere=participantIds.filter(other=>other!==id).reduce((sum,other)=>sum+vehicleCapacity(other),0);
+      return {tripId:id,vehicleName:capacity?.vehicleName??baseByTrip.get(id)?.vehicleName??'',min:Math.max(0,sharedCount-elsewhere),max:Math.min(sharedCount,available),capacity:capacity?.capacity??baseByTrip.get(id)?.capacity??0};
+    }).sort((a,b)=>Number(b.tripId===trip.id)-Number(a.tripId===trip.id)||a.vehicleName.localeCompare(b.vehicleName));
+    const current=allocations.find(item=>item.tripId===trip.id);
+    return {...trip,hasSharedPickups:true,sharedPickupMin:current?.min??0,sharedPickupMax:current?.max??0,sharedPickupTotal:sharedCount,sharedPickupVehicles:allocations,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
   });
 }
 

@@ -110,6 +110,8 @@
   .route-stop a { min-height: 44px; margin-top: 8px; padding: 0 12px; border: 1px solid #dce6df; border-radius: 11px; background: white; font-size: 12px; }
   .manifest-header { padding: 18px 16px 12px; }
   .manifest-header h4 { font-size: 15px; }
+  .shared-pickup-allocation { margin: 0 16px 12px; font-size: 12px; }
+  .shared-pickup-allocation > div { grid-template-columns: 1fr; }
   .manifest-list { padding: 0 12px 12px; }
   .rider-row { grid-template-columns: 80px minmax(0, 1fr) auto; gap: 10px; padding: 16px 4px; }
   .student-photo { width: 80px; height: 80px; border-radius: 8px; }
