@@ -54,6 +54,9 @@ test('shared pickups: simultaneous claim, authorization, undo, fixed seat reserv
  assert.equal(canonicalManifest[0].sharedPickupMin,1);
  assert.equal(canonicalManifest[0].sharedPickupMax,8);
  const gps={status:'CAPTURED',latitude:37.4,longitude:-122.1,accuracyMeters:15,capturedAt:'2026-09-08T20:00:00.000Z'};
+ await txn(c=>changeRiderStatus(c,drivers[1],assignments[0],'PICKED_UP',undefined,tripIds[1],gps));
+ assert.equal((await setup.query('select status from trip_students where id=$1',[assignments[0]])).rows[0].status,'PICKED_UP','canonical shared owner can confirm pickup');
+ await txn(c=>changeRiderStatus(c,drivers[1],assignments[0],'SCHEDULED',undefined,tripIds[1],gps));
  await assert.rejects(txn(c=>confirmCameraPickup(c,admin,tripIds[0],[assignments[0]],gps)));
  await assert.rejects(txn(c=>confirmCameraPickup(c,drivers[0],tripIds[1],[assignments[0]],gps)));
  await assert.rejects(txn(c=>confirmCameraPickup(c,drivers[0],tripIds[0],assignments,gps)),/CAPACITY_EXCEEDED/);

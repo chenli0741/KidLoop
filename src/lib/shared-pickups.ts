@@ -86,10 +86,17 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
 }
 
 export async function claimSharedPickup(c:PoolClient,user:AuthUser,assignmentId:string,targetId:string,nextStatus:string) {
-  const row=(await c.query(`select ts.trip_id,ts.status,m.pickup_stop_id,m.dropoff_stop_id,t.route_stops,t.status as trip_status,v.capacity
-    from shared_pickup_members m join trip_students ts on ts.id=m.assignment_id join trips t on t.id=m.trip_id
+  const row=(await c.query(`select ts.trip_id,ts.status,
+    case when ts.trip_id=$2 then ts.pickup_stop_id else m.pickup_stop_id end as pickup_stop_id,
+    case when ts.trip_id=$2 then ts.dropoff_stop_id else m.dropoff_stop_id end as dropoff_stop_id,
+    t.route_stops,t.status as trip_status,v.capacity
+    from trip_students ts
+    left join shared_pickup_members m on m.assignment_id=ts.id and m.trip_id=$2
+    join trips t on t.id=$2
     join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
-    where m.assignment_id=$1 and m.trip_id=$2 and t.operating_term_id=current_operating_term()
+    where ts.id=$1 and (ts.trip_id=$2 or m.trip_id is not null)
+    and exists(select 1 from shared_pickup_members participant where participant.assignment_id=ts.id)
+    and t.operating_term_id=current_operating_term()
     and ($3::uuid is null or sh.driver_id=$3)`,[assignmentId,targetId,user.role==='DRIVER'?user.driverId:null])).rows[0];
   if(!row)throw new Error('Assignment unavailable');
   if(row.trip_id!==targetId && (row.status!=='SCHEDULED'||nextStatus!=='PICKED_UP'))throw new Error('ALREADY_CLAIMED');
