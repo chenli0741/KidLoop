@@ -1,6 +1,7 @@
 import type {PoolClient} from 'pg';
 import type {AuthUser} from '../../src/lib/types';
 import type {RouteStop} from '../../src/lib/fixed-route-types';
+import {materializeSharedPickupLimits} from '../../src/lib/shared-pickups';
 export async function sharePickupSchool(c:PoolClient,user:AuthUser,tripIds:string[],schoolId:string) {
   if(user.role!=='ADMIN'||tripIds.length!==2||tripIds[0]===tripIds[1])throw new Error('Select two trips');
   await c.query('select pg_advisory_xact_lock(70919009)');
@@ -20,4 +21,5 @@ export async function sharePickupSchool(c:PoolClient,user:AuthUser,tripIds:strin
       await c.query('insert into shared_pickup_members values($1,$2,$3,$4)',[m.id,t.id,pickup.id,dropoff.id]);
     }
   }
+  await materializeSharedPickupLimits(c,tripIds);
 }

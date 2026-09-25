@@ -31,23 +31,8 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
     left join parents p on p.id=s.parent_id
     left join student_day_plans dp on dp.student_id=s.id and dp.service_date=owner.scheduled_date
     order by c.target_trip_id,s.classroom_name,s.name`,[trips.map(t=>t.id),user.role==='ADMIN'])).rows;
-  const assignmentIds = [...new Set(rows.map(row => row.id as string))];
-  const participantRows = assignmentIds.length ? (await c.query<{assignment_id:string;trip_id:string}>(`select ts.id as assignment_id,ts.trip_id
-    from trip_students ts where ts.id=any($1::uuid[])
-    union select m.assignment_id,m.trip_id from shared_pickup_members m where m.assignment_id=any($1::uuid[])`,[assignmentIds])).rows : [];
-  const allSharedTripIds = [...new Set(participantRows.map(row => row.trip_id))];
-  const capacityRows = allSharedTripIds.length ? (await c.query<{id:string;vehicleName:string;capacity:number;fixed:number}>(`select t.id,v.name as "vehicleName",v.capacity,
-    count(ts.id) filter (where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
-    from trips t join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
-    left join trip_students ts on ts.trip_id=t.id where t.id=any($1::uuid[]) group by t.id,v.name,v.capacity`,[allSharedTripIds])).rows : [];
-  const capacityByTrip = new Map(capacityRows.map(row => [row.id, { vehicleName: row.vehicleName, capacity: row.capacity, fixed: row.fixed }]));
-  const baseByTrip = new Map(trips.map(trip => [trip.id, trip]));
-  const participants = new Map<string, Set<string>>();
-  for (const row of participantRows) {
-    const set = participants.get(row.assignment_id) ?? new Set<string>();
-    set.add(row.trip_id);
-    participants.set(row.assignment_id, set);
-  }
+  const limitRows = (await c.query<{tripId:string;pickupStopId:string;min:number;max:number;total:number;feasible:boolean}>(`select trip_id as "tripId",pickup_stop_id as "pickupStopId",minimum_riders as min,maximum_riders as max,
+    pool_size as total,feasible from shared_pickup_limits where trip_id=any($1::uuid[])`,[trips.map(trip=>trip.id)])).rows;
   return trips.map(trip=>{
     const shared=rows.filter(r=>r.trip_id===trip.id);
     const ids=new Set(shared.map(r=>r.id));
@@ -56,32 +41,9 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
       parentNote:r.parent_note,parentAbsent:r.parent_absent,status:r.status,pickupStopId:r.pickup_stop_id,dropoffStopId:r.dropoff_stop_id,
       shared:true,otherVehicle:r.owner_id!==trip.id && r.status!=='SCHEDULED' ? r.vehicle_name:undefined}));
     if (!shared.length) return {...trip,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
-    const sharedCount = new Set(shared.map(r => r.id)).size;
-    const capacityLeft = (candidate: Trip) => {
-      const stops = candidate.routeStops ?? [];
-      const fixed = candidate.riders.filter(r => !r.shared && !r.otherVehicle && !['ABSENT','EXCEPTION'].includes(r.status));
-      if (stops.length < 2) return candidate.capacity - fixed.length;
-      const maxLoad = Math.max(0, ...stops.slice(0, -1).map((_, index) => fixed.filter(r => {
-        const from = stops.findIndex(stop => stop.id === r.pickupStopId);
-        const to = stops.findIndex(stop => stop.id === r.dropoffStopId);
-        return from >= 0 && to > from && from <= index && index < to;
-      }).length));
-      return candidate.capacity - maxLoad;
-    };
-    const normalizedTrip={...trip,riders:trip.riders.map(r=>ids.has(r.id)?{...r,shared:true}:r)};
-    const participantIds=[...new Set(shared.flatMap(r => [...(participants.get(r.id) ?? [])]))]
-      .filter(id => baseByTrip.has(id) || capacityByTrip.has(id));
-    const vehicleCapacity = (id:string) => {
-      const capacity=capacityByTrip.get(id);
-      return Math.max(0,capacity?capacity.capacity-capacity.fixed:capacityLeft(id===trip.id?normalizedTrip:baseByTrip.get(id)!));
-    };
-    const bounds=sharedPickupBounds(sharedCount,participantIds.map(id=>({tripId:id,availableSeats:vehicleCapacity(id)})));
-    const allocations=bounds.vehicles.map(bound=>{
-      const id=bound.tripId,capacity=capacityByTrip.get(id);
-      return {...bound,vehicleName:capacity?.vehicleName??baseByTrip.get(id)?.vehicleName??'',capacity:capacity?.capacity??baseByTrip.get(id)?.capacity??0};
-    }).sort((a,b)=>Number(b.tripId===trip.id)-Number(a.tripId===trip.id)||a.vehicleName.localeCompare(b.vehicleName));
-    const current=allocations.find(item=>item.tripId===trip.id);
-    return {...trip,hasSharedPickups:true,sharedPickupMin:current?.min??0,sharedPickupMax:current?.max??0,sharedPickupTotal:sharedCount,sharedPickupVehicles:allocations,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
+    const current=limitRows.find(limit=>limit.tripId===trip.id&&shared.some(r=>r.pickup_stop_id===limit.pickupStopId));
+    if(!current)throw new Error('Shared pickup limits were not assigned during scheduling.');
+    return {...trip,hasSharedPickups:true,sharedPickupMin:current.min,sharedPickupMax:current.max,sharedPickupTotal:current.total,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
   });
 }
 
@@ -122,29 +84,50 @@ export async function claimSharedPickup(c:PoolClient,user:AuthUser,assignmentId:
 }
 
 export async function sharedPickupDeparture(c:SqlReader,tripId:string,pickupStopId:string){
-  const pool=(await c.query<{total:number;picked:number}>(`with pool as (
-    select distinct ts.id,ts.status,ts.trip_id
-    from trip_students ts
-    left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
-    where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
-      and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
-   ) select count(*) filter(where status not in ('ABSENT','EXCEPTION'))::int as total,
-     count(*) filter(where trip_id=$1 and status in ('PICKED_UP','DROPPED_OFF'))::int as picked from pool`,[tripId,pickupStopId])).rows[0];
-  if(!pool?.total)return null;
-  const vehicles=(await c.query<{tripId:string;capacity:number;fixed:number}>(`with pool as (
-    select distinct ts.id
-    from trip_students ts
-    left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
-    where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
-      and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
-   ), participants as (
-    select ts.trip_id from trip_students ts join pool on pool.id=ts.id
-    union select m.trip_id from shared_pickup_members m join pool on pool.id=m.assignment_id
-   ) select t.id as "tripId",v.capacity,
-    count(ts.id) filter(where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
-   from participants p join trips t on t.id=p.trip_id join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
-   left join trip_students ts on ts.trip_id=t.id group by t.id,v.capacity`,[tripId,pickupStopId])).rows;
-  const bounds=sharedPickupBounds(pool.total,vehicles.map(vehicle=>({tripId:vehicle.tripId,availableSeats:vehicle.capacity-vehicle.fixed})));
-  const current=bounds.vehicles.find(vehicle=>vehicle.tripId===tripId);
-  return current?{...current,picked:pool.picked,total:pool.total,feasible:bounds.feasible}:null;
+  const limit=(await c.query<{tripId:string;min:number;max:number;total:number;feasible:boolean}>(`select trip_id as "tripId",minimum_riders as min,maximum_riders as max,pool_size as total,feasible
+    from shared_pickup_limits where trip_id=$1 and pickup_stop_id=$2`,[tripId,pickupStopId])).rows[0];
+  if(!limit)return null;
+  const picked=(await c.query<{count:number}>(`select count(*)::int as count from trip_students ts
+    where ts.trip_id=$1 and ts.pickup_stop_id=$2 and ts.status in ('PICKED_UP','DROPPED_OFF')
+      and exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id)`,[tripId,pickupStopId])).rows[0]?.count??0;
+  return {...limit,picked};
+}
+
+/** Persist allocation-time bounds. Driver execution only reads these rows. */
+export async function materializeSharedPickupLimits(c:PoolClient,tripIds:string[]){
+  if(!tripIds.length)return;
+  const pairs=(await c.query<{tripId:string;pickupStopId:string}>(`select distinct trip_id as "tripId",pickup_stop_id as "pickupStopId" from (
+    select ts.trip_id,ts.pickup_stop_id from trip_students ts
+    where ts.trip_id=any($1::uuid[]) and ts.pickup_stop_id is not null
+      and exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id)
+    union select m.trip_id,m.pickup_stop_id from shared_pickup_members m where m.trip_id=any($1::uuid[])
+   ) candidates`,[tripIds])).rows;
+  for(const pair of pairs){
+    const pool=(await c.query<{total:number}>(`with pool as (
+      select distinct ts.id,ts.status from trip_students ts
+      left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
+      where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
+        and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
+     ) select count(*) filter(where status not in ('ABSENT','EXCEPTION'))::int as total from pool`,[pair.tripId,pair.pickupStopId])).rows[0];
+    if(!pool?.total)continue;
+    const vehicles=(await c.query<{tripId:string;capacity:number;fixed:number}>(`with pool as (
+      select distinct ts.id from trip_students ts
+      left join shared_pickup_members target on target.assignment_id=ts.id and target.trip_id=$1 and target.pickup_stop_id=$2
+      where exists(select 1 from shared_pickup_members any_member where any_member.assignment_id=ts.id)
+        and ((ts.trip_id=$1 and ts.pickup_stop_id=$2) or target.assignment_id is not null)
+     ), participants as (
+      select ts.trip_id from trip_students ts join pool on pool.id=ts.id
+      union select m.trip_id from shared_pickup_members m join pool on pool.id=m.assignment_id
+     ) select t.id as "tripId",v.capacity,
+      count(ts.id) filter(where ts.status not in ('ABSENT','EXCEPTION') and not exists(select 1 from shared_pickup_members x where x.assignment_id=ts.id))::int as fixed
+     from participants p join trips t on t.id=p.trip_id join driver_shifts sh on sh.id=t.shift_id join vehicles v on v.id=sh.vehicle_id
+     left join trip_students ts on ts.trip_id=t.id group by t.id,v.capacity`,[pair.tripId,pair.pickupStopId])).rows;
+    const bounds=sharedPickupBounds(pool.total,vehicles.map(vehicle=>({tripId:vehicle.tripId,availableSeats:vehicle.capacity-vehicle.fixed})));
+    const current=bounds.vehicles.find(vehicle=>vehicle.tripId===pair.tripId);
+    if(!current)throw new Error('Unable to allocate shared pickup limits.');
+    await c.query(`insert into shared_pickup_limits(trip_id,pickup_stop_id,minimum_riders,maximum_riders,pool_size,feasible)
+      values($1,$2,$3,$4,$5,$6) on conflict(tenant_id,trip_id,pickup_stop_id) do update set
+      minimum_riders=excluded.minimum_riders,maximum_riders=excluded.maximum_riders,pool_size=excluded.pool_size,
+      feasible=excluded.feasible,created_at=clock_timestamp()`,[pair.tripId,pair.pickupStopId,current.min,current.max,pool.total,bounds.feasible]);
+  }
 }

@@ -2,6 +2,7 @@ import 'server-only';
 import type {PoolClient} from 'pg';
 import {readTrialInput} from './schedule-trial-data';
 import {trialDay} from './schedule-trial';
+import {materializeSharedPickupLimits} from './shared-pickups';
 
 // The caller holds the route advisory transaction lock. Preview and publication share trialDay.
 export async function materializeTrial(c:PoolClient,date:string){
@@ -47,6 +48,7 @@ export async function materializeTrial(c:PoolClient,date:string){
   await c.query("update trips set route_name=$2,route_stops=$3,departure_time=$4,assignment_reason=$5,status='PUBLISHED' where id=$1",[trip,p.name,JSON.stringify(p.stops),p.stops[0].time,p.assignmentReason??null]);tripMap.set(p.routeId,trip);
  }
  const mutableTrips=existing.filter(t=>!protectedRoutes.has(t.fixed_route_id));
+ await c.query('delete from shared_pickup_limits where trip_id=any($1::uuid[])',[mutableTrips.map(t=>t.id)]);
  await c.query('delete from shared_pickup_members where trip_id=any($1::uuid[])',[mutableTrips.map(t=>t.id)]);
  const eligible=[...new Set(executable.flatMap(p=>p.students.map(a=>a.studentId)))];
  for(const studentId of eligible){
@@ -74,4 +76,5 @@ export async function materializeTrial(c:PoolClient,date:string){
    await c.query(`delete from trip_students ts where ts.trip_id=$1 and not(ts.student_id=any($2::uuid[])) and ts.status='SCHEDULED' and not exists(select 1 from status_history h where h.trip_student_id=ts.id)`,[t.id,eligible]);
   }
  }
+ await materializeSharedPickupLimits(c,[...tripMap.values()]);
 }

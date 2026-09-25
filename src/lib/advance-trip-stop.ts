@@ -5,6 +5,7 @@ import type {RouteStop} from './fixed-route-types';
 import {readTripExecution} from './read-trip-execution';
 import {normalizeOperationLocation} from './operation-location';
 import {sharedPickupDeparture} from './shared-pickups';
+import {sharedPickupCanDepart} from './shared-pickup-progress';
 export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:string,action:'GO'|'ARRIVE'|'DROP_OFF',location?:unknown){
  if(!['DRIVER','ADMIN'].includes(user.role)||(user.role==='DRIVER'&&!user.driverId))throw new Error('Trip unavailable.');
 
@@ -37,7 +38,7 @@ export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:st
     }
     if(stop.schoolId) {
       const shared=await sharedPickupDeparture(c,tripId,stop.id);
-      if(atPickup.some(r=>r.status==='SCHEDULED'&&!r.shared)||shared&&(!shared.feasible||shared.picked<shared.min)) throw new Error('Resolve the required students at this school first.');
+      if(atPickup.some(r=>r.status==='SCHEDULED'&&!r.shared)||shared&&!sharedPickupCanDepart(shared.picked,shared.min,shared.max,shared.feasible)) throw new Error('Resolve the required students at this school first.');
     }
     if(stop.programId && atDropoff.some(r=>r.status==='PICKED_UP')) throw new Error('Drop off all students at this stop first.');
     if(index===row.route_stops.length-1) await c.query("update trips set status='COMPLETED',progress_state='AT_STOP',updated_at=clock_timestamp() where id=$1",[tripId]);
