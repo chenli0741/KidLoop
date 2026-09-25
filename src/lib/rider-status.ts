@@ -1,29 +1,33 @@
 import {normalizeOperationLocation} from './operation-location';
 import { claimSharedPickup } from './shared-pickups';
 import "server-only";
-import type { PoolClient } from "pg";
+import type { PoolClient, QueryResult } from "pg";
 import type { AuthUser, RiderStatus } from "./types";
-import { requireTerm } from "./operating-terms";
 import type { MissedPickupDetails } from "./missed-pickup";
 
 export async function changeRiderStatus(client: PoolClient, user: AuthUser, assignmentId: string, nextStatus: RiderStatus, details?: MissedPickupDetails, targetTripId?: string, location?: unknown) {
   if (!["ADMIN", "DRIVER"].includes(user.role) || (user.role === "DRIVER" && !user.driverId)) throw new Error("Assignment unavailable.");
-  // Different riders must remain independent. Only serialize attempts to mutate
-  // the same assignment, which is the shared-pickup double-claim boundary.
-  await client.query("select pg_advisory_xact_lock(hashtextextended($1::text,70919010))", [assignmentId]);
-  await requireTerm(client);
+  type Target={student_id:string;trip_id:string;shared:boolean};
+  const findTarget=()=>client.query<Target>(`
+    select ts.student_id,ts.trip_id,exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id) as shared
+    from trip_students ts join trips t on t.id=ts.trip_id join driver_shifts sh on sh.id=t.shift_id
+    where ts.id=$1::uuid and t.operating_term_id=current_operating_term()
+      and ($2::uuid is null or sh.driver_id=$2)
+  `,[assignmentId,user.role==="DRIVER"?user.driverId:null]);
+  let target:QueryResult<Target>|undefined;
   if(!targetTripId) {
-    const shared=(await client.query("select ts.trip_id from trip_students ts where ts.id=$1 and exists(select 1 from shared_pickup_members m where m.assignment_id=ts.id)",[assignmentId])).rows[0];
-    if(shared) targetTripId=shared.trip_id;
+    target=await findTarget();
+    if(!target.rowCount)throw new Error("Assignment unavailable.");
+    if(target.rows[0].shared)targetTripId=target.rows[0].trip_id;
   }
-  if(targetTripId) await claimSharedPickup(client,user,assignmentId,targetTripId,nextStatus);
-  const target = await client.query<{ student_id: string; trip_id: string }>(`
-    select ts.student_id, ts.trip_id from trip_students ts
-    join trips t on t.id = ts.trip_id join driver_shifts sh on sh.id = t.shift_id
-    where ts.id = $1::uuid and t.operating_term_id = current_operating_term()
-      and ($2::uuid is null or sh.driver_id = $2)
-  `, [assignmentId, user.role === "DRIVER" ? user.driverId : null]);
-  if (!target.rowCount) throw new Error("Assignment unavailable.");
+  if(targetTripId){
+    // Only shared pickup needs cross-vehicle mutual exclusion. Ordinary pickup
+    // relies on its assignment row lock and never enters the shared lock path.
+    await client.query("select pg_advisory_xact_lock(hashtextextended($1::text,70919010))",[assignmentId]);
+    await claimSharedPickup(client,user,assignmentId,targetTripId,nextStatus);
+    target=await findTarget();
+  }
+  if (!target?.rowCount) throw new Error("Assignment unavailable.");
   const { student_id: studentId, trip_id: tripId } = target.rows[0];
   // Match parent-plan and route-completion lock order.
   await client.query("select id from students where id = $1 for update", [studentId]);
