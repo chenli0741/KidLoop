@@ -45,6 +45,60 @@ test("early dismissal blocks the restricted driver and leaves children unassigne
   data.drivers[0].earliestDismissalTime = null;
   assert.equal(trialDay(data, date).plans.length, 1);
 });
+test("an eligible cover driver replaces the regular driver for an early dismissal", () => {
+  const data = fixture(); exception(data, "12:59");
+  data.drivers.push({ id: "chen", active: true, status: "AVAILABLE" });
+  const day = trialDay(data, date);
+  assert.equal(day.plans.length, 1);
+  assert.equal(day.plans[0].driverId, "chen");
+  assert.match(day.plans[0].assignmentReason ?? "", /automatic cover assigned/);
+  assert.ok(!day.issues.some(i => i.code === "DRIVER_TIME" || i.code === "UNASSIGNED"));
+});
+test("configured leave reassigns a route without a named or date-specific code rule", () => {
+  const data = fixture();
+  data.drivers.push({ id: "cover", active: true, status: "AVAILABLE" });
+  data.driverUnavailability = [{ id: "leave", driverId: "yang", startsOn: date, endsOn: date, weekdays: [1], unavailableFrom: null, unavailableTo: null, reason: "Sick leave" }];
+  const day = trialDay(data, date);
+  assert.equal(day.plans[0].driverId, "cover");
+  assert.match(day.plans[0].assignmentReason ?? "", /automatic cover assigned/);
+});
+test("cover selection keeps an overlapping regular route with its own driver", () => {
+  const data = fixture(); exception(data, "12:45");
+  data.drivers.push(
+    { id: "lina", active: true, status: "AVAILABLE" },
+    { id: "chen", active: true, status: "AVAILABLE" },
+  );
+  data.children.push(
+    { id: "ellis-child", schoolId: "ellis", programId: "program", grade: "K", reviewed: true },
+    { id: "later-child", schoolId: "later-school", programId: "program", grade: "K", reviewed: true },
+  );
+  data.rules.push(
+    { schoolId: "ellis", grades: ["K"], weekdays: [1], pickupTime: "12:45" },
+    { schoolId: "later-school", grades: ["K"], weekdays: [1], pickupTime: "14:30" },
+  );
+  data.terms.push(
+    { schoolId: "ellis", startsOn: "2026-09-01", endsOn: "2026-12-18" },
+    { schoolId: "later-school", startsOn: "2026-09-01", endsOn: "2026-12-18" },
+  );
+  const ellis = structuredClone(data.routes[0]);
+  ellis.id = "ellis-route"; ellis.driverId = "lina"; ellis.vehicleId = "ellis-van";
+  ellis.stops[0] = { ...ellis.stops[0], id: "ellis-stop", schoolId: "ellis", name: "Ellis", time: "12:45", pickupTime: "12:45" };
+  ellis.stops[1] = { ...ellis.stops[1], id: "ellis-program", time: "13:05" };
+  const later = structuredClone(data.routes[0]);
+  later.id = "later-route"; later.driverId = "chen"; later.vehicleId = "later-van";
+  later.stops[0] = { ...later.stops[0], id: "later-stop", schoolId: "later-school", name: "Later", time: "14:30", pickupTime: "14:30" };
+  later.stops[1] = { ...later.stops[1], id: "later-program", time: "15:00" };
+  data.vehicles.push(
+    { id: "ellis-van", active: true, status: "AVAILABLE", capacity: 10 },
+    { id: "later-van", active: true, status: "AVAILABLE", capacity: 10 },
+  );
+  data.routes.push(ellis, later);
+  const day = trialDay(data, date);
+  assert.deepEqual(Object.fromEntries(day.plans.map(p => [p.routeId, p.driverId])), {
+    route: "chen", "ellis-route": "lina", "later-route": "chen",
+  });
+  assert.ok(!day.issues.some(i => i.code === "CONFLICT" || i.code === "UNASSIGNED"));
+});
 test("grade-specific early dismissal cannot be hidden by later planned arrival", () => {
   const data = fixture(); exception(data, "14:00");
   data.exceptions[0].gradeTimes = [{ grades: ["K"], time: "12:30" }];

@@ -2,6 +2,7 @@ import {DEFAULT_TRAVEL_MINUTES} from '../travel-defaults';
 import {driverAllowsSchools,driverAllowsTime,schoolPreferenceScore} from '../driver-preferences';
 import { familiarityScore } from '../driver-familiarity';
 import { allocateEarlyTrips, type EarlyRequest } from '../automatic-extra-trips';
+import {driverIsAvailable} from '../driver-availability';
 import type { TrialInput, TrialIssue } from '../schedule-trial';
 import {
   activeOn,
@@ -324,7 +325,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
     });
     if(earlyRequests.length){
       const extraInput:TrialInput={routes:snapshot.routes,children:[],rules:[],batches:[],terms:[],exceptions:[],absences:day.absentIds.map(studentId=>({date:day.date,studentId})),
-        drivers:snapshot.drivers.filter(d=>!intent.unavailableDriverIds.includes(d.id)&&(!intent.noAdditionalDrivers||before.some(p=>p.driverId===d.id))),vehicles:snapshot.vehicles.filter(v=>!intent.unavailableVehicleIds.includes(v.id)).map(v=>({...v,capacity:v.capacity??0})),driverRuns:snapshot.driverRuns,travelTimes:snapshot.travelTimes,
+        drivers:snapshot.drivers.filter(d=>!intent.unavailableDriverIds.includes(d.id)&&(!intent.noAdditionalDrivers||before.some(p=>p.driverId===d.id))),vehicles:snapshot.vehicles.filter(v=>!intent.unavailableVehicleIds.includes(v.id)).map(v=>({...v,capacity:v.capacity??0})),driverRuns:snapshot.driverRuns,driverUnavailability:snapshot.driverUnavailability,travelTimes:snapshot.travelTimes,
         existing:blockers.map(t=>({...t,date:day.date,students:t.students.map(s=>s.studentId)}))};
       const extraIssues:TrialIssue[]=[];
       const extras=allocateEarlyTrips(extraInput,day.date,earlyRequests,normal.map(p=>({...p,routeId:p.sourceIds[0],shared:{}})),extraIssues);
@@ -420,7 +421,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
           task.stops.some((s) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time))
         )
           return;
-        const ds = drivers.filter(d => (!task.preserveAssignment || d.id===task.driverId) && (driverAllowsSchools(d,task.stops.filter(s=>s.schoolId&&task.students.some(r=>r.pickupStopId===s.id)).map(s=>s.schoolId!)) && !task.students.some(s => matches.some(m => m.student_id === s.studentId && !driverAllowsTime(d,m.time))))).sort(
+        const ds = drivers.filter(d => (!task.preserveAssignment || d.id===task.driverId) && driverIsAvailable(snapshot.driverUnavailability,d.id,day.date,task.stops[0].time,task.stops.at(-1)!.time) && (driverAllowsSchools(d,task.stops.filter(s=>s.schoolId&&task.students.some(r=>r.pickupStopId===s.id)).map(s=>s.schoolId!)) && !task.students.some(s => matches.some(m => m.student_id === s.studentId && !driverAllowsTime(d,m.time))))).sort(
           (a, b) =>
             schoolPreferenceScore(b,task.stops.filter(s=>s.schoolId).map(s=>s.schoolId!))-schoolPreferenceScore(a,task.stops.filter(s=>s.schoolId).map(s=>s.schoolId!)) ||
             familiarityScore(snapshot.driverRuns??[],b.id,task.sourceIds,task.stops.find(s=>s.schoolId)?.schoolId??undefined,day.date) - familiarityScore(snapshot.driverRuns??[],a.id,task.sourceIds,task.stops.find(s=>s.schoolId)?.schoolId??undefined,day.date) ||

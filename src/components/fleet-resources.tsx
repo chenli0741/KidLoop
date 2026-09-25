@@ -1,22 +1,24 @@
 import { DriverConditionFields } from "@/components/driver-condition-fields";
+import { DriverUnavailabilityActions } from "@/components/driver-unavailability-actions";
 import { requireUser } from "@/lib/auth";
 import { FormPanel } from "@/components/form-panel";
 import { DriverRecordActions, VehicleRecordActions } from "@/components/fleet-record-actions";
-import { BusFront, CircleGauge, Clock3, Phone } from "lucide-react";
+import { BusFront, CalendarOff, CircleGauge, Clock3, Phone } from "lucide-react";
 import { createDriver, createVehicle } from "@/app/actions";
+import { createDriverUnavailability } from "@/app/fleet/actions";
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDate, formatTime, todayInOperationsTimeZone } from "@/lib/date";
-import { getDrivers, getShifts, getVehicles, getSchools } from "@/lib/data";
+import { getDriverUnavailability, getDrivers, getShifts, getVehicles, getSchools } from "@/lib/data";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 
 export async function FleetResources() {
   await requireUser(["ADMIN"]);
   const locale = await getLocale();
-  const [vehicles, drivers, shifts, schools] = await Promise.all([
-    getVehicles(), getDrivers(), getShifts(todayInOperationsTimeZone()), getSchools(),
+  const [vehicles, drivers, shifts, schools, driverUnavailability] = await Promise.all([
+    getVehicles(), getDrivers(), getShifts(todayInOperationsTimeZone()), getSchools(), getDriverUnavailability(),
   ]);
 
   return (
@@ -70,6 +72,38 @@ export async function FleetResources() {
             <label><span>{text(locale, "司机姓名", "Driver name")}</span><input name="name" placeholder={text(locale, "姓名", "Full name")} required /></label>
             <label><span>{text(locale, "电话", "Phone")}</span><input name="phone" type="tel" placeholder="(555) 123-4567" /></label>
             <DriverConditionFields locale={locale} schools={schools} />
+          </ActionForm>
+        </FormPanel>
+      </div>
+
+      <div className="split-layout">
+        <section className="content-section">
+          <div className="section-heading"><div><span className="eyebrow">{text(locale, "司机例外", "Driver exceptions")}</span><h2>{text(locale, "不可用日期与时段", "Unavailable dates and times")}</h2></div></div>
+          {driverUnavailability.length ? (
+            <div className="record-grid">
+              {driverUnavailability.map((record) => {
+                const weekdayNames = locale === "zh" ? ["一", "二", "三", "四", "五", "六", "日"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                const dates = record.startsOn === record.endsOn ? formatDate(record.startsOn, locale) : `${formatDate(record.startsOn, locale)} – ${formatDate(record.endsOn, locale)}`;
+                const hours = record.unavailableFrom && record.unavailableTo ? `${formatTime(record.unavailableFrom, locale)}–${formatTime(record.unavailableTo, locale)}` : text(locale, "全天", "All day");
+                return <article className="record-card" key={record.id}>
+                  <div className="record-icon teal"><CalendarOff size={21} /></div>
+                  <div className="record-main"><strong>{record.driverName}</strong><span>{dates} · {hours}</span><span>{text(locale, "星期", "Weekdays")}: {record.weekdays.map(day => weekdayNames[day - 1]).join("、")}</span><span>{record.reason}</span></div>
+                  <DriverUnavailabilityActions record={record} drivers={drivers} locale={locale} />
+                </article>;
+              })}
+            </div>
+          ) : <EmptyState title={text(locale, "暂无不可用设置", "No unavailability configured")} body={text(locale, "司机请假或某段时间不能出车时，在右侧添加。", "Add sick leave or another unavailable time window using the form.")} />}
+        </section>
+
+        <FormPanel heading={<div className="panel-heading"><CalendarOff size={19} /><div><h2>{text(locale, "添加不可用时间", "Add unavailability")}</h2><p>{text(locale, "请假、预约或固定时段限制", "Leave, appointments or recurring time limits")}</p></div></div>}>
+          <ActionForm action={createDriverUnavailability} submitLabel={text(locale, "保存不可用时间", "Save unavailability")}>
+            <label><span>{text(locale, "司机", "Driver")}</span><select name="driverId" required defaultValue=""><option value="" disabled>{text(locale, "选择司机", "Select driver")}</option>{drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>
+            <label><span>{text(locale, "开始日期", "Start date")}</span><input name="startsOn" type="date" defaultValue={todayInOperationsTimeZone()} required /></label>
+            <label><span>{text(locale, "结束日期", "End date")}</span><input name="endsOn" type="date" defaultValue={todayInOperationsTimeZone()} required /></label>
+            <fieldset className="pickup-checks full"><legend>{text(locale, "生效星期", "Active weekdays")}</legend>{[1,2,3,4,5,6,7].map((day) => <label key={day}><input type="checkbox" name="weekdays" value={day} defaultChecked /><span>{text(locale, `星期${["一","二","三","四","五","六","日"][day-1]}`, ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][day-1])}</span></label>)}</fieldset>
+            <label><span>{text(locale, "不可用开始时间（全天则留空）", "Unavailable from (blank for all day)")}</span><input name="unavailableFrom" type="time" /></label>
+            <label><span>{text(locale, "不可用结束时间（全天则留空）", "Unavailable until (blank for all day)")}</span><input name="unavailableTo" type="time" /></label>
+            <label><span>{text(locale, "原因", "Reason")}</span><input name="reason" maxLength={200} placeholder={text(locale, "例如：病假、看医生", "For example: sick leave or appointment")} required /></label>
           </ActionForm>
         </FormPanel>
       </div>

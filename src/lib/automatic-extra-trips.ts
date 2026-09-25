@@ -5,6 +5,7 @@ import { clockTime, minutes } from './route-plan';
 import { familiarityScore } from './driver-familiarity';
 import type { TrialInput, TrialPlan, TrialIssue } from './schedule-trial';
 import type { RouteStop, RouteStudent } from './fixed-route-types';
+import {driverIsAvailable} from './driver-availability';
 
 export type EarlyRequest = { sourceRouteId: string; preferredDriverId: string | null; preferredVehicleId: string | null; time: string; pickup: RouteStop; dropoff: RouteStop; students: RouteStudent[]; shared: Record<string,string> };
 function identity(value: string) {
@@ -77,7 +78,7 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
     }
     return true;
   }
-  const options=tasks.map(task=>input.drivers.filter(d=>d.active&&d.status==='AVAILABLE'&&driverAllowsTime(d,task.g.time)&&driverAllowsSchools(d,[task.g.pickup.schoolId!])).flatMap(d=>{
+  const options=tasks.map(task=>input.drivers.filter(d=>d.active&&d.status==='AVAILABLE'&&driverAllowsTime(d,task.g.time)&&driverAllowsSchools(d,[task.g.pickup.schoolId!])&&task.end!==null&&driverIsAvailable(input.driverUnavailability,d.id,date,task.g.time,clockTime(task.end))).flatMap(d=>{
     const history=familiarityScore(input.driverRuns??[],d.id,[task.g.sourceRouteId],task.g.pickup.schoolId??undefined,date);
     const preference=schoolPreferenceScore(d,[task.g.pickup.schoolId!]);
     const score=history+(d.id===task.g.preferredDriverId?5:0);

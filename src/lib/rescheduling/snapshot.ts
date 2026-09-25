@@ -6,6 +6,7 @@ import { readFixedRoutes } from "../fixed-routes";
 import { openTerm } from "../operating-terms";
 import { readPickupMatches } from "../route-plan";
 import type { Snapshot, Rider, Resource, Task } from "./types";
+import type { DriverUnavailability } from "../driver-availability";
 export function datesBetween(start: string, end: string) {
   const days: string[] = [];
   for (
@@ -44,6 +45,12 @@ export async function readSnapshot(
   ).rows;
   const travelTimes = (await c.query<{ fromName: string; toName: string; minutes: number; originDwellMinutes: number }>(
     "select from_name as \"fromName\",to_name as \"toName\",estimated_minutes + buffer_minutes as minutes,origin_dwell_minutes as \"originDwellMinutes\" from travel_time_profiles where active order by from_name,to_name",
+  )).rows;
+  const driverUnavailability = (await c.query<DriverUnavailability>(
+    `select id,driver_id as "driverId",starts_on::text as "startsOn",ends_on::text as "endsOn",weekdays,
+      to_char(unavailable_from,'HH24:MI') as "unavailableFrom",to_char(unavailable_to,'HH24:MI') as "unavailableTo",reason
+     from driver_unavailability where starts_on<=$2 and ends_on>=$1 order by starts_on,id`,
+    [start, end],
   )).rows;
   const days: Snapshot["days"] = [];
   for (const date of datesBetween(start, end)) {
@@ -96,7 +103,7 @@ export async function readSnapshot(
     )
   ).rows[0];
   const driverRuns = await readDriverRuns(c,start,end);
-  const snapshot = { term, routes, students, drivers, vehicles, days, driverRuns };
+  const snapshot = { term, routes, students, drivers, vehicles, days, driverRuns, driverUnavailability };
   return {
     ...snapshot,
     travelTimes,

@@ -28,6 +28,19 @@ export type Driver = DriverPreferences & {
   updatedAt: string;
 };
 
+export type DriverUnavailabilityView = {
+  id: string;
+  driverId: string;
+  driverName: string;
+  startsOn: string;
+  endsOn: string;
+  weekdays: number[];
+  unavailableFrom: string | null;
+  unavailableTo: string | null;
+  reason: string;
+  updatedAt: string;
+};
+
 export type School = {
   id: string;
   /** Preferred everyday display name. */

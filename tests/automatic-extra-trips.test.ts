@@ -36,6 +36,11 @@ test('a 13:00 condition assigns the short run to an available backup and preserv
  assert.equal(day.plans.find(p=>p.sourceRouteId)?.driverId,'backup');assert.equal(day.plans.find(p=>!p.sourceRouteId)?.driverId,'usual');
  input.drivers[1].status='OFF_DUTY';const blocked=trialDay(input,date);assert.equal(blocked.plans.length,1);assert.ok(blocked.issues.some(i=>i.code==='EXTRA_UNASSIGNED'));assert.ok(blocked.issues.some(i=>i.code==='UNASSIGNED'&&i.studentId==='k'));
 });
+test('a configured partial absence excludes only overlapping extra work',()=>{
+ const input=extraFixture();input.driverUnavailability=[{id:'appointment',driverId:'usual',startsOn:date,endsOn:date,weekdays:[2],unavailableFrom:'12:30',unavailableTo:'13:30',reason:'Appointment'}];
+ let day=trialDay(input,date);assert.equal(day.plans.find(p=>p.sourceRouteId)?.driverId,'backup');assert.equal(day.plans.find(p=>!p.sourceRouteId)?.driverId,'usual');
+ input.driverUnavailability[0].unavailableFrom='13:30';input.driverUnavailability[0].unavailableTo='14:00';day=trialDay(input,date);assert.equal(day.plans.find(p=>p.sourceRouteId)?.driverId,'usual');
+});
 test('historical route familiarity outweighs an unused default binding; future records do not teach',()=>{
  const input=extraFixture();input.driverRuns=[{driverId:'backup',routeId:'route',schoolIds:['school-a'],date:'2026-09-10'}];
  const extra=trialDay(input,date).plans.find(p=>p.sourceRouteId)!;assert.equal(extra.driverId,'backup');assert.match(extra.assignmentReason!,/熟悉度/);

@@ -8,7 +8,7 @@ import "server-only";
 
 import { requireUser } from "@/lib/auth";
 import { db, query } from "@/lib/db";
-import type { Driver, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
+import type { Driver, DriverUnavailabilityView, Program, Rider, School, Shift, Student, Trip, Vehicle } from "@/lib/types";
 
 export async function getVehicles() {
   await requireUser(["ADMIN"]);
@@ -28,6 +28,17 @@ export async function getDrivers() {
     from drivers
     where active = true
     order by name
+  `);
+  return result.rows;
+}
+
+export async function getDriverUnavailability() {
+  await requireUser(["ADMIN"]);
+  const result = await query<DriverUnavailabilityView>(`
+    select u.id,u.driver_id as "driverId",d.name as "driverName",u.starts_on::text as "startsOn",u.ends_on::text as "endsOn",u.weekdays,
+           to_char(u.unavailable_from,'HH24:MI') as "unavailableFrom",to_char(u.unavailable_to,'HH24:MI') as "unavailableTo",u.reason,u.updated_at::text as "updatedAt"
+    from driver_unavailability u join drivers d on d.id=u.driver_id
+    order by u.ends_on desc,u.starts_on desc,d.name,u.id
   `);
   return result.rows;
 }

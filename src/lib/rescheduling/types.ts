@@ -2,6 +2,7 @@ import type {DriverPreferences} from '../driver-preferences';
 import type { DriverRun } from '../driver-familiarity';
 import type { FixedRoute, RouteStop, RouteStudent } from "../fixed-route-types";
 import type { PickupMatch } from "../route-plan";
+import type { DriverUnavailability } from "../driver-availability";
 export type Intent = {
   startsOn: string;
   endsOn: string;
@@ -43,6 +44,7 @@ export type Task = {
 };
 export type Snapshot = {
   driverRuns?: DriverRun[];
+  driverUnavailability?: DriverUnavailability[];
   term: { id: string; startsOn: string; endsOn: string };
   routes: FixedRoute[];
   students: Rider[];
