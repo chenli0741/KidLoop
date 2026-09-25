@@ -32,6 +32,11 @@ test('capacity uses segments and fixed reservations across multiple shared cars'
  const two={...one,vehicleId:'v2',students:[...one.students,...Array.from({length:5},(_,i)=>({studentId:'fixed'+i,pickupStopId:'c',dropoffStopId:'p'}))]};
  assert.equal(checkCapacity([one,two],[{id:'v',active:true,status:'AVAILABLE',capacity:12},{id:'v2',active:true,status:'AVAILABLE',capacity:12}]),true);
  assert.equal(checkCapacity([one,two],[{id:'v',active:true,status:'AVAILABLE',capacity:9},{id:'v2',active:true,status:'AVAILABLE',capacity:9}]),false);
+ const sixteen={...p,students:Array.from({length:16},(_,i)=>({studentId:'cumberland'+i,pickupStopId:'s',dropoffStopId:'p'}))};
+ const cherry={...sixteen,students:[...sixteen.students,...Array.from({length:5},(_,i)=>({studentId:'cherry'+i,pickupStopId:'c',dropoffStopId:'p'}))]};
+ const ellis={...sixteen,vehicleId:'v2',students:[...sixteen.students,...Array.from({length:3},(_,i)=>({studentId:'ellis'+i,pickupStopId:'c',dropoffStopId:'p'}))]};
+ assert.equal(checkCapacity([cherry,ellis],[{id:'v',active:true,status:'AVAILABLE',capacity:13},{id:'v2',active:true,status:'AVAILABLE',capacity:13}]),true);
+ assert.equal(checkCapacity([cherry,ellis],[{id:'v',active:true,status:'AVAILABLE',capacity:10},{id:'v2',active:true,status:'AVAILABLE',capacity:10}]),false);
 });
 
 test('a later driver cannot silently collect an earlier dismissal batch',()=>{

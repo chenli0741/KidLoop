@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import type { AuthUser, Trip, Rider } from './types';
 import { overCapacity } from './route-plan';
 import { displayedStudentPhoto, recognitionStudentPhoto } from './photo-display';
+import {sharedPickupBounds} from './shared-allocation';
 
 // Caller supplies authorized trips. The canonical assignment is never duplicated.
 export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUser) {
@@ -74,10 +75,10 @@ export async function addSharedRiders(c: SqlReader, trips: Trip[], user: AuthUse
       const capacity=capacityByTrip.get(id);
       return Math.max(0,capacity?capacity.capacity-capacity.fixed:capacityLeft(id===trip.id?normalizedTrip:baseByTrip.get(id)!));
     };
-    const allocations=participantIds.map(id=>{
-      const capacity=capacityByTrip.get(id),available=vehicleCapacity(id);
-      const elsewhere=participantIds.filter(other=>other!==id).reduce((sum,other)=>sum+vehicleCapacity(other),0);
-      return {tripId:id,vehicleName:capacity?.vehicleName??baseByTrip.get(id)?.vehicleName??'',min:Math.max(0,sharedCount-elsewhere),max:Math.min(sharedCount,available),capacity:capacity?.capacity??baseByTrip.get(id)?.capacity??0};
+    const bounds=sharedPickupBounds(sharedCount,participantIds.map(id=>({tripId:id,availableSeats:vehicleCapacity(id)})));
+    const allocations=bounds.vehicles.map(bound=>{
+      const id=bound.tripId,capacity=capacityByTrip.get(id);
+      return {...bound,vehicleName:capacity?.vehicleName??baseByTrip.get(id)?.vehicleName??'',capacity:capacity?.capacity??baseByTrip.get(id)?.capacity??0};
     }).sort((a,b)=>Number(b.tripId===trip.id)-Number(a.tripId===trip.id)||a.vehicleName.localeCompare(b.vehicleName));
     const current=allocations.find(item=>item.tripId===trip.id);
     return {...trip,hasSharedPickups:true,sharedPickupMin:current?.min??0,sharedPickupMax:current?.max??0,sharedPickupTotal:sharedCount,sharedPickupVehicles:allocations,riders:[...trip.riders.filter(r=>!ids.has(r.id)),...riders]};
