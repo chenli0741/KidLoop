@@ -79,13 +79,13 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
           </button>
         ) : null}
         {role === "DRIVER" && status === "PICKED_UP" && !atDropoff ? (
-          <button type="button" className="icon-button" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} aria-label={text(locale, "撤销接到", "Undo pickup")} disabled={pending} onClick={() => update("SCHEDULED")}>
-            <RotateCcw size={17} />
+          <button type="button" className="button compact secondary" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} disabled={pending} onClick={() => update("SCHEDULED")}>
+            <RotateCcw size={15} /> {text(locale,"撤销接到","Undo pickup")}
           </button>
         ) : null}
         {role === "DRIVER" && status === "DROPPED_OFF" ? (
-          <button type="button" className="icon-button" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} aria-label={text(locale, "撤销送达", "Undo drop-off")} disabled={pending} onClick={() => update("PICKED_UP")}>
-            <RotateCcw size={17} />
+          <button type="button" className="button compact secondary" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} disabled={pending} onClick={() => update("PICKED_UP")}>
+            <RotateCcw size={15} /> {text(locale,"撤销送达","Undo drop-off")}
           </button>
         ) : null}
         {role === "ADMIN" && (status === "SCHEDULED" || status === "PICKED_UP") ? (
@@ -99,7 +99,7 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
           </button>
         ) : null}
       </div>
-      {pending && <span role="status">{text(locale,"正在保存…","Saving…")}</span>}
+      {pending && <span className="status-saving" role="status">{text(locale,"正在保存…","Saving…")}</span>}
       {visibleError ? <span className="inline-error" role="alert">{visibleError} <button type="button" className="button compact secondary" onClick={()=>window.location.reload()}>{text(locale,"刷新页面","Reload page")}</button></span> : null}
       <dialog ref={dialog} className="record-dialog" aria-labelledby={`${id}-title`} onCancel={event => { if (pending) event.preventDefault(); }}>
         <h2 id={`${id}-title`}>{text(locale, role === "ADMIN" ? "缺席原因" : "特殊原因", role === "ADMIN" ? "Absence reason" : "Special reason")}</h2>
