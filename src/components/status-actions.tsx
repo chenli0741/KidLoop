@@ -75,17 +75,17 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
         {atDropoff && status === "PICKED_UP" ? <button type="button" className="button compact primary" disabled={pending} onClick={() => update("DROPPED_OFF")}><Check size={16}/>{text(locale,"送达","Drop off")}</button> : null}
         {role === "DRIVER" && status === "SCHEDULED" ? (
           <button type="button" className="button compact primary" disabled={pending} onClick={() => update("PICKED_UP")}>
-            <UserCheck size={16} /> {text(locale, "已接到", "Picked up")}
+            <UserCheck size={16} /> {text(locale, "已接到", "Pickup")}
           </button>
         ) : null}
         {role === "DRIVER" && status === "PICKED_UP" && !atDropoff ? (
           <button type="button" className="button compact secondary" title={text(locale, "撤销接到，恢复待接送", "Undo pickup, return to scheduled")} disabled={pending} onClick={() => update("SCHEDULED")}>
-            <RotateCcw size={15} /> {text(locale,"撤销接到","Undo pickup")}
+            <RotateCcw size={15} /> {text(locale,"撤销接到","Undo")}
           </button>
         ) : null}
         {role === "DRIVER" && status === "DROPPED_OFF" ? (
           <button type="button" className="button compact secondary" title={text(locale, "撤销送达，恢复已接到", "Undo drop-off, return to picked up")} disabled={pending} onClick={() => update("PICKED_UP")}>
-            <RotateCcw size={15} /> {text(locale,"撤销送达","Undo drop-off")}
+            <RotateCcw size={15} /> {text(locale,"撤销送达","Undo")}
           </button>
         ) : null}
         {role === "ADMIN" && (status === "SCHEDULED" || status === "PICKED_UP") ? (
