@@ -12,6 +12,7 @@ import {db} from '@/lib/db';
 import {getTrips} from '@/lib/data';
 import {DriverWeekTabs} from '@/components/driver-week-tabs';
 import {scheduleDatePeriod,schedulePeriodLabels} from '@/lib/schedule-day-status';
+import type {TrialDay} from '@/lib/schedule-trial';
 export const dynamic='force-dynamic';
 type Params={week?:string|string[];day?:string;view?:string};
 type ActualStop={stopId:string;arrivedAt:string|null;departedAt:string|null;dropOffAt:string|null;finishedAt:string|null};
@@ -32,15 +33,32 @@ export default async function DriverWeekPage({searchParams}:{searchParams:Promis
  </div>;
 }
 async function Calendar(props:{today:string;monthly:boolean;month:ReturnType<typeof calendarMonth>;dates:string[];locale:Locale;initialDate:string;driverId:string}){
- const overview=await readDriverScheduleOverview(db,props.driverId,props.dates,props.today);
- return <DriverWeekTabs {...props} key={props.initialDate} statuses={props.dates.map(d=>overview.get(d)?'planned':'empty')}>
-  {props.dates.map(date=><Suspense key={date} fallback={<p role="status">{text(props.locale,'正在加载当天详情…','Loading day details…')}</p>}>{date===props.initialDate?<Day date={date} today={props.today} locale={props.locale} driverId={props.driverId} monthly={props.monthly}/>:null}</Suspense>)}
+ const week=props.monthly?null:await readWeekDetails(props.dates,props.today);
+ const overview=props.monthly?await readDriverScheduleOverview(db,props.driverId,props.dates,props.today):null;
+ const statuses=props.dates.map(date=>{
+  const detail=week?.get(date);
+  if(detail)return detail.trips.length||detail.trial?.plans.some(plan=>plan.driverId===props.driverId)?'planned':'empty';
+  return overview?.get(date)?'planned':'empty';
+ });
+ return <DriverWeekTabs {...props} key={props.initialDate} statuses={statuses}>
+  {props.dates.map(date=><Suspense key={date} fallback={<p role="status">{text(props.locale,'正在加载当天详情…','Loading day details…')}</p>}>{!props.monthly||date===props.initialDate?<Day date={date} today={props.today} locale={props.locale} driverId={props.driverId} monthly={props.monthly} preloaded={week?.get(date)}/>:null}</Suspense>)}
  </DriverWeekTabs>;
 }
-async function Day({date,today,locale,driverId,monthly}:{date:string;today:string;locale:Locale;driverId:string;monthly:boolean}){
+type WeekDetail={trips:Awaited<ReturnType<typeof getTrips>>;trial?:TrialDay};
+async function readWeekDetails(dates:string[],today:string){
+ const current=dates.filter(date=>date<=today),future=dates.filter(date=>date>today);
+ const [trips,trial]=await Promise.all([
+  Promise.all(current.map(async date=>[date,await getTrips(date,date<today?{ensure:false}:undefined)] as const)),
+  future.length?readTrialRange(db,future,true):Promise.resolve({summaries:[],days:[]}),
+ ]);
+ const result=new Map<string,WeekDetail>(trips.map(([date,rows])=>[date,{trips:rows}]));
+ future.forEach((date,index)=>result.set(date,{trips:[],trial:trial.days[index]}));
+ return result;
+}
+async function Day({date,today,locale,driverId,monthly,preloaded}:{date:string;today:string;locale:Locale;driverId:string;monthly:boolean;preloaded?:WeekDetail}){
  const future=date>today;
- const trips=future?[]:await getTrips(date);
- const trial=future?(await readTrialRange(db,[date],true)).days[0]:undefined;
+ const trips=preloaded?.trips??(future?[]:await getTrips(date));
+ const trial=preloaded?.trial??(future?(await readTrialRange(db,[date],true)).days[0]:undefined);
  const plans=trial?.plans.filter(p=>p.driverId===driverId)??[];
  const completedIds=trips.filter(t=>t.status==='COMPLETED').map(t=>t.id);
  const summaries=completedIds.length?(await db.query<{trip_id:string;actual_stops:ActualStop[]}>(`select trip_id,actual_stops from completed_trip_summaries where trip_id=any($1::uuid[])`,[completedIds])).rows:[];

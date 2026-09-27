@@ -21,7 +21,9 @@ export function DriverWeekTabs({ dates, today, initialDate, locale, children, mo
   const [pending,startTransition]=useTransition();
   function selectDate(index:number){
     setSelected(index);
-    startTransition(()=>router.replace(`/driver/week?view=${monthly?'month':'week'}&week=${dates[index]}&day=${dates[index]}`,{scroll:false}));
+    const href=`/driver/week?view=${monthly?'month':'week'}&week=${dates[index]}&day=${dates[index]}`;
+    if(monthly)startTransition(()=>router.replace(href,{scroll:false}));
+    else window.history.replaceState(null,'',href);
   }
   const labels = locale === 'zh' ? ['一', '二', '三', '四', '五'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const selectedDate = dates[selected];
@@ -62,6 +64,6 @@ export function DriverWeekTabs({ dates, today, initialDate, locale, children, mo
     <div className="schedule-status-legend">{(['planned','empty'] as const).map(status=><span key={status}><i data-status={status} aria-hidden="true"/>{scheduleStatusLabels[status][locale]}</span>)}</div>
     {Children.toArray(children).map((child, index) => <div key={dates[index]} role="tabpanel"
       id={`weekday-panel-${dates[index]}`} aria-labelledby={`weekday-tab-${dates[index]}`}
-      hidden={selected !== index} tabIndex={0}>{pending?<p role="status" className="workweek-empty">{text(locale,'正在加载日程…','Loading schedule…')}</p>:child}</div>)}
+      hidden={selected !== index} tabIndex={0}>{pending&&monthly?<p role="status" className="workweek-empty">{text(locale,'正在加载日程…','Loading schedule…')}</p>:child}</div>)}
   </>;
 }
