@@ -76,7 +76,7 @@ export function AppNavigation({ user }: { user: AuthUser }) {
         {items.map(({ href, label, icon: Icon }) => {
           const active = (href === "/" || href === "/driver" || href === "/parent") ? pathname === href : pathname.startsWith(href);
           return (
-            <Link key={href} href={href} scroll={compact ? false : undefined} onNavigate={resetContentScroll} aria-current={active ? "page" : undefined} className={active ? "nav-link active" : "nav-link"}>
+            <Link key={href} href={href} prefetch={user.role === "DRIVER" ? true : undefined} scroll={compact ? false : undefined} onNavigate={resetContentScroll} aria-current={active ? "page" : undefined} className={active ? "nav-link active" : "nav-link"}>
               <Icon size={19} aria-hidden="true" />
               <span>{label}</span>
             </Link>

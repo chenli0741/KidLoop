@@ -4,6 +4,9 @@ import "server-only";
 // An explicit alias is required: PostgreSQL names an OR expression ?column?.
 export async function hasDashboardTasks(c: SqlReader, date: string) {
   const result = await c.query<{ exists: boolean }>(`select exists(
+    select 1 from schedule_materializations m
+    where m.operating_term_id=current_operating_term() and m.service_date=$1::date
+  ) or exists(
     select 1 from trips t
     where t.operating_term_id=current_operating_term()
       and t.scheduled_date=$1::date

@@ -80,6 +80,11 @@ export async function materializeRoutes(c:PoolClient,date:string,today:string,_d
  if(!validServiceDate(date)||date<today)return;
  void _driverId;void _replacementSources;
  await lockRoutes(c);await materializeTrial(c,date);
+ // A valid empty result is still a completed generation. Without this marker,
+ // every read of a weekend or holiday reruns the entire scheduling pipeline.
+ await c.query(`insert into schedule_materializations(operating_term_id,service_date)
+  select current_operating_term(),$1::date where current_operating_term() is not null
+  on conflict(tenant_id,operating_term_id,service_date) do update set completed_at=clock_timestamp()`,[date]);
 }
 export function routeForm(route:FixedRoute){
  const f=new FormData();

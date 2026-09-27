@@ -25,7 +25,8 @@ User-facing English uses **Ride / Rides** for a passenger transport execution. E
 | `fixed_routes` | Route dates, weekdays, driver/vehicle, enabled state and excluded student IDs. |
 | `fixed_route_stops` | Ordered school/program locations, arrival times and dismissal batch. |
 | `school_pickup_batches` | School, dismissal time and weekday sharing policy, with batch exclusions. |
-| `schedule_preview_cache` | Content-versioned daily summaries; no execution records. |
+| `schedule_preview_cache` | Input-versioned daily summaries; unchanged scheduling conditions reuse the saved result without rereading the full roster. |
+| `schedule_input_revisions` | Per-provider version incremented only when a scheduling input table changes. |
 | `route_task_issues` | Per-route, per-date generation conflicts shown to administrators. |
 | `student_photos` | Private upload metadata, uploader and optional student association. |
 | `driver_shifts` | Dated assignment of one driver to one vehicle for a time window. |
@@ -86,6 +87,6 @@ See [confirmed requirements](confirmed-requirements.md) for product boundaries a
 
 School and program foreign keys already exist on students. The route resolves students and stop mappings through `automatic-roster.ts`; there is no editable per-child stop assignment table. Exclusions retain separately arranged children without deleting them. `school_pickup_batches` owns the sharing policy for a school/dismissal-time/weekday, common to every participating route.
 
-`schedule-trial.ts` derives daily plans and checks requirements, resources and per-segment capacity. The same result drives execution and calendar summaries. `schedule_preview_cache` hashes date-relevant inputs and stores small summaries; details are calculated only for a selected date. Viewing future calendars never requires creating trips.
+`schedule-trial.ts` derives daily plans and checks requirements, resources and per-segment capacity. The same result drives execution and calendar summaries. `schedule_input_revisions` provides a cheap first check: when its version matches `schedule_preview_cache`, calendar summaries return immediately without rereading and hashing every scheduling input. A changed version rebuilds the date-relevant hash and summary; details are calculated only for a selected date. Viewing future calendars never requires creating trips.
 
 Migrations 030/031 replace the manual route roster and route-pair tables. The user authorized a one-time clear/rebuild of all old execution data; school calendars, students, program relationships and resource identities remain inputs. Subsequent normal operations retain started trips and enforce completed-state locks.

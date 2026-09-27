@@ -170,7 +170,9 @@ export async function getTrips(date: string, options?: { ensure?: boolean }) {
   if(user.role === 'DRIVER' && !user.driverId) return [];
   if(options?.ensure !== false) {
     if(user.role === 'DRIVER') {
-      const existing=await query('select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term() and t.scheduled_date=$1::date and t.status not in (\'DRAFT\',\'CANCELED\') and sh.driver_id=$2 limit 1',[date,user.driverId]);
+      const existing=await query(`select 1 from schedule_materializations where operating_term_id=current_operating_term() and service_date=$1::date
+       union all select 1 from trips t join driver_shifts sh on sh.id=t.shift_id where t.operating_term_id=current_operating_term()
+       and t.scheduled_date=$1::date and t.status not in ('DRAFT','CANCELED') and sh.driver_id=$2 limit 1`,[date,user.driverId]);
       if(!existing.rowCount) await ensureRouteTasks(date,user.driverId!);
     } else await ensureRouteTasks(date);
   }

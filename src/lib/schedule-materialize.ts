@@ -3,11 +3,12 @@ import type {PoolClient} from 'pg';
 import {readTrialInput} from './schedule-trial-data';
 import {trialDay} from './schedule-trial';
 import {materializeSharedPickupLimits} from './shared-pickups';
+import {serialSqlReader} from './sql-reader';
 
 // The caller holds the route advisory transaction lock. Preview and publication share trialDay.
 export async function materializeTrial(c:PoolClient,date:string){
  await c.query('select id from students where active order by id for update');
- const input=await readTrialInput(c,date,date);
+ const input=await readTrialInput(serialSqlReader(c),date,date);
  if(!input.routes.length)return;
  const day=trialDay(input,date);
  const existing=(await c.query(`select t.id,t.shift_id,coalesce(t.generated_plan_id,t.fixed_route_id) as fixed_route_id,coalesce(t.source_route_id,t.fixed_route_id) as source_route_id from trips t where t.operating_term_id=current_operating_term() and t.scheduled_date=$1 and (t.fixed_route_id is not null or t.generated_plan_id is not null) order by t.id for update`,[date])).rows;

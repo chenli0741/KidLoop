@@ -30,22 +30,25 @@ export type TrialSummary={date:string;hasTrips:boolean;issueCount:number;holiday
 export async function readTrialRange(c:SqlReader,dates:string[],details=false,sharedInput?:Promise<TrialInput>):Promise<{summaries:TrialSummary[];days:TrialDay[]}> {
  if(!dates.length)return {summaries:[],days:[]};
  if(dates.length>62||dates.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw new Error('Invalid preview range');
+ const sourceRevision=Number((await c.query<{revision:string}>(`select revision::text from schedule_input_revisions where tenant_id=current_tenant()`)).rows[0]?.revision??0);
+ const cached=(await c.query<{service_date:string;revision:string;source_revision:string;payload:TrialSummary}>(`select service_date::text,revision,source_revision::text,payload from schedule_preview_cache where operating_term_id=current_operating_term() and service_date=any($1::date[])`,[dates])).rows;
+ if(!details&&dates.every(date=>cached.some(row=>row.service_date===date&&Number(row.source_revision)===sourceRevision)))
+  return {summaries:dates.map(date=>cached.find(row=>row.service_date===date)!.payload),days:[]};
  const sorted=[...dates].sort(),input=await (sharedInput ?? readTrialInput(c,sorted[0],sorted.at(-1)!));
- const cached=(await c.query<{service_date:string;revision:string;payload:TrialSummary}>(`select service_date::text,revision,payload from schedule_preview_cache where operating_term_id=current_operating_term() and service_date=any($1::date[])`,[dates])).rows;
  const summaries:TrialSummary[]=[],days:TrialDay[]=[],updates:{date:string;revision:string;payload:TrialSummary}[]=[];
  for(const date of dates){
   const weekday=new Date(date+'T12:00:00Z').getUTCDay()||7;
   const routes=input.routes.filter(r=>r.enabled&&r.startsOn<=date&&r.endsOn>=date&&r.weekdays.includes(weekday));
   const dayInput={...input,routes,rules:input.rules.filter(r=>r.weekdays?.includes(weekday)),batches:input.batches.filter(b=>b.weekday===weekday),children:input.children.filter(s=>!s.noPickupWeekdays?.includes(weekday)),drivers:input.drivers,vehicles:input.vehicles,exceptions:input.exceptions.filter(e=>e.startsOn<=date&&e.endsOn>=date),driverUnavailability:input.driverUnavailability?.filter(e=>e.startsOn<=date&&e.endsOn>=date&&e.weekdays.includes(weekday)),absences:input.absences.filter(a=>a.date===date),existing:input.existing?.filter(t=>t.date===date)};
   const revision=createHash('sha256').update('school-batches-extra-v3-transfer-warnings:').update(JSON.stringify(dayInput)).digest('hex');
-  const prior=cached.find(r=>r.service_date===date&&r.revision===revision);
+  const prior=cached.find(r=>r.service_date===date&&Number(r.source_revision)===sourceRevision&&r.revision===revision);
   if(prior&&!details){summaries.push(prior.payload);continue;}
   const day=trialDay(dayInput,date);if(details)days.push(day);
   const summary={date,hasTrips:day.plans.length>0||!!dayInput.existing?.length,issueCount:day.issues.length,holiday:day.holiday,checked:day.checked,driverIds:[...new Set([...day.plans.map(p=>p.driverId),...dayInput.existing?.map(t=>t.driverId)??[]])]};
   summaries.push(summary);
   updates.push({date,revision,payload:summary});
  }
- if(updates.length)await c.query(`insert into schedule_preview_cache(operating_term_id,service_date,revision,payload) select current_operating_term(),x.date,x.revision,x.payload from jsonb_to_recordset($1::jsonb) as x(date date,revision text,payload jsonb) where current_operating_term() is not null on conflict(operating_term_id,service_date) do update set revision=excluded.revision,payload=excluded.payload,checked_at=clock_timestamp()`,[JSON.stringify(updates)]);
+ if(updates.length)await c.query(`insert into schedule_preview_cache(operating_term_id,service_date,revision,source_revision,payload) select current_operating_term(),x.date,x.revision,$2,x.payload from jsonb_to_recordset($1::jsonb) as x(date date,revision text,payload jsonb) where current_operating_term() is not null on conflict(operating_term_id,service_date) do update set revision=excluded.revision,source_revision=excluded.source_revision,payload=excluded.payload,checked_at=clock_timestamp()`,[JSON.stringify(updates),sourceRevision]);
 
  return {summaries,days};
 }
