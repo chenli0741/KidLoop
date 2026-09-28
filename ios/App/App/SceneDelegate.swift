@@ -28,5 +28,6 @@ class KidLoopBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(KidLoopOCRPlugin())
         bridge?.registerPluginInstance(KidLoopMailAuthPlugin())
         bridge?.registerPluginInstance(KidLoopNavigationPlugin())
+        bridge?.registerPluginInstance(KidLoopCredentialsPlugin())
     }
 }

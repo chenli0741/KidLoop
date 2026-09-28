@@ -17,3 +17,5 @@ if(!delegate.includes('registerPluginInstance(KidLoopOCRPlugin())')||!delegate.i
 console.log('Native OCR bridge source and registration check passed.');
 if(!delegate.includes('registerPluginInstance(KidLoopNavigationPlugin())')||!project.includes('KidLoopNavigationPlugin.swift in Sources')||!info.LSApplicationQueriesSchemes?.includes('comgooglemaps'))throw new Error('Native map navigation bridge not registered, linked or configured');
 console.log('Native Apple Maps / Google Maps navigation bridge check passed.');
+if(!delegate.includes('registerPluginInstance(KidLoopCredentialsPlugin())')||!project.includes('KidLoopCredentialsPlugin.swift in Sources'))throw new Error('Native saved-login Keychain bridge not registered or linked');
+console.log('Native multi-account Keychain bridge check passed.');
