@@ -5,13 +5,15 @@
 | 功能 | 原生依赖 / 配置 | 状态 |
 | --- | --- | --- |
 | 拍照、直接选择相册 | `@capacitor/camera` 8.2.4；相机、相册读取和保存用途说明 | 原生注册与现有图片接口就绪 |
-| 当前位置 | `@capacitor/geolocation` 8.2.2；WhenInUse 和插件要求的 AlwaysAndWhenInUse 用途说明 | 原生 API 就绪；现有操作位置采集仍使用 WebView geolocation |
+| 当前位置 | `@capacitor/geolocation` 8.2.2；WhenInUse 和插件要求的 AlwaysAndWhenInUse 用途说明 | iPhone 接送操作使用原生单次定位；Web 使用浏览器定位 |
 | App 内浏览 | `@capacitor/browser` 8.0.4；SFSafariViewController | 原生 API 就绪；不代表现有所有链接已改造 |
 | 司机驾车导航 | `KidLoopNavigationPlugin`；Apple Maps / Google Maps URL Scheme；`LSApplicationQueriesSchemes` | stop 点可选择地图并启动实际导航；Google Maps 未安装时在 App 内报错 |
 | 麦克风 | `NSMicrophoneUsageDescription` | 已配置 |
 | 苹果语音识别 | `NSSpeechRecognitionUsageDescription` | 权限说明预置；本机语音桥接和录入 UI 改造仍见 `pending-local-speech.md` |
 
 定位的 AlwaysAndWhenInUse 文案是 Geolocation 依赖要求，不开启后台定位，不请求持续追踪。iOS 授权仍在第一次使用对应功能时由用户选择；工程配置不能预先替用户授权。
+
+iPhone App 在 Pickup、Drop off、GO、Arrive 等操作前先读取原生授权状态：仅当状态仍为 `prompt` 时申请权限一次；已授权时直接采集一次当前位置，已拒绝时记录拒绝结果，不重复申请。不得回退到 WebView 定位弹窗。
 
 安装前运行：
 
