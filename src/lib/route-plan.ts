@@ -57,7 +57,11 @@ export function planRoute(
     if (time > (schoolTimes.get(stop.id) ?? "")) schoolTimes.set(stop.id, time);
     return true;
   });
-  const stops = r.stops.map((s) => ({ ...s }));
+  // A daily plan contains only stops used by that day's riders. In particular,
+  // removing a school pickup must also remove its now-unused program drop-off;
+  // otherwise a later school run incorrectly appears to start at that program.
+  const activeStopIds = new Set(students.flatMap(a => [a.pickupStopId, a.dropoffStopId]));
+  const stops = r.stops.filter(s => activeStopIds.has(s.id)).map((s) => ({ ...s }));
   const anchor = stops.find((s) => schoolTimes.has(s.id));
   const delta = anchor
     ? minutes(schoolTimes.get(anchor.id)!) - minutes(anchor.pickupTime || anchor.time)
@@ -68,7 +72,7 @@ export function planRoute(
     const dwell = stops[i - 1]?.dwellMinutes || profile?.originDwellMinutes || 0;
     const arrival =
       i === 0
-        ? minutes(r.stops[0].time) + delta
+        ? minutes(stops[0].time) + delta
         : configured !== undefined
         ? minutes(stops[i - 1].time) + dwell + configured
         : minutes(stops[i - 1].time) +
@@ -85,13 +89,7 @@ export function planRoute(
   }
   return {
     students,
-    stops: stops.filter(
-      (s) =>
-        !s.schoolId ||
-        students.some(
-          (a) => a.pickupStopId === s.id || a.dropoffStopId === s.id,
-        ),
-    ),
+    stops,
   };
 }
 export function overCapacity(

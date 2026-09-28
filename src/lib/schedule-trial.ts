@@ -5,6 +5,7 @@ import type { FixedRoute, RouteStop, RouteStudent } from './fixed-route-types';
 import { automaticRoster, batchTime, type RosterChild, type DismissalRule, type PickupBatch } from './automatic-roster';
 import { planRoute, overlaps } from './route-plan';
 import {driverBlockingUnavailability,driverIsAvailable,type DriverUnavailability} from './driver-availability';
+import {routeName} from './route-name';
 
 export type TrialIssue={code:string;advisory?:boolean;schoolId?:string;studentId?:string;routeId?:string;message:string};
 export type TrialPlan={routeId:string;sourceRouteId?:string;assignmentReason?:string;name:string;driverId:string;vehicleId:string;stops:RouteStop[];students:RouteStudent[];shared:Record<string,string>};
@@ -80,7 +81,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
    else issues.push({code:'RESOURCE',routeId:route.id,message:'司机未绑定或不可用，且未找到替补司机 / Driver unavailable and no cover driver is available'});
    continue;
   }
-  for(let i=1;i<r.stops.length;i++) if(!input.travelTimes?.some(t=>t.fromName===r.stops[i-1].name&&t.toName===r.stops[i].name)) issues.push({code:'TRAVEL_TIME_DEFAULT',advisory:true,routeId:r.id,message:`缺少 ${r.stops[i-1].name} → ${r.stops[i].name} 的行驶时间，按默认 10 分钟 / Missing travel time; using default 10 minutes`});
+  for(let i=1;i<plan.stops.length;i++) if(!input.travelTimes?.some(t=>t.fromName===plan.stops[i-1].name&&t.toName===plan.stops[i].name)) issues.push({code:'TRAVEL_TIME_DEFAULT',advisory:true,routeId:r.id,message:`缺少 ${plan.stops[i-1].name} → ${plan.stops[i].name} 的行驶时间，按默认 10 分钟 / Missing travel time; using default 10 minutes`});
   const shared:Record<string,string>={};
   for(const a of roster){
    const stop=r.stops.find(s=>s.id===a.pickupStopId)!;
@@ -89,7 +90,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   }
   if(!input.vehicles.some(v=>v.id===r.vehicleId&&v.active&&v.status!=='MAINTENANCE'))issues.push({code:'RESOURCE',routeId:r.id,message:'车辆未绑定或不可用 / Vehicle unassigned or unavailable'});
   if(plan.stops.at(-1)!.time>'23:59')issues.push({code:'TIME',routeId:r.id,message:'行程超出当天 / Trip extends beyond this day'});
-  plans.push({routeId:r.id,name:r.name,driverId:assigned.id,vehicleId:r.vehicleId??'',...plan,shared,assignmentReason});
+  plans.push({routeId:r.id,name:routeName(plan.stops)||r.name,driverId:assigned.id,vehicleId:r.vehicleId??'',...plan,shared,assignmentReason});
  }
  // Explicit temporary services take over the student for this date.
  const temporary=new Set(plans.filter(p=>input.routes.find(r=>r.id===p.routeId)?.routeType==='TEMPORARY'&&!issues.some(i=>i.routeId===p.routeId&&i.code==='RESOURCE')).flatMap(p=>p.students.map(a=>a.studentId)));
@@ -102,7 +103,8 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   }
  }
  plans.push(...allocateEarlyTrips(input,date,earlyRequests,plans,issues));
- const active=plans.filter(p=>p.students.length&&!(input.routes.find(r=>r.id===p.routeId)?.routeType==='TEMPORARY'&&issues.some(i=>i.routeId===p.routeId&&i.code==='RESOURCE')));
+ const active=plans.filter(p=>p.students.length&&!(input.routes.find(r=>r.id===p.routeId)?.routeType==='TEMPORARY'&&issues.some(i=>i.routeId===p.routeId&&i.code==='RESOURCE')))
+  .sort((a,b)=>a.stops[0].time.localeCompare(b.stops[0].time)||a.routeId.localeCompare(b.routeId));
  for(const [studentId,{child}] of expected){
   if(input.absences.some(a=>a.date===date&&a.studentId===studentId))continue;
   const assigned=active.filter(p=>p.students.some(a=>a.studentId===studentId));

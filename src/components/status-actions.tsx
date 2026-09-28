@@ -9,7 +9,7 @@ import { listStudentStatusReasons } from "@/app/actions";
 import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
 import type { RiderStatus } from "@/lib/types";
-import { missedPickupReasons, type StudentStatusReason } from "@/lib/missed-pickup";
+import { driverDefaultMissedPickupReason, missedPickupReasons, type StudentStatusReason } from "@/lib/missed-pickup";
 import type { TripExecution } from "@/lib/trip-execution";
 
 export function StatusActions({ tripId, assignmentId, status, parentAbsent = false, atDropoff = false, onUpdated, targetTripId, role = "DRIVER" }: { tripId: string; atDropoff?: boolean; targetTripId?: string; assignmentId: string; status: RiderStatus; parentAbsent?: boolean; role?: "ADMIN" | "DRIVER"; onUpdated: (update: TripExecution) => void }) {
@@ -20,13 +20,19 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
   const [error, setError] = useState<{message:string;expectedStatus:RiderStatus|null}|null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const id = useId();
-  const [reason, setReason] = useState<string>(missedPickupReasons[0].id);
+  const [reason, setReason] = useState<string>(role === "DRIVER" ? driverDefaultMissedPickupReason : missedPickupReasons[0].id);
   const [reasons, setReasons] = useState<StudentStatusReason[]>([...missedPickupReasons]);
   const reasonStatus: RiderStatus = role === "ADMIN" ? "ABSENT" : "EXCEPTION";
   const visibleError=error&&status!==error.expectedStatus?error.message:"";
+  const defaultReason=(items:StudentStatusReason[])=>role === "DRIVER"&&items.some(item=>item.id===driverDefaultMissedPickupReason)
+    ? driverDefaultMissedPickupReason
+    : items[0]?.id ?? "OTHER";
   function openReasonDialog(){
-    setError(null);setReason(reasons[0]?.id ?? "OTHER");dialog.current?.showModal();
-    void listStudentStatusReasons().then(setReasons).catch(()=>undefined);
+    setError(null);setReason(defaultReason(reasons));dialog.current?.showModal();
+    void listStudentStatusReasons().then(items=>{
+      setReasons(items);
+      setReason(current=>items.some(item=>item.id===current)?current:defaultReason(items));
+    }).catch(()=>undefined);
   }
 
   async function confirmSavedStatus(next:RiderStatus){

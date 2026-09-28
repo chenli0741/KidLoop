@@ -46,7 +46,7 @@ test('independent institutions: migration, isolation, membership and scheduling'
    second=await tx(()=>createTenant(c,legacy,'Second provider'));
    assert.equal((await scoped(second,()=>c.query('select count(*)::int n from schools'))).rows[0].n,0);
    assert.equal((await scoped(second,()=>c.query('select count(*)::int n from travel_time_profiles'))).rows[0].n,0);
-   assert.equal((await scoped(second,()=>c.query('select count(*)::int n from student_status_reasons'))).rows[0].n,5);
+   assert.equal((await scoped(second,()=>c.query('select count(*)::int n from student_status_reasons'))).rows[0].n,6);
    assert.equal((await scoped(second,()=>c.query('select count(*)::int n from app_users'))).rows[0].n,1);
   });
   await t.test('RLS hides all foreign records and rejects foreign writes, missing context and global credentials',async()=>{

@@ -6,7 +6,7 @@ import pg from "pg";
 // Historical test defaults for the remaining legacy schools only.
 // Ellis was corrected to grade-specific school rules on 2026-09-14; never seed
 // its former all-grade Tuesday 12:45 / other-day 13:45 test defaults again.
-// McAuliffe regular dismissal was user-corrected to 14:30 on 2026-09-14;
+// McAuliffe regular dismissal was finally corrected to 14:35 on 2026-09-28;
 // its obsolete defaults must not be reintroduced either.
 const schools = [
   { name: "Stratford School", tuesday: "12:45", other: "13:45" },

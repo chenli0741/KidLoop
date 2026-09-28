@@ -29,6 +29,7 @@ export async function createTenant(c: PoolClient, accountId: string, name: strin
   await c.query(`insert into student_status_reasons(id,name_zh,name_en,roles) values
     ('ILLNESS','因病缺席','Illness',array['ADMIN','DRIVER','PARENT']),
     ('PARENT_REQUEST','家长请假','Parent request',array['ADMIN','PARENT']),
+    ('PICKED_UP_BY_PARENT','家长已接','Picked up by parent',array['DRIVER']),
     ('PICKED_UP_ELSEWHERE','由其他人接走','Picked up elsewhere',array['ADMIN','DRIVER','PARENT']),
     ('KEPT_AT_SCHOOL','被老师留课','Kept at school',array['DRIVER','PARENT']),
     ('OTHER','其他原因','Other reason',array['ADMIN','DRIVER','PARENT'])`);
