@@ -3,7 +3,10 @@ import 'server-only';
 import type { RosterChild, DismissalRule, PickupBatch } from './automatic-roster';
 export async function readRosterData(c:SqlReader){
  const [children,rules,batches]=await Promise.all([
-  c.query<RosterChild>(`select s.id,s.name,s.school_id as "schoolId",s.program_id as "programId",trim(s.grade) as grade,s.no_pickup_weekdays as "noPickupWeekdays",ts.reviewed from students s join term_students ts on ts.student_id=s.id and ts.operating_term_id=current_operating_term() where s.active order by s.id`),
+  c.query<RosterChild>(`select s.id,s.name,s.school_id as "schoolId",s.program_id as "programId",trim(s.grade) as grade,s.no_pickup_weekdays as "noPickupWeekdays",ts.reviewed,
+   coalesce((select jsonb_agg(jsonb_build_object('id',sp.id,'startsOn',sp.starts_on::text,'endsOn',sp.ends_on::text) order by sp.starts_on,sp.id)
+    from student_service_periods sp where sp.student_id=s.id and sp.operating_term_id=ts.operating_term_id),'[]') as "servicePeriods"
+   from students s join term_students ts on ts.student_id=s.id and ts.operating_term_id=current_operating_term() where s.active order by s.id`),
   c.query<DismissalRule>(`select school_id as "schoolId",grades,weekdays,to_char(pickup_time,'HH24:MI') as "pickupTime" from school_pickup_rules where operating_term_id=current_operating_term() order by school_id,pickup_time,id`),
   c.query<PickupBatch>(`select id,school_id as "schoolId",to_char(pickup_time,'HH24:MI') as "pickupTime",weekday,shared,excluded_student_ids as "excludedStudentIds",updated_at::text as "updatedAt" from school_pickup_batches where operating_term_id=current_operating_term() order by id`)
  ]);

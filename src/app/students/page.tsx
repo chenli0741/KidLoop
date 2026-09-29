@@ -17,8 +17,17 @@ import { PageHeader } from "@/components/page-header";
 import { getPrograms, getSchools, getStudents } from "@/lib/data";
 import { text } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
+import { StudentServiceControls } from "@/components/student-service-controls";
 
 export const dynamic = "force-dynamic";
+
+function serviceSummary(student: Awaited<ReturnType<typeof getStudents>>[number], today: string, locale: Awaited<ReturnType<typeof getLocale>>) {
+  const period = student.servicePeriods.find(item => item.endsOn >= today) ?? student.servicePeriods.at(-1);
+  if (!period) return text(locale,"未设置接送期间","No service dates");
+  if (period.startsOn > today) return text(locale,`接送：${period.startsOn} 开始`,`Service: starts ${period.startsOn}`);
+  if (period.endsOn < today) return text(locale,`接送：已于 ${period.endsOn} 结束`,`Service: ended ${period.endsOn}`);
+  return text(locale,`接送至 ${period.endsOn}`,`Service through ${period.endsOn}`);
+}
 
 export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ school?: string | string[] }> }) {
   await requireUser(["ADMIN"]);
@@ -32,7 +41,8 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
   const requestedSchool = (await searchParams).school;
   const selectedSchool = schools.find((school) => school.id === requestedSchool) ?? schools[0];
   const visibleStudents = students.filter((student) => student.schoolId === selectedSchool?.id);
-  const routeOptions = studentRouteOptions(routes, todayInOperationsTimeZone()).filter(o => o.schoolId === selectedSchool?.id);
+  const today = todayInOperationsTimeZone();
+  const routeOptions = studentRouteOptions(routes, today).filter(o => o.schoolId === selectedSchool?.id);
   const canAddStudent = Boolean(selectedSchool) && programs.length > 0;
 
   return (
@@ -42,6 +52,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
 
       <div className="roster-toolbar"><SchoolFilter schools={schools} selected={selectedSchool?.id ?? ""} label={text(locale, "学校", "School")} />
         <div className="roster-create-actions" key={selectedSchool?.id ?? "empty"}>
+          {visibleStudents.length ? <StudentServiceControls students={visibleStudents} term={operation} locale={locale} /> : null}
           <RosterCreateDialog title={text(locale, "添加学生", "Add student")} closeLabel={text(locale, "关闭", "Close")}>
             {canAddStudent ? (
               <StudentCreateForm schoolId={selectedSchool!.id} programs={programs} options={routeOptions} locale={locale}>
@@ -52,6 +63,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                 <StudentWeekdays locale={locale}/>
                 <label><span>{text(locale, "年级", "Grade")}</span><input name="grade" placeholder="3" required /></label>
                 <label><span>{text(locale, "年龄", "Age")}</span><input name="age" type="number" min="3" max="20" required /></label>
+                <label><span>{text(locale, "开始接送", "Service starts")}</span><input name="serviceStartsOn" type="date" min={operation.startsOn} max={operation.endsOn} defaultValue={today < operation.startsOn ? operation.startsOn : today} required /></label>
                 <label><span>{text(locale, "家长姓名", "Parent name")}</span><input name="parentName" required /></label>
                 <label><span>{text(locale, "与学生关系", "Relationship")}</span><input name="relationship" placeholder={text(locale, "母亲", "Mother")} required /></label>
                 <label><span>{text(locale, "家长电话", "Parent phone")}</span><input name="parentPhone" type="tel" required /></label>
@@ -83,6 +95,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                       <span><Phone size={14} /> {student.parentName ? `${student.parentName} · ${student.parentPhone}` : text(locale, "家长联系方式待补充", "Parent contact pending")}</span>
                     </div>
                     <div className="destination"><span>{text(locale, "送达", "Dropoff")}</span><strong>{student.programName}</strong></div>
+                    <p className="student-service-summary">{serviceSummary(student,today,locale)}</p>
                   </div>
                 </article>
               ))}

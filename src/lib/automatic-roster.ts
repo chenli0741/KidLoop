@@ -1,6 +1,7 @@
 import type { RouteStop, RouteStudent } from './fixed-route-types';
 
-export type RosterChild = { id:string; schoolId:string; programId:string; grade:string; name?:string; noPickupWeekdays?:number[]; reviewed?:boolean };
+import type {StudentServicePeriod} from './student-service-periods';
+export type RosterChild = { id:string; schoolId:string; programId:string; grade:string; name?:string; noPickupWeekdays?:number[]; reviewed?:boolean; servicePeriods?:StudentServicePeriod[] };
 export type DismissalRule = { schoolId:string; grades?:string[]; weekdays?:number[]; pickupTime?:string|null };
 export type PickupBatch = { id:string; schoolId:string; pickupTime:string; weekday:number; shared:boolean; excludedStudentIds:string[]; updatedAt:string };
 export function batchTime(stop:RouteStop,rules:DismissalRule[],weekday:number) {

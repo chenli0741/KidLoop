@@ -93,6 +93,7 @@ export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoute
     no_pickup_weekdays: number[]; classroom_name: string; classroom_id: string; school_id: string; school_name: string;
     program_id: string; program_name: string; parent_name: string; parent_phone: string; relationship: string;
     backup_phone: string; email: string; notes: string; updated_at: string;
+    service_periods: Student["servicePeriods"];
   }>(`
     select false as route_assigned,
            st.id, st.name, st.photo_url, (select '/api/student-avatars/'||ca.student_id::text from student_cartoon_avatars ca where ca.student_id=st.id and ca.source_photo_url=coalesce(st.photo_url,'')) as cartoon_url, st.grade, st.age, st.no_pickup_weekdays,
@@ -102,7 +103,9 @@ export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoute
            coalesce(pa.name, '') as parent_name, coalesce(pa.phone, '') as parent_phone,
            coalesce(pa.relationship, '') as relationship,
            coalesce(pa.backup_phone, '') as backup_phone, coalesce(pa.email, '') as email,
-           st.notes, st.updated_at::text
+           st.notes, st.updated_at::text,
+           coalesce((select jsonb_agg(jsonb_build_object('id',sp.id,'startsOn',sp.starts_on::text,'endsOn',sp.ends_on::text) order by sp.starts_on,sp.id)
+             from student_service_periods sp where sp.student_id=st.id and sp.operating_term_id=current_operating_term()),'[]') as service_periods
     from students st
     join schools sc on sc.id = st.school_id
     join after_school_programs p on p.id = st.program_id
@@ -131,6 +134,7 @@ export async function getStudents(knownRoutes?: ReturnType<typeof readFixedRoute
     email: row.email,
     notes: row.notes,
     updatedAt: row.updated_at,
+    servicePeriods: row.service_periods,
   }));
 }
 

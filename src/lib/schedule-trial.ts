@@ -6,6 +6,7 @@ import { automaticRoster, batchTime, type RosterChild, type DismissalRule, type 
 import { planRoute, overlaps } from './route-plan';
 import {driverBlockingUnavailability,driverIsAvailable,type DriverUnavailability} from './driver-availability';
 import {routeName} from './route-name';
+import {isStudentInService} from './student-service-periods';
 
 export type TrialIssue={code:string;advisory?:boolean;schoolId?:string;studentId?:string;routeId?:string;message:string};
 export type TrialPlan={routeId:string;sourceRouteId?:string;assignmentReason?:string;name:string;driverId:string;vehicleId:string;stops:RouteStop[];students:RouteStudent[];shared:Record<string,string>};
@@ -16,7 +17,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
  const issues:TrialIssue[]=[],expected=new Map<string,{child:RosterChild;normalTime:string;time:string}>();
  let schoolOpen=false;
  for(const child of input.children){
-  if(!input.terms.some(t=>t.schoolId===child.schoolId&&t.startsOn<=date&&t.endsOn>=date)||child.noPickupWeekdays?.includes(weekday))continue;
+  if(!isStudentInService(child,date)||!input.terms.some(t=>t.schoolId===child.schoolId&&t.startsOn<=date&&t.endsOn>=date)||child.noPickupWeekdays?.includes(weekday))continue;
   const exception=input.exceptions.find(e=>e.schoolId===child.schoolId&&e.startsOn<=date&&e.endsOn>=date);
   if(exception&&!exception.pickupTime&&!exception.gradeTimes.length)continue;
   const rules=input.rules.filter(r=>r.schoolId===child.schoolId&&r.grades?.includes(child.grade)&&r.weekdays?.includes(weekday));

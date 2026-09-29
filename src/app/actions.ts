@@ -310,6 +310,11 @@ export async function createStudent(_: FormState, formData: FormData): Promise<F
       ]);
       await attachPhoto(client,photo,student.rows[0].id,user.id);
       await client.query("insert into term_students(operating_term_id,student_id,reviewed) values($1,$2,true)",[operation.id,student.rows[0].id]);
+      const serviceStartsOn = optional(formData, "serviceStartsOn") || todayInOperationsTimeZone();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceStartsOn) || serviceStartsOn < operation.startsOn || serviceStartsOn > operation.endsOn)
+        throw new Error("service start date must be within the term");
+      await client.query(`update student_service_periods set starts_on=$3,created_by=$4,updated_at=clock_timestamp()
+        where operating_term_id=$1 and student_id=$2`,[operation.id,student.rows[0].id,serviceStartsOn,user.id]);
       const assignment = await assignNewStudentRoute(client, student.rows[0].id, optional(formData, "routeAssignment"), todayInOperationsTimeZone());
       success.zh = assignment.zh;
       success.en = assignment.en;

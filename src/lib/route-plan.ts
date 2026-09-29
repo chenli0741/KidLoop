@@ -21,6 +21,8 @@ export async function readPickupMatches(
     join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=s.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays)
  left join school_calendar_schedules e on e.operating_term_id=current_operating_term() and e.school_id=s.school_id and $2::date between e.starts_on and e.ends_on
     where s.id=any($1::uuid[]) and s.active and not ($3=any(s.no_pickup_weekdays))
+    and exists(select 1 from student_service_periods sp where sp.student_id=s.id
+      and sp.operating_term_id=current_operating_term() and $2::date between sp.starts_on and sp.ends_on)
     and (e.id is null or e.pickup_time is not null or jsonb_array_length(e.grade_times)>0)`,
       [ids, date, weekday],
     )

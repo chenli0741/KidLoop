@@ -18,7 +18,8 @@ async function fixture(run: (f: Awaited<ReturnType<typeof setup>>) => Promise<vo
   try {
     await c.query(`create schema ${schema}`);
     await c.query(`set search_path to ${schema}`);
-    for (const file of (await readdir('db/migrations')).filter(f => f.endsWith('.sql')).sort()) await c.query(await readFile(`db/migrations/${file}`, 'utf8'));
+    for (const file of (await readdir('db/migrations')).filter(f => f.endsWith('.sql') && !f.startsWith('047_')).sort()) await c.query(await readFile(`db/migrations/${file}`, 'utf8'));
+    await c.query("select set_config('kidloop.tenant_id','00000000-0000-4000-8000-000000000001',false)");
     await c.query('begin');
     await run(await setup(c));
     await c.query('commit');
@@ -106,6 +107,20 @@ test('adding a student preserves started execution and joins the next unstarted 
   assert.deepEqual((await f.c.query('select * from trip_students')).rows, before);
   await materializeRoutes(f.c, '2026-09-09', today);
   assert.equal((await f.c.query('select count(*)::int n from trip_students where student_id=$1', [student])).rows[0].n, 1);
+}));
+
+test('service periods remove future riders and allow a later rejoin', async () => fixture(async f => {
+  await f.route();
+  const student = await f.student();
+  await f.c.query("update student_service_periods set ends_on='2026-09-08' where student_id=$1", [student]);
+  await materializeRoutes(f.c, '2026-09-09', today);
+  assert.equal((await f.c.query(`select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id
+    where ts.student_id=$1 and t.scheduled_date='2026-09-09'`, [student])).rows[0].n, 0);
+  await f.c.query(`insert into student_service_periods(operating_term_id,student_id,starts_on,ends_on)
+    values(current_operating_term(),$1,'2026-09-10','2026-09-30')`, [student]);
+  await materializeRoutes(f.c, '2026-09-10', today);
+  assert.equal((await f.c.query(`select count(*)::int n from trip_students ts join trips t on t.id=ts.trip_id
+    where ts.student_id=$1 and t.scheduled_date='2026-09-10'`, [student])).rows[0].n, 1);
 }));
 
 test('stale or mismatched choices cannot assign to an unrelated route; invalid grade leaves pending', async () => fixture(async f => {

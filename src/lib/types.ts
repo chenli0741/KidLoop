@@ -82,6 +82,7 @@ export type Student = {
   email: string;
   notes: string;
   updatedAt: string;
+  servicePeriods: import("./student-service-periods").StudentServicePeriod[];
 };
 
 export type Shift = {
