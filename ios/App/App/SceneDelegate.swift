@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import WebKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -25,6 +26,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 class KidLoopBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
+        let nativeMarker = WKUserScript(
+            source: "window.__KIDLOOP_NATIVE__ = true; window.dispatchEvent(new Event('kidloopnative'));",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        webView?.configuration.userContentController.addUserScript(nativeMarker)
         bridge?.registerPluginInstance(KidLoopOCRPlugin())
         bridge?.registerPluginInstance(KidLoopMailAuthPlugin())
         bridge?.registerPluginInstance(KidLoopNavigationPlugin())

@@ -32,7 +32,17 @@ public class KidLoopCredentialsPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Saved accounts could not be read", "KEYCHAIN_READ_FAILED")
             return
         }
-        let items = result as? [[String: Any]] ?? []
+        // Match-all normally returns an array. Accept one dictionary as well so
+        // the picker still works across Keychain implementations and upgrades.
+        let items: [[String: Any]]
+        if let array = result as? [[String: Any]] {
+            items = array
+        } else if let item = result as? [String: Any] {
+            items = [item]
+        } else {
+            call.reject("Saved accounts could not be decoded", "KEYCHAIN_READ_FAILED")
+            return
+        }
         let accounts = items.compactMap { item -> [String: String]? in
             guard let email = item[kSecAttrAccount as String] as? String,
                   let data = item[kSecValueData as String] as? Data,

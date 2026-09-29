@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getIdentity } from "@/lib/identity";
 import { cookies } from "next/headers";
-import { LOGIN_EMAIL_COOKIE, LOGIN_HANDOFF_COOKIE, readLoginEmail } from "@/lib/login-preferences";
+import { LOGIN_EMAIL_COOKIE, readLoginEmail } from "@/lib/login-preferences";
 import { BusFront, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getUser, homeFor } from "@/lib/auth";
@@ -13,10 +13,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { passwordChanged, registered, invitation } = await searchParams;
   const [user, locale] = await Promise.all([getUser(), getLocale()]);
   const jar = await cookies();
-  const credentialHandoff = jar.get(LOGIN_HANDOFF_COOKIE)?.value === "1";
   const invitationPath=invitation&&/^[a-f0-9]{64}$/.test(invitation)?`/invite/${invitation}`:null;
-  if (user && !credentialHandoff) redirect(invitationPath??homeFor(user.role));
-  if (!credentialHandoff && await getIdentity()) redirect(invitationPath??"/organizations");
+  if (user) redirect(invitationPath??homeFor(user.role));
+  if (await getIdentity()) redirect(invitationPath??"/organizations");
   const rememberedEmail = readLoginEmail(jar.get(LOGIN_EMAIL_COOKIE)?.value);
   return <main className="login-page"><section className="login-card">
     <div className="login-brand"><span className="brand-mark"><BusFront size={25} /></span><strong>Kid Loop Rides</strong></div>

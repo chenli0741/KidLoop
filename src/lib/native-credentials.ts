@@ -13,10 +13,20 @@ type CredentialsPlugin = {
   remove(options: { email: string }): Promise<void>;
 };
 
+declare global {
+  interface Window {
+    __KIDLOOP_NATIVE__?: boolean;
+  }
+}
+
 const NativeCredentials = registerPlugin<CredentialsPlugin>("KidLoopCredentials");
 
+export function isSavedLoginShell() {
+  return typeof window !== "undefined" && (window.__KIDLOOP_NATIVE__ === true || Capacitor.isNativePlatform());
+}
+
 export function supportsSavedLogins() {
-  return Capacitor.isNativePlatform();
+  return isSavedLoginShell();
 }
 
 export async function listSavedLogins(): Promise<SavedLogin[]> {

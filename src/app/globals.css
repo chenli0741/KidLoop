@@ -410,9 +410,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .form-grid .login-remember { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .login-remember input { flex: none; width: 20px; height: 20px; min-height: 20px; accent-color: var(--green); }
 .form-grid .login-remember > span { color: var(--ink); font-size: 13px; font-weight: 500; }
-.saved-login-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
-.saved-login-row label { min-width: 0; }
-.saved-login-forget { min-height: 48px; padding-inline: 14px; white-space: nowrap; }
+.login-email-field { position: relative; }
+.login-email-field > input { padding-right: 54px; }
+.saved-login-toggle { position: absolute; top: 4px; right: 4px; width: 44px; height: calc(100% - 8px); display: grid; place-items: center; border: 0; border-left: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.saved-login-options { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; left: 0; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: white; box-shadow: 0 12px 30px rgba(17, 38, 29, .14); }
+.saved-login-options button { display: block; width: 100%; min-height: 42px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.saved-login-options button.selected { background: var(--mint); color: var(--green); font-weight: 700; }
 
 .mobile-only { display: none; }
 .resource-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px; margin-bottom: 24px; background: #e8eee9; border-radius: 15px; max-width: 650px; }

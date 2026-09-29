@@ -1,10 +1,12 @@
 "use client";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { ArrowRight, Trash2 } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { login, type LoginState } from "@/app/login/actions";
 import { useLocale } from "@/components/locale-provider";
 import { text } from "@/lib/i18n";
-import { listSavedLogins, removeSavedLogin, saveLogin, supportsSavedLogins, type SavedLogin } from "@/lib/native-credentials";
+import { isSavedLoginShell, listSavedLogins, removeSavedLogin, saveLogin, supportsSavedLogins, type SavedLogin } from "@/lib/native-credentials";
+
+let pendingSavedLogin: { account: SavedLogin; previous: SavedLogin | null } | null = null;
 
 export function LoginForm({ rememberedEmail = "", invitation = "" }: { rememberedEmail?: string; invitation?: string }) {
   const [email, setEmail] = useState(rememberedEmail);
@@ -12,47 +14,51 @@ export function LoginForm({ rememberedEmail = "", invitation = "" }: { remembere
   const [remember, setRemember] = useState(true);
   const [savedLogins, setSavedLogins] = useState<SavedLogin[]>([]);
   const [selectedEmail, setSelectedEmail] = useState("");
+  const [savedLoginMenuOpen, setSavedLoginMenuOpen] = useState(false);
   const [nativeAccountPicker, setNativeAccountPicker] = useState(false);
-  const navigated = useRef(false);
   const locale = useLocale();
   const initialState: LoginState = { ok: false, message: "" };
   const [state, action, pending] = useActionState(login, initialState);
 
   useEffect(() => {
-    if (!supportsSavedLogins()) return;
-    void listSavedLogins().then((accounts) => {
-      setNativeAccountPicker(true);
-      setSavedLogins(accounts);
-      const selected = accounts.find((account) => account.email === rememberedEmail) ?? accounts[0];
-      if (selected) {
-        setSelectedEmail(selected.email);
-        setEmail(selected.email);
-        setPassword(selected.password);
+    let cancelled = false;
+    void (async () => {
+      // The native scripts and the remotely hosted React page can finish in
+      // either order. Wait briefly for the bridge instead of deciding once at
+      // hydration time that this is a browser forever.
+      for (let attempt = 0; attempt < 30 && !cancelled; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 0 : 100));
+        if (isSavedLoginShell()) setNativeAccountPicker(true);
+        if (!supportsSavedLogins()) continue;
+        try {
+          const accounts = await listSavedLogins();
+          if (cancelled) return;
+          setSavedLogins(accounts);
+          const selected = accounts.find((account) => account.email === rememberedEmail) ?? accounts[0];
+          if (selected) {
+            setSelectedEmail(selected.email);
+            setEmail(selected.email);
+            setPassword(selected.password);
+          }
+          return;
+        } catch (error) {
+          console.error("KidLoop could not read saved accounts", error);
+          return;
+        }
       }
-    }).catch(() => undefined);
+    })();
+    return () => { cancelled = true; };
   }, [rememberedEmail]);
 
   useEffect(() => {
-    if (!state.ok || !state.redirectTo || navigated.current) return;
-    navigated.current = true;
-    const destination = state.redirectTo;
-    const accountEmail = state.email ?? email.trim().toLowerCase();
-    void (async () => {
-      if (remember && accountEmail && password) {
-        try {
-          await saveLogin({ email: accountEmail, password });
-          if (supportsSavedLogins()) {
-            const saved = await listSavedLogins();
-            if (!saved.some((account) => account.email === accountEmail && account.password === password)) throw new Error("Saved login verification failed");
-          }
-        } catch (error) { console.error("KidLoop could not save this account", error); }
-      }
-      try { await fetch("/api/login-handoff", { method: "DELETE", credentials: "same-origin" }); } catch { /* The flag also expires after two minutes. */ }
-      window.location.replace(destination);
-    })();
-  }, [email, password, remember, state]);
+    if (!state.message || !pendingSavedLogin) return;
+    const failed = pendingSavedLogin;
+    pendingSavedLogin = null;
+    void (failed.previous ? saveLogin(failed.previous) : removeSavedLogin(failed.account.email)).catch((error) => console.error("KidLoop could not restore the saved login", error));
+  }, [state.message]);
 
   function selectAccount(value: string) {
+    setSavedLoginMenuOpen(false);
     setSelectedEmail(value);
     const account = savedLogins.find((item) => item.email === value);
     if (account) {
@@ -64,29 +70,28 @@ export function LoginForm({ rememberedEmail = "", invitation = "" }: { remembere
     }
   }
 
-  async function forgetSelected() {
-    if (!selectedEmail) return;
-    await removeSavedLogin(selectedEmail);
-    const remaining = savedLogins.filter((account) => account.email !== selectedEmail);
-    setSavedLogins(remaining);
-    const next = remaining[0];
-    setSelectedEmail(next?.email ?? "");
-    setEmail(next?.email ?? "");
-    setPassword(next?.password ?? "");
-  }
-
-  return <form action={action} id="login-form" autoComplete="on" className="form-grid login-form">
+  return <form action={async (formData) => {
+    const accountEmail = String(formData.get("email") ?? "").trim().toLowerCase();
+    const accountPassword = String(formData.get("password") ?? "");
+    if (formData.get("remember") === "on" && isSavedLoginShell() && accountEmail && accountPassword) {
+      try {
+        const saved = await listSavedLogins();
+        const account = { email: accountEmail, password: accountPassword };
+        pendingSavedLogin = { account, previous: saved.find((entry) => entry.email === accountEmail) ?? null };
+        await saveLogin(account);
+      } catch (error) {
+        pendingSavedLogin = null;
+        console.error("KidLoop could not save this login", error);
+      }
+    } else {
+      pendingSavedLogin = null;
+    }
+    action(formData);
+  }} id="login-form" autoComplete="on" className="form-grid login-form">
     <input type="hidden" name="invitation" value={invitation}/>
-    {nativeAccountPicker && savedLogins.length > 0 && <div className="saved-login-row full">
-      <label><span>{text(locale, "已保存账号", "Saved account")}</span><select value={selectedEmail} onChange={(event) => selectAccount(event.target.value)}>
-        {savedLogins.map((account) => <option key={account.email} value={account.email}>{account.email}</option>)}
-        <option value="">{text(locale, "使用其他账号", "Another account")}</option>
-      </select></label>
-      <button type="button" className="button secondary saved-login-forget" onClick={() => void forgetSelected()} disabled={!selectedEmail} aria-label={text(locale,"忘记此账号","Forget account")}><Trash2 size={17}/><span>{text(locale,"忘记","Forget")}</span></button>
-    </div>}
-    <label className="full"><span>{text(locale, "邮箱", "Email")}</span><input id="login-email" type="email" name="email" autoComplete="username" autoCapitalize="none" spellCheck={false} value={email} onChange={(event) => { const value=event.target.value; setEmail(value); if(value.trim().toLowerCase()!==selectedEmail)setSelectedEmail(""); }} required maxLength={254} /></label>
-    <label className="full"><span>{text(locale, "密码", "Password")}</span><input id="login-password" type="password" name="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={128} /></label>
-    <label className="login-remember full"><input type="checkbox" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>{text(locale, nativeAccountPicker ? "记住此账号" : "记住登录 30 天", nativeAccountPicker ? "Remember account" : "Keep me signed in for 30 days")}</span></label>
+    <label className="full"><span>{text(locale, "邮箱", "Email")}</span><div className="login-email-field"><input id="login-email" type="email" name="email" autoComplete="username" autoCapitalize="none" spellCheck={false} value={email} onFocus={() => setSavedLoginMenuOpen(false)} onChange={(event) => { const value=event.target.value; setEmail(value); if(value.trim().toLowerCase()!==selectedEmail)setSelectedEmail(""); }} required maxLength={254} />{savedLogins.length > 0 && <><button type="button" className="saved-login-toggle" aria-label={text(locale,"选择已保存登录","Choose saved login")} aria-expanded={savedLoginMenuOpen} onClick={() => setSavedLoginMenuOpen((open) => !open)}><ChevronDown size={20}/></button>{savedLoginMenuOpen && <div className="saved-login-options">{savedLogins.map((account) => <button type="button" key={account.email} className={account.email === selectedEmail ? "selected" : ""} onClick={() => selectAccount(account.email)}>{account.email}</button>)}</div>}</>}</div></label>
+    <label className="full"><span>{text(locale, "密码", "Password")}</span><input id="login-password" type="password" name="password" autoComplete="current-password" value={password} onFocus={() => setSavedLoginMenuOpen(false)} onChange={(event) => setPassword(event.target.value)} required maxLength={128} /></label>
+    <label className="login-remember full"><input type="checkbox" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>{text(locale, nativeAccountPicker ? "保存登录" : "记住登录 30 天", nativeAccountPicker ? "Save login" : "Keep me signed in for 30 days")}</span></label>
     {state.message && <p className="form-message error full" role="alert">{state.message}</p>}
     <button className="button primary full" disabled={pending}>{text(locale, pending ? "登录中…" : "登录", pending ? "Signing in…" : "Sign in")}<ArrowRight size={18} /></button>
   </form>;

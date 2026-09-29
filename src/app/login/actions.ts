@@ -13,10 +13,7 @@ import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
 
-export type LoginState = FormState & {
-  redirectTo?: string;
-  email?: string;
-};
+export type LoginState = FormState;
 
 // Unknown accounts perform the same password work as known accounts.
 const dummyHash = hashPassword(randomBytes(32).toString("hex"));
@@ -50,7 +47,6 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   if (old) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(old)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(old)]); });
   const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
   jar.set(SESSION_COOKIE, token, { ...cookieOptions, ...(remember ? { maxAge: sessionSeconds } : {}) });
-  jar.set(LOGIN_HANDOFF_COOKIE, "1", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 120 });
   if (remember) {
     jar.set(LOGIN_EMAIL_COOKIE, encodeURIComponent(email), { ...cookieOptions, maxAge: LOGIN_EMAIL_SECONDS });
   } else {
@@ -58,16 +54,13 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
   await query("delete from login_limits where key_hash = $1", [tokenHash(email)]);
   const invitation=String(form.get("invitation")??"");
-  // Return the destination to the client before navigating so the native app can
-  // finish its successful-login Keychain write. Revalidating here can render the
-  // authenticated page and redirect before that client-side write ever runs.
-  if(/^[a-f0-9]{64}$/.test(invitation))return {ok:true,message:"",redirectTo:`/invite/${invitation}`,email};
+  if(/^[a-f0-9]{64}$/.test(invitation))redirect(`/invite/${invitation}`);
   const memberships = await query<{tenant_id:string}>("select u.tenant_id from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 and u.active and t.active",[user.id]);
   if (memberships.rows.length === 1) {
     const role = await identityTransaction(c => selectTenant(c,tokenHash(token),memberships.rows[0].tenant_id));
-    return {ok:true,message:"",redirectTo:homeFor(role),email};
+    redirect(homeFor(role));
   }
-  return {ok:true,message:"",redirectTo:"/organizations",email};
+  redirect("/organizations");
 }
 
 export async function logout(form?:FormData) {
