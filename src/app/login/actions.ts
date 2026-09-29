@@ -8,7 +8,7 @@ import { identityQuery as query, identityTransaction } from "@/lib/identity-db";
 import { selectTenant } from "@/lib/tenant-service";
 import { hashPassword, tokenHash, verifyPassword } from "@/lib/password";
 import { homeFor, SESSION_COOKIE } from "@/lib/auth";
-import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
+import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, LOGIN_HANDOFF_COOKIE, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
@@ -50,6 +50,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   if (old) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(old)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(old)]); });
   const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
   jar.set(SESSION_COOKIE, token, { ...cookieOptions, ...(remember ? { maxAge: sessionSeconds } : {}) });
+  jar.set(LOGIN_HANDOFF_COOKIE, "1", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 120 });
   if (remember) {
     jar.set(LOGIN_EMAIL_COOKIE, encodeURIComponent(email), { ...cookieOptions, maxAge: LOGIN_EMAIL_SECONDS });
   } else {
@@ -57,14 +58,15 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
   await query("delete from login_limits where key_hash = $1", [tokenHash(email)]);
   const invitation=String(form.get("invitation")??"");
-  if(/^[a-f0-9]{64}$/.test(invitation)){revalidatePath("/","layout");return {ok:true,message:"",redirectTo:`/invite/${invitation}`,email};}
+  // Return the destination to the client before navigating so the native app can
+  // finish its successful-login Keychain write. Revalidating here can render the
+  // authenticated page and redirect before that client-side write ever runs.
+  if(/^[a-f0-9]{64}$/.test(invitation))return {ok:true,message:"",redirectTo:`/invite/${invitation}`,email};
   const memberships = await query<{tenant_id:string}>("select u.tenant_id from app_users u join tenants t on t.id=u.tenant_id where u.account_id=$1 and u.active and t.active",[user.id]);
   if (memberships.rows.length === 1) {
     const role = await identityTransaction(c => selectTenant(c,tokenHash(token),memberships.rows[0].tenant_id));
-    revalidatePath("/","layout");
     return {ok:true,message:"",redirectTo:homeFor(role),email};
   }
-  revalidatePath("/","layout");
   return {ok:true,message:"",redirectTo:"/organizations",email};
 }
 
@@ -73,6 +75,7 @@ export async function logout(form?:FormData) {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await identityTransaction(async c => { await c.query("delete from user_sessions where token_hash=$1",[tokenHash(token)]); await c.query("delete from account_sessions where token_hash=$1",[tokenHash(token)]); });
   jar.delete(SESSION_COOKIE);
+  jar.delete(LOGIN_HANDOFF_COOKIE);
   revalidatePath("/","layout");
   const invitation=String(form?.get("invitation")??"");
   redirect(/^[a-f0-9]{64}$/.test(invitation)?`/login?invitation=${invitation}`:"/login");

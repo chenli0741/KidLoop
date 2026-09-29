@@ -39,8 +39,15 @@ export function LoginForm({ rememberedEmail = "", invitation = "" }: { remembere
     const accountEmail = state.email ?? email.trim().toLowerCase();
     void (async () => {
       if (remember && accountEmail && password) {
-        try { await saveLogin({ email: accountEmail, password }); } catch { /* Login must still continue. */ }
+        try {
+          await saveLogin({ email: accountEmail, password });
+          if (supportsSavedLogins()) {
+            const saved = await listSavedLogins();
+            if (!saved.some((account) => account.email === accountEmail && account.password === password)) throw new Error("Saved login verification failed");
+          }
+        } catch (error) { console.error("KidLoop could not save this account", error); }
       }
+      try { await fetch("/api/login-handoff", { method: "DELETE", credentials: "same-origin" }); } catch { /* The flag also expires after two minutes. */ }
       window.location.replace(destination);
     })();
   }, [email, password, remember, state]);
