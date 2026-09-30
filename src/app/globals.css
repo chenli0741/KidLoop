@@ -679,6 +679,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .weekday-tabs span { font-size: 12px; }
 
 .schedule-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.driver-calendar-card { margin-bottom: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.driver-calendar-card > div:first-child { display: flex; align-items: center; gap: 10px; color: var(--green); }
+.driver-calendar-card > div:first-child div { display: grid; gap: 2px; }
+.driver-calendar-card > div:first-child span { color: var(--muted); font-size: 12px; }
+.driver-calendar-card p { margin: 10px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.driver-calendar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.driver-calendar-actions button { width: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.driver-notification-notice { margin: 12px auto; max-width: 760px; padding: 10px 14px; border-radius: 12px; background: #fff4dc; color: #6b4b12; font-size: 13px; }
+
 .schedule-view-switch { display: flex; padding: 3px; background: var(--green-soft); border-radius: 12px; }
 .schedule-controls a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 9px; color: var(--green); }
 .schedule-view-switch a[aria-current="page"] { background: var(--green); color: white; }

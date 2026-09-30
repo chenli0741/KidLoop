@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A93800010000000000000001 /* KidLoopCalendarAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93800010000000000000002 /* KidLoopCalendarAuthPlugin.swift */; };
+		A94800010000000000000001 /* KidLoopNotificationsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94800010000000000000002 /* KidLoopNotificationsPlugin.swift */; };
 		A91800010000000000000001 /* KidLoopNavigationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91800010000000000000002 /* KidLoopNavigationPlugin.swift */; };
 		A92800010000000000000001 /* KidLoopCredentialsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92800010000000000000002 /* KidLoopCredentialsPlugin.swift */; };
 		570057005700570057005701 /* KidLoopMailAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570057005700570057005702 /* KidLoopMailAuthPlugin.swift */; };
@@ -25,6 +27,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A93800010000000000000002 /* KidLoopCalendarAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopCalendarAuthPlugin.swift; sourceTree = "<group>"; };
+		A94800010000000000000002 /* KidLoopNotificationsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopNotificationsPlugin.swift; sourceTree = "<group>"; };
+		A95800010000000000000002 /* KidLoop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KidLoop.entitlements; sourceTree = "<group>"; };
 		A91800010000000000000002 /* KidLoopNavigationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopNavigationPlugin.swift; sourceTree = "<group>"; };
 		A92800010000000000000002 /* KidLoopCredentialsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopCredentialsPlugin.swift; sourceTree = "<group>"; };
 		570057005700570057005702 /* KidLoopMailAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidLoopMailAuthPlugin.swift; sourceTree = "<group>"; };
@@ -77,6 +82,9 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A95800010000000000000002 /* KidLoop.entitlements */,
+				A94800010000000000000002 /* KidLoopNotificationsPlugin.swift */,
+				A93800010000000000000002 /* KidLoopCalendarAuthPlugin.swift */,
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				A91800010000000000000002 /* KidLoopNavigationPlugin.swift */,
 				A92800010000000000000002 /* KidLoopCredentialsPlugin.swift */,
@@ -178,6 +186,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A94800010000000000000001 /* KidLoopNotificationsPlugin.swift in Sources */,
+				A93800010000000000000001 /* KidLoopCalendarAuthPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				A91800010000000000000001 /* KidLoopNavigationPlugin.swift in Sources */,
@@ -332,8 +342,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = App/KidLoop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2PQPJB9568;
@@ -360,8 +372,10 @@
 		504EC3181FED79650016851F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = App/KidLoop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2PQPJB9568;

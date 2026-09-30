@@ -12,14 +12,14 @@ test('location is optional and malformed data becomes an audit outcome, never a 
 });
 test('one-shot collection uses fresh position and returns failure instead of rejecting',async()=>{
  let count=0;
- const geo:Pick<Geolocation,'getCurrentPosition'>={getCurrentPosition(success,_error,options){count++;assert.equal(options?.maximumAge,0);success({coords:{latitude:37.4,longitude:-122.1,accuracy:25},timestamp:Date.parse(sample.capturedAt)} as GeolocationPosition);}};
+ const geo:Pick<Geolocation,'getCurrentPosition'>={getCurrentPosition(success,_error,options){count++;assert.equal(options?.maximumAge,120_000);assert.equal(options?.enableHighAccuracy,false);assert.equal(options?.timeout,800);success({coords:{latitude:37.4,longitude:-122.1,accuracy:25},timestamp:Date.parse(sample.capturedAt)} as GeolocationPosition);}};
  assert.deepEqual(await captureOperationLocation(geo),sample);assert.equal(count,1);
  for(const [code,status] of [[1,'DENIED'],[2,'UNAVAILABLE'],[3,'TIMEOUT']] as const){assert.deepEqual(await captureOperationLocation({getCurrentPosition(_ok,fail){fail!({code} as GeolocationPositionError);}}),{status});}
  assert.deepEqual(await captureOperationLocation({getCurrentPosition(){throw new Error('blocked');}}),{status:'UNAVAILABLE'});
 });
 test('unresponsive device resolves at bounded timeout',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
- try{const result=captureOperationLocation({getCurrentPosition(){}});t.mock.timers.tick(5000);assert.deepEqual(await result,{status:'TIMEOUT'});}finally{t.mock.timers.reset();}
+ try{const result=captureOperationLocation({getCurrentPosition(){}});t.mock.timers.tick(1000);assert.deepEqual(await result,{status:'TIMEOUT'});}finally{t.mock.timers.reset();}
 });
 test('native app asks once, then only reads the already granted location',async()=>{
  let checks=0,requests=0,positions=0;

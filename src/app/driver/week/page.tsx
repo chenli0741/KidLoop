@@ -13,6 +13,8 @@ import {getTrips} from '@/lib/data';
 import {DriverWeekTabs} from '@/components/driver-week-tabs';
 import {scheduleDatePeriod,schedulePeriodLabels} from '@/lib/schedule-day-status';
 import type {TrialDay} from '@/lib/schedule-trial';
+import {driverCalendarStatus} from '@/lib/driver-calendar';
+import {DriverCalendarSettings} from '@/components/driver-calendar-settings';
 export const dynamic='force-dynamic';
 type Params={week?:string|string[];day?:string;view?:string};
 type ActualStop={stopId:string;arrivedAt:string|null;departedAt:string|null;dropOffAt:string|null;finishedAt:string|null};
@@ -23,10 +25,12 @@ function actualStopText(stop:ActualStop|undefined,locale:Locale){
 }
 export default async function DriverWeekPage({searchParams}:{searchParams:Promise<Params>}){
  const user=await requireUser(['DRIVER']);const locale=await getLocale(),params=await searchParams,today=todayInOperationsTimeZone();
+ const calendar=await driverCalendarStatus(user);
  const date=driverScheduleDate(params.week,today),monthly=params.view==='month',month=calendarMonth(date),dates=monthly?month.days:workweek(date).days;
  const selected=dates.includes(params.day??'')?params.day!:dates.includes(today)?today:dates[0];
  const props={today,monthly,month,dates,locale,initialDate:selected};
  return <div className="page-container driver-week-page">
+  <DriverCalendarSettings connection={calendar}/>
   <Suspense key={monthly+'-'+date+'-'+selected} fallback={<DriverWeekTabs {...props} loading statuses={dates.map(()=>'loading')}>{dates.map(d=><p key={d}>{text(locale,'正在加载日程…','Loading schedule…')}</p>)}</DriverWeekTabs>}>
    <Calendar {...props} driverId={user.driverId??''}/>
   </Suspense>

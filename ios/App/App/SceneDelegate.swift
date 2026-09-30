@@ -34,6 +34,8 @@ class KidLoopBridgeViewController: CAPBridgeViewController {
         webView?.configuration.userContentController.addUserScript(nativeMarker)
         bridge?.registerPluginInstance(KidLoopOCRPlugin())
         bridge?.registerPluginInstance(KidLoopMailAuthPlugin())
+        bridge?.registerPluginInstance(KidLoopCalendarAuthPlugin())
+        bridge?.registerPluginInstance(KidLoopNotificationsPlugin())
         bridge?.registerPluginInstance(KidLoopNavigationPlugin())
         bridge?.registerPluginInstance(KidLoopCredentialsPlugin())
     }

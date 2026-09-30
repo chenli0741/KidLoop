@@ -19,3 +19,7 @@ if(!delegate.includes('registerPluginInstance(KidLoopNavigationPlugin())')||!pro
 console.log('Native Apple Maps / Google Maps navigation bridge check passed.');
 if(!delegate.includes('registerPluginInstance(KidLoopCredentialsPlugin())')||!project.includes('KidLoopCredentialsPlugin.swift in Sources'))throw new Error('Native saved-login Keychain bridge not registered or linked');
 console.log('Native multi-account Keychain bridge check passed.');
+if(!delegate.includes('registerPluginInstance(KidLoopCalendarAuthPlugin())')||!project.includes('KidLoopCalendarAuthPlugin.swift in Sources')||!info.CFBundleURLTypes?.some(group=>group.CFBundleURLSchemes?.includes('kidloop-calendar')))throw new Error('Native Google Calendar authorization bridge not registered, linked or configured');
+console.log('Native Google Calendar authorization bridge check passed.');
+if(!delegate.includes('registerPluginInstance(KidLoopNotificationsPlugin())')||!project.includes('KidLoopNotificationsPlugin.swift in Sources')||!project.includes('CODE_SIGN_ENTITLEMENTS = App/KidLoop.entitlements'))throw new Error('Native notification bridge or APNs entitlement missing');
+console.log('Native APNs notification bridge and entitlement check passed.');
