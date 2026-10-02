@@ -32,5 +32,17 @@ test('independent rider saves merge even when their responses arrive out of orde
  const second=applyTripExecution(trip,{tripId:'trip',version:'2026-09-25T20:00:02.000001',status:'IN_PROGRESS',completedSegments:[],partial:true,riders:[{id:'two',status:'PICKED_UP'}]});
  const first=applyTripExecution(second,{tripId:'trip',version:'2026-09-25T20:00:01.000001',status:'IN_PROGRESS',completedSegments:[],partial:true,riders:[{id:'one',status:'PICKED_UP'}]});
  assert.deepEqual(first.riders.map(rider=>rider.status),['PICKED_UP','PICKED_UP']);
- assert.equal(first.executionVersion,'2026-09-25T20:00:02.000001');
+  assert.equal(first.executionVersion,'2026-09-25T20:00:02.000001');
+});
+
+test('ordinary rider taps update locally without changing trip execution metadata',()=>{
+ const trip={id:'trip',executionVersion:'2026-10-02T20:00:00.000001',status:'IN_PROGRESS',currentStopIndex:1,progressState:'AT_STOP',completedSegments:['a:b'],riders:[
+  {id:'one',status:'SCHEDULED'},{id:'two',status:'SCHEDULED'},
+ ]} as unknown as Trip;
+ const next=applyTripExecution(trip,{tripId:'trip',version:'',status:'PUBLISHED',completedSegments:[],partial:true,optimistic:true,riders:[{id:'one',status:'PICKED_UP'}]});
+ assert.deepEqual(next.riders.map(rider=>rider.status),['PICKED_UP','SCHEDULED']);
+ assert.equal(next.executionVersion,trip.executionVersion);
+ assert.equal(next.status,'IN_PROGRESS');
+ assert.equal(next.currentStopIndex,1);
+ assert.deepEqual(next.completedSegments,['a:b']);
 });

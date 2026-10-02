@@ -10,10 +10,16 @@ export type TripExecution = {
   progressState?: "AT_STOP" | "IN_TRANSIT";
   /** A single independently saved rider; merge even when another rider returned later. */
   partial?: boolean;
+  /** Immediate local feedback while an ordinary rider save continues in the background. */
+  optimistic?: boolean;
 };
 
 export function applyTripExecution(trip: Trip, update: TripExecution): Trip {
   if (trip.id !== update.tripId) return trip;
+  if(update.optimistic){
+    const riders=new Map(update.riders.map(rider=>[rider.id,rider]));
+    return {...trip,riders:trip.riders.map(rider=>({...rider,...riders.get(rider.id)}))};
+  }
   const newer=!trip.executionVersion||trip.executionVersion<=update.version;
   if(!newer&&!update.partial)return trip;
   const riders = new Map(update.riders.map(rider => [rider.id, rider]));

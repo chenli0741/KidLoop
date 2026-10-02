@@ -16,6 +16,7 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
   const locale = useLocale();
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [showSaving, setShowSaving] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState<{message:string;expectedStatus:RiderStatus|null}|null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -51,7 +52,13 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
 
   async function update(next: RiderStatus) {
     if(saving.current)return;
-    saving.current=true;setPending(true);setError(null);
+    const immediateFeedback=!targetTripId&&['PICKED_UP','DROPPED_OFF','SCHEDULED'].includes(next);
+    saving.current=true;setPending(true);setShowSaving(!immediateFeedback);setError(null);
+    if(immediateFeedback){
+      // Ordinary riders do not need cross-vehicle confirmation. Reflect the tap
+      // immediately so a driver can continue down the roster while it saves.
+      onUpdated({tripId,version:"",status:"PUBLISHED",completedSegments:[],partial:true,optimistic:true,riders:[{id:assignmentId,status:next}]});
+    }
       try {
         const location = await captureOperationLocation();
         const response = await withOperationTimeout(fetch("/api/rider-status", {
@@ -59,7 +66,10 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
           headers: {"Content-Type":"application/json"},
           body: JSON.stringify({assignmentId,nextStatus:next,details:next === "EXCEPTION" || next === "ABSENT" ? {reason} : undefined,targetTripId,location}),
         }));
-        if(!response.ok)throw new Error("Rider status update was not confirmed");
+        if(!response.ok){
+          if(immediateFeedback)onUpdated({tripId,version:"",status:"PUBLISHED",completedSegments:[],partial:true,optimistic:true,riders:[{id:assignmentId,status}]});
+          throw new Error("Rider status update was rejected");
+        }
         const result:TripExecution=await response.json();
         dialog.current?.close();
         const rider=result.riders.find(item=>item.id===assignmentId);
@@ -68,7 +78,7 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
         window.dispatchEvent(new Event('kidloop:execution-refresh'));
         setError({expectedStatus:next,message:text(locale,"尚未确认操作结果，正在核对状态。请先核对名单；若仍未更新，请点刷新页面，不必关闭 App。","Result not confirmed. Checking status; verify the roster before retrying. Reload this page if it does not update.")});
         if(!await confirmSavedStatus(next))router.refresh();
-      } finally {saving.current=false;setPending(false);}
+      } finally {saving.current=false;setPending(false);setShowSaving(false);}
   }
 
   if (status === "ABSENT" || status === "EXCEPTION" || (role === "DRIVER" && parentAbsent)) {
@@ -105,7 +115,7 @@ export function StatusActions({ tripId, assignmentId, status, parentAbsent = fal
           </button>
         ) : null}
       </div>
-      {pending && <span className="status-saving" role="status">{text(locale,"正在保存…","Saving…")}</span>}
+      {pending && showSaving && <span className="status-saving" role="status">{text(locale,"正在保存…","Saving…")}</span>}
       {visibleError ? <span className="inline-error" role="alert">{visibleError} <button type="button" className="button compact secondary" onClick={()=>window.location.reload()}>{text(locale,"刷新页面","Reload page")}</button></span> : null}
       <dialog ref={dialog} className="record-dialog" aria-labelledby={`${id}-title`} onCancel={event => { if (pending) event.preventDefault(); }}>
         <h2 id={`${id}-title`}>{text(locale, role === "ADMIN" ? "缺席原因" : "特殊原因", role === "ADMIN" ? "Absence reason" : "Special reason")}</h2>
