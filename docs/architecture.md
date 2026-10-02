@@ -173,13 +173,13 @@ npm run ios:open
 CAPACITOR_SERVER_URL=http://127.0.0.1:3010 npm run ios:sync
 ```
 
-真机开发时，将 `127.0.0.1` 替换为 Mac 在同一局域网内的地址。正式构建必须使用已部署的 HTTPS 地址：
+真机开发时，将 `127.0.0.1` 替换为 Mac 在同一局域网内的地址。正式构建直接运行不带环境变量的同步命令，固定恢复生产 HTTPS 地址：
 
 ```bash
-CAPACITOR_SERVER_URL=https://your-kidloop-domain.example npm run ios:sync
+npm run ios:sync
 ```
 
-不提供 `CAPACITOR_SERVER_URL` 时，App 使用内置的安全回退页面，不会把开发地址写入正式构建。
+不提供 `CAPACITOR_SERVER_URL` 时，App 使用 `https://kid-loop.vercel.app`。本地地址只允许通过显式环境变量写入；从本地调试切回正式构建时必须重新执行默认同步，`ios:check` 会阻止未显式声明的本地地址残留。
 
 
 ## 固定线路与每日执行（2026-09-07 确认）

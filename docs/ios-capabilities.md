@@ -25,6 +25,8 @@ npm run ios:open
 
 `ios:sync` 自动执行 `scripts/check-ios-capabilities.mjs`，检查权限用途说明、生成的插件注册清单和 Swift Package 产品链接。也可单独运行 `npm run ios:check`。不要手工编辑被同步覆盖的 `CapApp-SPM/Package.swift` 或 `capacitor.config.json`。
 
+默认 `npm run ios:sync` 始终把原生壳恢复为 `https://kid-loop.vercel.app`。只有显式设置 `CAPACITOR_SERVER_URL` 才能使用本地开发地址；本地调试结束后必须再次运行默认同步，避免安装包继续访问手机自身的 `127.0.0.1`。
+
 已通过模拟器及 iPhone 真机目标的无签名编译（CODE_SIGNING_ALLOWED=NO），未生成已签名安装包。原生插件及权限变化必须重新编译安装 iPhone App；只推送网页不会更新手机里已有的原生壳。实际相册选择与系统授权弹窗仍需手机验收。
 
 司机 stop 点的箭头调用 `KidLoopNavigation` 原生桥接：Apple Maps 使用 HTTPS Maps 地址，Google Maps 使用 `comgooglemaps` URL Scheme，目的地为 stop 地址，模式为驾车。网页或尚未包含该桥接的旧 App 使用对应 HTTPS 导航 URL 兼容。学校资料中的地址地图和 Pickup 示意图仍在 KidLoop 内预览，不使用此桥接。原生地图切换能力必须重新编译安装 App，网页部署本身不能把插件加入已有安装包。

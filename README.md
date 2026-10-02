@@ -58,7 +58,7 @@ CAPACITOR_SERVER_URL=http://127.0.0.1:3010 npm run ios:sync
 npm run ios:open
 ```
 
-Use the deployed HTTPS URL in `CAPACITOR_SERVER_URL` before creating a release build. Running `npm run ios:sync` without that variable restores the bundled fallback page.
+Running `npm run ios:sync` without `CAPACITOR_SERVER_URL` restores the production URL `https://kid-loop.vercel.app`. A loopback URL is written only when it is explicitly supplied for simulator development. After switching between local and production builds, run `ios:sync` again before building in Xcode.
 
 ## Verification
 

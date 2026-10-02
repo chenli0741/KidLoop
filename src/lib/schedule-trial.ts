@@ -1,9 +1,9 @@
 import {driverAllowsSchools,driverAllowsTime,schoolPreferenceScore,type DriverPreferences} from './driver-preferences';
-import { allocateEarlyTrips, type EarlyRequest } from './automatic-extra-trips';
+import { allocateEarlyTrips, stopDwellMinutes, transferMinutes, type EarlyRequest } from './automatic-extra-trips';
 import {familiarityScore,type DriverRun} from './driver-familiarity';
 import type { FixedRoute, RouteStop, RouteStudent } from './fixed-route-types';
 import { automaticRoster, batchTime, type RosterChild, type DismissalRule, type PickupBatch } from './automatic-roster';
-import { planRoute, overlaps } from './route-plan';
+import { minutes, planRoute, overlaps } from './route-plan';
 import {driverBlockingUnavailability,driverIsAvailable,type DriverUnavailability} from './driver-availability';
 import {routeName} from './route-name';
 import {isStudentInService} from './student-service-periods';
@@ -29,6 +29,7 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   expected.set(child.id,{child,normalTime,time});
  }
  const plans:TrialPlan[]=[],earlyRequests:EarlyRequest[]=[];
+ const prepared:{route:FixedRoute;roster:RouteStudent[]}[]=[];
  for(const route of input.routes){
   if(!route.enabled||route.startsOn>date||route.endsOn<date||!route.weekdays.includes(weekday))continue;
   let roster=automaticRoster(route.stops,input.children,input.rules,[weekday],route.excludedStudentIds,route.routeType==='TEMPORARY'?[]:input.batches).filter(a=>expected.has(a.studentId));
@@ -48,6 +49,9 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
    const ids=new Set(early.map(a=>a.studentId));roster=roster.filter(a=>!ids.has(a.studentId));
    if(!roster.length)continue;
   }
+  prepared.push({route,roster});
+ }
+ for(const {route,roster} of prepared){
   const serving=roster.filter(a=>!input.absences.some(x=>x.date===date&&x.studentId===a.studentId));
   const r={...route,students:roster};
   const plan=planRoute(r,roster.map(a=>({student_id:a.studentId,school_id:expected.get(a.studentId)!.child.schoolId,time:expected.get(a.studentId)!.time})),input.travelTimes);
@@ -59,6 +63,17 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   const occupied=(driverId:string)=>{
    if(plans.some(p=>p.driverId===driverId&&overlaps(interval,{start:p.stops[0].time,end:p.stops.at(-1)!.time})))return true;
    if((input.existing??[]).some(t=>t.date===date&&t.driverId===driverId&&(t.started||!t.routeId)&&overlaps(interval,t)))return true;
+   // A driver's own early-release pickup has priority over covering another route.
+   // Check both overlap and the required transfer between the two jobs.
+   if(earlyRequests.some(request=>{
+    if(request.sourceRouteId===route.id||request.preferredDriverId!==driverId||!request.students.some(student=>!input.absences.some(a=>a.date===date&&a.studentId===student.studentId)))return false;
+    const earlyStart=minutes(request.time);
+    const earlyEnd=earlyStart+stopDwellMinutes(input,request.pickup)+transferMinutes(input,request.pickup,request.dropoff);
+    const normalStart=minutes(interval.start),normalEnd=minutes(interval.end);
+    if(normalEnd<=earlyStart)return normalEnd+stopDwellMinutes(input,plan.stops.at(-1)!)+transferMinutes(input,plan.stops.at(-1)!,request.pickup)>earlyStart;
+    if(earlyEnd<=normalStart)return earlyEnd+stopDwellMinutes(input,request.dropoff)+transferMinutes(input,request.dropoff,plan.stops[0])>normalStart;
+    return true;
+   }))return true;
    // Keep an eligible driver's own fixed route available when it overlaps this cover assignment.
    return input.routes.some(other=>other.id!==route.id&&other.enabled&&other.driverId===driverId&&other.startsOn<=date&&other.endsOn>=date&&other.weekdays.includes(weekday)&&overlaps(interval,{start:other.stops[0].time,end:other.stops.at(-1)!.time}));
   };

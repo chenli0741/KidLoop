@@ -20,7 +20,7 @@ export function transferMinutes(input: TrialInput, from: RouteStop, to: RouteSto
   return input.travelTimes?.find(t=>t.fromName===from.name&&t.toName===to.name)?.minutes ?? DEFAULT_TRAVEL_MINUTES;
 }
 
-function dwell(input: TrialInput, stop: RouteStop) {
+export function stopDwellMinutes(input: TrialInput, stop: RouteStop) {
   return stop.dwellMinutes || input.travelTimes?.find(t=>t.fromName===stop.name)?.originDwellMinutes || 0;
 }
 
@@ -53,7 +53,7 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
   }
   const tasks=groups.filter(g=>g.students.length).map(g=>{
     const duration=transferMinutes(input,g.pickup,g.dropoff);
-    const start=minutes(g.time),end=duration===null?null:start+dwell(input,g.pickup)+duration;
+    const start=minutes(g.time),end=duration===null?null:start+stopDwellMinutes(input,g.pickup)+duration;
     const routeId=identity(`${g.sourceRouteId}:${place(g.pickup)}:${place(g.dropoff)}:${g.time}`);
     return {g,routeId,end,stops:[{...g.pickup,time:g.time,pickupTime:g.time},{...g.dropoff,time:end===null?'':clockTime(end)}]};
   }).sort((a,b)=>a.g.time.localeCompare(b.g.time)||a.routeId.localeCompare(b.routeId));
@@ -70,10 +70,10 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
       if(!b.stops?.length)return false; // No evidence that repositioning is feasible.
       if(minutes(b.end)<=start){
         const journey=transferMinutes(input,b.stops.at(-1)!,task.stops[0]);
-        if(journey===null||minutes(b.end)+dwell(input,b.stops.at(-1)!)+journey>start)return false;
+        if(journey===null||minutes(b.end)+stopDwellMinutes(input,b.stops.at(-1)!)+journey>start)return false;
       }else{
         const journey=transferMinutes(input,task.stops[1],b.stops[0]);
-        if(journey===null||end+dwell(input,task.stops[1])+journey>minutes(b.start))return false;
+        if(journey===null||end+stopDwellMinutes(input,task.stops[1])+journey>minutes(b.start))return false;
       }
     }
     return true;

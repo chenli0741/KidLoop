@@ -36,6 +36,24 @@ test('a 13:00 condition assigns the short run to an available backup and preserv
  assert.equal(day.plans.find(p=>p.sourceRouteId)?.driverId,'backup');assert.equal(day.plans.find(p=>!p.sourceRouteId)?.driverId,'usual');
  input.drivers[1].status='OFF_DUTY';const blocked=trialDay(input,date);assert.equal(blocked.plans.length,1);assert.ok(blocked.issues.some(i=>i.code==='EXTRA_UNASSIGNED'));assert.ok(blocked.issues.some(i=>i.code==='UNASSIGNED'&&i.studentId==='k'));
 });
+test('a regular driver keeps their early-release route instead of being consumed as another route cover',()=>{
+ const input=extraFixture();
+ input.drivers[1].status='OFF_DUTY';
+ input.drivers.push({id:'cover-regular',active:true,status:'OFF_DUTY'});
+ input.children.push({id:'cover-child',schoolId:'school-c',programId:'program-c',grade:'1',reviewed:true});
+ input.rules.push({schoolId:'school-c',grades:['1'],weekdays:[2],pickupTime:'12:30'});
+ input.terms.push({schoolId:'school-c',startsOn:'2026-09-01',endsOn:'2026-09-30'});
+ input.vehicles.push({id:'cover-van',active:true,status:'AVAILABLE',capacity:4});
+ input.routes.push({id:'cover',name:'C → Q',routeType:'RECURRING',startsOn:'2026-09-01',endsOn:'2026-09-30',weekdays:[2],driverId:'cover-regular',vehicleId:'cover-van',enabled:true,updatedAt:'',students:[],stops:[
+  {id:'c',name:'C',address:'C',schoolId:'school-c',programId:null,time:'12:30',pickupTime:'12:30'},
+  {id:'q',name:'Q',address:'Q',schoolId:null,programId:'program-c',time:'12:40'},
+ ]});
+ const day=trialDay(input,date);
+ assert.equal(day.plans.find(p=>p.sourceRouteId==='route')?.driverId,'usual');
+ assert.ok(!day.plans.some(p=>p.routeId==='cover'));
+ assert.ok(day.issues.some(i=>i.routeId==='cover'&&i.code==='RESOURCE'));
+ assert.ok(day.issues.some(i=>i.studentId==='cover-child'&&i.code==='UNASSIGNED'));
+});
 test('a configured partial absence excludes only overlapping extra work',()=>{
  const input=extraFixture();input.driverUnavailability=[{id:'appointment',driverId:'usual',startsOn:date,endsOn:date,weekdays:[2],unavailableFrom:'12:30',unavailableTo:'13:30',reason:'Appointment'}];
  let day=trialDay(input,date);assert.equal(day.plans.find(p=>p.sourceRouteId)?.driverId,'backup');assert.equal(day.plans.find(p=>!p.sourceRouteId)?.driverId,'usual');
