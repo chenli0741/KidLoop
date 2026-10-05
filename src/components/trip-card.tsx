@@ -15,6 +15,7 @@ import { text, type Locale } from "@/lib/i18n";
 import { applyTripExecution, type TripExecution } from "@/lib/trip-execution";
 import { TripJourneyControls } from "@/components/trip-journey-controls";
 import { isSharedPickupStop } from "@/lib/shared-pickup-progress";
+import {TripTransferButton} from "@/components/trip-transfer-button";
 
 export function TripCard({ trip: source, locale, interactive = true, cameraEnabled = false, showParentContact = true, role = "ADMIN" }: { trip: Trip; locale: Locale; cameraEnabled?: boolean; showParentContact?: boolean; interactive?: boolean; role?: "ADMIN" | "DRIVER" }) {
   const [state, setState] = useState({ source, trip: source });
@@ -84,11 +85,11 @@ export function TripCard({ trip: source, locale, interactive = true, cameraEnabl
     <article className={`trip-card${isCompleted&&!completedExpanded?' is-collapsed':''}`} style={{order:driverRideOrder(trip.status)}}>
       {(syncFailed||executionSyncFailed)&&<p role="alert">{text(locale,"名单同步中断，正在重试。请联网后核对再操作。","Manifest sync interrupted. Retrying; reconnect and verify before updating.")}</p>}
       <header className="trip-header">
-        <div>
+        <div className="trip-header-main">
           <div className="eyebrow">{formatTime(trip.departureTime, locale)} {text(locale, "出发", "departure")}</div>
         <h3>{trip.routeName ?? <>{trip.schoolName} <span>{text(locale, "至", "to")}</span> {trip.programName}</>}</h3>
         </div>
-        <StatusBadge status={trip.status} />
+        <div className="trip-header-actions"><StatusBadge status={trip.status} />{interactive&&trip.transferable?<TripTransferButton tripId={trip.id}/>:null}</div>
       </header>
 
       <div className="trip-meta">

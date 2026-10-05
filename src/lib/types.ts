@@ -120,6 +120,7 @@ export type Rider = {
 };
 
 export type Trip = {
+  transferable?: boolean;
   hasSharedPickups?: boolean;
   sharedPickupMin?: number;
   sharedPickupMax?: number;

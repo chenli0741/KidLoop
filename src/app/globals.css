@@ -136,6 +136,9 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .trip-card.is-collapsed { opacity: .92; }
 .trip-card-toggle { display: flex; width: calc(100% - 40px); min-height: 40px; align-items: center; justify-content: center; gap: 5px; margin: 0 20px 16px; color: var(--green); background: var(--green-soft); border: 0; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
 .trip-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 19px 20px 13px; }
+.trip-header-main { min-width: 0; }
+.trip-header-actions { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 7px; }
+.trip-transfer-trigger { width: 34px; height: 34px; color: var(--green); }
 .trip-header h3 { margin: 5px 0 0; font-size: 18px; }
 .trip-header h3 span { color: #839089; font-weight: 500; }
 .trip-meta { display: flex; flex-wrap: wrap; gap: 18px; padding: 0 20px 17px; color: var(--muted); font-size: 12px; }
@@ -262,6 +265,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .record-dialog-heading .icon-button { flex-shrink: 0; }
 .record-dialog-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
 .record-dialog-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.trip-transfer-dialog { width: min(430px, calc(100vw - 24px)); }
+.trip-transfer-dialog label > span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.trip-transfer-dialog select { width: 100%; min-height: 46px; }
 .record-delete-description { margin: 0; line-height: 1.6; font-size: 14px; }
 .record-delete-button { background: #b9363e; color: white; }
 .record-photo-preview { display: flex; gap: 14px; align-items: center; }

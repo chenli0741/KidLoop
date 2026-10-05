@@ -11,9 +11,16 @@ export async function materializeTrial(c:PoolClient,date:string){
  const input=await readTrialInput(serialSqlReader(c),date,date);
  if(!input.routes.length)return;
  const day=trialDay(input,date);
- const existing=(await c.query(`select t.id,t.shift_id,coalesce(t.generated_plan_id,t.fixed_route_id) as fixed_route_id,coalesce(t.source_route_id,t.fixed_route_id) as source_route_id from trips t where t.operating_term_id=current_operating_term() and t.scheduled_date=$1 and (t.fixed_route_id is not null or t.generated_plan_id is not null) order by t.id for update`,[date])).rows;
+ const existing=(await c.query(`select t.id,t.shift_id,coalesce(t.generated_plan_id,t.fixed_route_id) as fixed_route_id,
+  coalesce(t.source_route_id,t.fixed_route_id) as source_route_id,
+  exists(select 1 from trip_driver_transfers x where x.trip_id=t.id) as driver_transferred
+  from trips t where t.operating_term_id=current_operating_term() and t.scheduled_date=$1
+  and (t.fixed_route_id is not null or t.generated_plan_id is not null) order by t.id for update`,[date])).rows;
  const old=(await c.query(`select ts.id,ts.trip_id,ts.student_id,ts.status,ts.parent_absence,ts.picked_up_at,exists(select 1 from status_history h where h.trip_student_id=ts.id) as history from trip_students ts where ts.trip_id=any($1::uuid[]) order by ts.id for update`,[existing.map(t=>t.id)])).rows;
- const protectedRoutes=new Set(input.existing?.filter(t=>t.started).map(t=>t.routeId).filter((id):id is string=>!!id));
+ const protectedRoutes=new Set([
+  ...(input.existing?.filter(t=>t.started).map(t=>t.routeId).filter((id):id is string=>!!id)??[]),
+  ...existing.filter(t=>t.driver_transferred).map(t=>t.fixed_route_id),
+ ]);
  // Protect the whole actual shared execution group if anyone has already acted.
  const members=(await c.query(`select m.assignment_id,m.trip_id from shared_pickup_members m where m.trip_id=any($1::uuid[])`,[existing.map(t=>t.id)])).rows;
  let changed=true;

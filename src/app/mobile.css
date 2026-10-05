@@ -95,7 +95,7 @@
   .trip-journey-controls { padding:12px 16px 0; }
   .trip-start-button { flex:1; justify-content:center; min-height:48px; font-size:16px; }
   .trip-header { padding: 20px 16px 14px; gap: 10px; }
-  .trip-header > div { min-width: 0; }
+  .trip-header-main { min-width: 0; }
   .trip-header h3 { margin-top: 8px; font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
   .trip-meta { gap: 10px; padding: 0 16px 17px; font-size: 12px; }
   .trip-meta > span { overflow-wrap: anywhere; }
