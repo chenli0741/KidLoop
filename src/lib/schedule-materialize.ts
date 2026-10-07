@@ -28,10 +28,10 @@ export async function materializeTrial(c:PoolClient,date:string){
   const related=existing.filter(t=>t.id===row.trip_id||members.some(m=>m.assignment_id===row.id&&m.trip_id===t.id));
   if(related.some(t=>protectedRoutes.has(t.fixed_route_id)))for(const t of related)if(!protectedRoutes.has(t.fixed_route_id)){protectedRoutes.add(t.fixed_route_id);changed=true;}
  }}
- // Capacity warnings must not suppress publication: the operator needs to see
- // the task and resolve the extra rider after generation. Hard execution
- // blockers (resource conflicts, missing travel data, etc.) still block routes.
- const blocked=new Set(day.issues.filter(i=>!i.advisory&&!['OTHER_TRIP','CAPACITY'].includes(i.code)).flatMap(i=>i.routeId?[i.routeId]:i.studentId&&i.code!=='UNASSIGNED'?day.plans.filter(p=>p.students.some(a=>a.studentId===i.studentId)).map(p=>p.routeId):[]));
+ // A capacity failure is an execution blocker. Keep the issue visible in the
+ // planning result, but never publish a ride that the assigned vehicles cannot
+ // carry. OTHER_TRIP remains a planning cleanup issue rather than a blocker.
+ const blocked=new Set(day.issues.filter(i=>!i.advisory&&i.code!=='OTHER_TRIP').flatMap(i=>i.routeId?[i.routeId]:i.studentId&&i.code!=='UNASSIGNED'?day.plans.filter(p=>p.students.some(a=>a.studentId===i.studentId)).map(p=>p.routeId):[]));
  const immutableStudents=new Set(old.filter(a=>protectedRoutes.has(existing.find(t=>t.id===a.trip_id)!.fixed_route_id)).map(a=>a.student_id));
  for(const p of day.plans)if(!protectedRoutes.has(p.routeId)){
   // A child already served by this route's extra run must not cancel the normal run.

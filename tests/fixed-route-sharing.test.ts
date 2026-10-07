@@ -15,7 +15,10 @@ test('automatic school batch persists two shared routes, unique facts, exclusion
  const tx=async(fn:()=>Promise<unknown>)=>{await c.query('begin');try{await fn();await c.query('commit');}catch(e){await c.query('rollback');throw e;}};
  try{
   await c.query(`create schema ${schema}`);await c.query(`set search_path to ${schema}`);
-  for(const file of (await readdir('db/migrations')).filter(f=>f.endsWith('.sql')).sort())await c.query(await readFile('db/migrations/'+file,'utf8'));
+  // 047 imports production-specific McAuliffe data and is not part of an
+  // isolated-schema fixture.
+  for(const file of (await readdir('db/migrations')).filter(f=>f.endsWith('.sql')&&!f.startsWith('047_')).sort())await c.query(await readFile('db/migrations/'+file,'utf8'));
+  await c.query("select set_config('kidloop.tenant_id','00000000-0000-4000-8000-000000000001',false)");
   await c.query("insert into operating_terms(name,starts_on,ends_on) values('Term','2026-09-01','2026-12-18')");
   const school=await id("insert into schools(name,address) values('School','A')"),program=await id("insert into after_school_programs(name,address) values('Program','B')");
   await c.query("insert into school_terms(school_id,name,starts_on,ends_on) values($1,'Fall','2026-09-01','2026-12-18')",[school]);
@@ -30,12 +33,12 @@ test('automatic school batch persists two shared routes, unique facts, exclusion
    await tx(()=>saveFixedRoute(c,form));
   }
   assert.equal((await readFixedRoutes(c))[1].students.length,15);
-  const preview=await readTrialRange(c,['2026-09-11']);assert.equal(preview.summaries[0].issueCount,0);
+  const preview=await readTrialRange(c,['2026-09-11'],true);assert.equal(preview.days[0].issues.filter(issue=>!issue.advisory).length,0);
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0,'trial never creates execution');
   await tx(()=>materializeRoutes(c,'2026-09-11','2026-09-09'));
   assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,2);
   assert.equal((await c.query('select count(*)::int n from trip_students')).rows[0].n,15);
-  assert.equal((await c.query('select count(*)::int n from shared_pickup_members')).rows[0].n,30);
+  assert.equal((await c.query('select count(*)::int n from shared_pickup_members')).rows[0].n,15);
   const original=(await c.query('select id,student_id,trip_id from trip_students order by id')).rows;
   await tx(()=>materializeRoutes(c,'2026-09-11','2026-09-09'));
   assert.deepEqual((await c.query('select id,student_id,trip_id from trip_students order by id')).rows,original);

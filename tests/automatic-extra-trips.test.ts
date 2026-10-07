@@ -80,10 +80,14 @@ test('capacity and explicit temporary pickups prevent duplicate automatic runs',
  const manual=extraFixture();manual.routes.push({...structuredClone(manual.routes[0]),id:'temporary',routeType:'TEMPORARY',driverId:'backup',vehicleId:'spare',excludedStudentIds:['older','other-school']});
  const day=trialDay(manual,date);assert.ok(!day.plans.some(p=>p.sourceRouteId));assert.equal(day.plans.filter(p=>p.students.some(s=>s.studentId==='k')).length,1);
 });
-test('shared school batches create exactly one early pickup',()=>{
+test('shared school batches keep every participating vehicle in an early pickup pool',()=>{
  const input=extraFixture();input.routes.push({...structuredClone(input.routes[0]),id:'route-2',driverId:'backup',vehicleId:'spare'});
+ for(let n=2;n<=5;n++)input.children.push({id:`k${n}`,schoolId:'school-a',programId:'program',grade:'K',reviewed:true});
  input.batches=[{id:'shared-a',schoolId:'school-a',pickupTime:'14:30',weekday:2,shared:true,excludedStudentIds:[],updatedAt:''},{id:'shared-b',schoolId:'school-b',pickupTime:'14:30',weekday:2,shared:true,excludedStudentIds:[],updatedAt:''}];
- const day=trialDay(input,date);assert.equal(day.plans.filter(p=>p.sourceRouteId).length,1);assert.equal(day.plans.filter(p=>p.students.some(s=>s.studentId==='k')).length,1);
+ const day=trialDay(input,date),early=day.plans.filter(p=>p.sourceRouteId);
+ assert.equal(early.length,2);assert.equal(early.filter(p=>p.students.some(s=>s.studentId==='k')).length,2);
+ assert.ok(early.every(p=>p.shared.k==='shared-a'&&Object.keys(p.shared).length===5));
+ assert.equal(new Set(early.map(p=>p.driverId)).size,2);assert.equal(new Set(early.map(p=>p.vehicleId)).size,2);
 });
 test('started students are retained without a second early pickup',()=>{
  const input=extraFixture();input.existing=[{date,routeId:'route',tripId:'started',driverId:'usual',vehicleId:'van',start:'14:30',end:'14:50',students:['k','older','other-school'],started:true,stops:input.routes[0].stops}];

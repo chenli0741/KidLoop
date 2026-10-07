@@ -35,8 +35,11 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
       issues.push({code:'EXTRA_STARTED',routeId:request.sourceRouteId,advisory:true,message:'提前接送涉及已执行学生，保留原行程并待人工核对 / Early pickup includes students already served; original ride retained for review'});
     }
     const remaining=students.filter(s=>!protectedStudents.has(s.studentId));
-    // Shared school-batch candidates become one request, not two duplicate pickups.
-    const existing=groups.find(g=>place(g.pickup)===place(request.pickup)&&place(g.dropoff)===place(request.dropoff)&&g.time===request.time&&remaining.some(s=>g.students.some(x=>x.studentId===s.studentId)&&g.shared[s.studentId]&&g.shared[s.studentId]===request.shared[s.studentId]));
+    // Keep one request per participating route for a shared batch. The repeated
+    // students are a shared pool, not duplicate assignments: materialization
+    // stores one canonical assignment and projects it onto every vehicle.
+    const sharedRequest=remaining.some(s=>request.shared[s.studentId]);
+    const existing=!sharedRequest&&groups.find(g=>place(g.pickup)===place(request.pickup)&&place(g.dropoff)===place(request.dropoff)&&g.time===request.time&&remaining.some(s=>g.students.some(x=>x.studentId===s.studentId)));
     if(existing){
       for(const s of remaining)if(!existing.students.some(x=>x.studentId===s.studentId))existing.students.push({...s,pickupStopId:existing.pickup.id,dropoffStopId:existing.dropoff.id});
       continue;
@@ -45,7 +48,11 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
   }
   // Do not duplicate non-shared candidates or take riders from a manual trip.
   const duplicates=new Set<string>();
-  for(const group of groups)for(const s of group.students)if(groups.filter(g=>g.students.some(x=>x.studentId===s.studentId)).length>1)duplicates.add(s.studentId);
+  for(const group of groups)for(const s of group.students){
+    const occurrences=groups.filter(g=>g.students.some(x=>x.studentId===s.studentId));
+    const batchIds=new Set(occurrences.map(g=>g.shared[s.studentId]).filter(Boolean));
+    if(occurrences.length>1&&(batchIds.size!==1||occurrences.some(g=>!g.shared[s.studentId])))duplicates.add(s.studentId);
+  }
   const manual=new Set(input.existing?.filter(t=>t.date===date&&!t.routeId).flatMap(t=>t.students));
   for(const group of groups){
     if(group.students.some(s=>duplicates.has(s.studentId)))issues.push({code:'EXTRA_DUPLICATE',routeId:group.sourceRouteId,advisory:true,message:'提前接送学生出现在多个非共享线路，需核对归属 / Early riders appear on multiple non-shared routes; review assignments'});
@@ -82,7 +89,8 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
     const history=familiarityScore(input.driverRuns??[],d.id,[task.g.sourceRouteId],task.g.pickup.schoolId??undefined,date);
     const preference=schoolPreferenceScore(d,[task.g.pickup.schoolId!]);
     const score=history+(d.id===task.g.preferredDriverId?5:0);
-    return input.vehicles.filter(v=>v.active&&v.status!=='MAINTENANCE'&&v.capacity>=task.g.students.length).map(v=>({driverId:d.id,vehicleId:v.id,history,preference,score:score+(v.id===task.g.preferredVehicleId?0.1:0)}));
+    const shared=task.g.students.some(student=>task.g.shared[student.studentId]);
+    return input.vehicles.filter(v=>v.active&&v.status!=='MAINTENANCE'&&(shared?v.capacity>0:v.capacity>=task.g.students.length)).map(v=>({driverId:d.id,vehicleId:v.id,history,preference,score:score+(v.id===task.g.preferredVehicleId?0.1:0)}));
   }).sort((a,b)=>b.preference-a.preference||b.score-a.score||a.driverId.localeCompare(b.driverId)||a.vehicleId.localeCompare(b.vehicleId)));
   let best:TrialPlan[]=[],bestCount=-1,bestScore=-Infinity,bestPreference=-Infinity,visits=0;
   function search(n:number,assigned:TrialPlan[],score:number,preference:number){
@@ -91,7 +99,7 @@ export function allocateEarlyTrips(input: TrialInput, date: string, requests: Ea
     const task=tasks[n];
     for(const option of options[n])if(fits(task,option.driverId,option.vehicleId,assigned))search(n+1,[...assigned,{
       routeId:task.routeId,sourceRouteId:task.g.sourceRouteId,name:`${task.g.pickup.name} → ${task.g.dropoff.name} · Extra ${task.g.time}`,
-      driverId:option.driverId,vehicleId:option.vehicleId,stops:task.stops,students:task.g.students,shared:{},
+      driverId:option.driverId,vehicleId:option.vehicleId,stops:task.stops,students:task.g.students,shared:task.g.shared,
       assignmentReason:`${option.preference?"符合学校偏好 / Preferred school; ":""}历史熟悉度 ${option.history.toFixed(2)}${option.driverId===task.g.preferredDriverId?'，原线路司机':''}；已检查座位和前后行程衔接 / Familiarity ${option.history.toFixed(2)}${option.driverId===task.g.preferredDriverId?', regular route driver':''}; seats and transfers checked`,
     }],score+option.score,preference+option.preference);
     search(n+1,assigned,score,preference);
