@@ -64,10 +64,16 @@ async function applyCalendar(
   matches: { student_id: string; school_id: string; time: string }[],
   students: { id: string; grade: string }[],
 ) {
-  for (const schoolId of new Set(intent.changes.map((x) => x.schoolId))) {
+  const closureSchools = (intent.closures ?? [])
+    .filter((closure) => closure.startsOn <= day && closure.endsOn >= day)
+    .map((closure) => closure.schoolId);
+  for (const schoolId of new Set([...intent.changes.map((x) => x.schoolId), ...closureSchools])) {
     const changes = intent.changes.filter((x) => x.schoolId === schoolId);
-    // Keep holidays and non-service days exactly as before.
+    const closed = closureSchools.includes(schoolId);
+    // A closure is an explicit calendar change; time-only adjustments keep
+    // an existing non-service day unchanged.
     if (
+      !closed &&
       !matches.some(
         (m) =>
           m.school_id === schoolId &&
@@ -129,12 +135,12 @@ async function applyCalendar(
     for (const [k, v] of Object.entries({
       schoolId,
       kind: "exception",
-      name: "接送调整 / Schedule adjustment",
+      name: closed ? "放假 / Closed" : "接送调整 / Schedule adjustment",
       startsOn: day,
       endsOn: day,
-      exceptionType: "grades",
+      exceptionType: closed ? "closed" : "grades",
       gradeTimes: JSON.stringify(
-        [...overrides].map(([grade, time]) => ({ grades: [grade], time })),
+        closed ? [] : [...overrides].map(([grade, time]) => ({ grades: [grade], time })),
       ),
     }))
       f.set(k, v);

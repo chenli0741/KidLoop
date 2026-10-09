@@ -52,6 +52,7 @@ export function validateIntent(
   if (
     !Array.isArray(x.changes) ||
     x.changes.length > 10 ||
+    (x.closures !== undefined && (!Array.isArray(x.closures) || x.closures.length > 20)) ||
     typeof x.preferExistingDrivers !== "boolean" ||
     typeof x.noAdditionalDrivers !== "boolean" ||
     typeof x.question !== "string"
@@ -70,6 +71,18 @@ export function validateIntent(
       throw new Error("资源或线路无法匹配 / Resource or route not found");
   }
   const changed = new Set<string>();
+  for (const closure of x.closures ?? []) {
+    if (
+      !closure ||
+      !snapshot.students.some((s) => s.schoolId === closure.schoolId) ||
+      !dateValid(closure.startsOn) ||
+      !dateValid(closure.endsOn) ||
+      closure.startsOn > closure.endsOn ||
+      closure.startsOn < x.startsOn ||
+      closure.endsOn > x.endsOn
+    )
+      throw new Error("请核对停课学校和日期 / Check closure school and dates");
+  }
   for (const c of x.changes) {
     if (
       !c ||
@@ -89,6 +102,7 @@ export function validateIntent(
   }
   if (
     !x.changes.length &&
+    !(x.closures?.length) &&
     !x.unavailableDriverIds.length &&
     !x.unavailableVehicleIds.length
   )
@@ -218,7 +232,12 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
   const deadline = Date.now() + 2500;
   const candidateDays: DayCandidate[][] = [[], [], []];
   for (const day of snapshot.days) {
-    const changedMatches = day.matches.map((m) => {
+    const closedSchools = new Set(
+      (intent.closures ?? [])
+        .filter((closure) => closure.startsOn <= day.date && closure.endsOn >= day.date)
+        .map((closure) => closure.schoolId),
+    );
+    const changedMatches = day.matches.filter((m) => !closedSchools.has(m.school_id)).map((m) => {
       const student = snapshot.students.find((s) => s.id === m.student_id);
       const change = intent.changes.find(
         (c) =>

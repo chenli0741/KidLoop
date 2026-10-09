@@ -8,10 +8,11 @@ import { identityQuery as query, identityTransaction } from "@/lib/identity-db";
 import { selectTenant } from "@/lib/tenant-service";
 import { hashPassword, tokenHash, verifyPassword } from "@/lib/password";
 import { homeFor, SESSION_COOKIE } from "@/lib/auth";
-import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, LOGIN_HANDOFF_COOKIE, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
+import { LOGIN_EMAIL_COOKIE, LOGIN_EMAIL_SECONDS, REMEMBERED_SESSION_SECONDS, TEMPORARY_SESSION_SECONDS } from "@/lib/login-preferences";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import type { FormState } from "@/lib/types";
+import {clearLoginSession} from '@/lib/logout-session';
 
 export type LoginState = FormState;
 
@@ -64,17 +65,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
 }
 
 export async function logout(form?:FormData) {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await identityTransaction(async c => {
-    const hash=tokenHash(token);
-    // A signed-out phone must stop receiving the former driver's private schedule.
-    await c.query("update driver_push_devices p set active=false,last_seen_at=now() from user_sessions s where s.token_hash=$1 and p.user_id=s.user_id",[hash]);
-    await c.query("delete from user_sessions where token_hash=$1",[hash]);
-    await c.query("delete from account_sessions where token_hash=$1",[hash]);
-  });
-  jar.delete(SESSION_COOKIE);
-  jar.delete(LOGIN_HANDOFF_COOKIE);
+  await clearLoginSession();
   revalidatePath("/","layout");
   const invitation=String(form?.get("invitation")??"");
   redirect(/^[a-f0-9]{64}$/.test(invitation)?`/login?invitation=${invitation}`:"/login");

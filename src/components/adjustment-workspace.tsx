@@ -332,9 +332,10 @@ export function AdjustmentWorkspace({
           </p>
         ))}
         {draft?.intent?.question && (
-          <p className="adjust-question" role="status">
-            {draft.intent.question}
-          </p>
+          <div className="adjust-question" role="status">
+            <strong>{t("需要补充，尚未生成方案", "More detail needed; no plan generated")}</strong>
+            <p>{draft.intent.question}</p>
+          </div>
         )}
         <label htmlFor="adjust-message">
           {t("调整要求或补充条件", "Change or additional constraint")}
@@ -371,7 +372,7 @@ export function AdjustmentWorkspace({
             onClick={() => void submit()}
           >
             <Send size={17} />
-            {busy ? t("处理中…", "Working…") : t("生成方案", "Generate plans")}
+            {busy ? t("处理中…", "Working…") : draft?.intent?.question ? t("提交补充", "Submit detail") : t("生成方案", "Generate plans")}
           </button>
         </div>
         {recording && (
@@ -406,9 +407,14 @@ export function AdjustmentWorkspace({
             <p>
               {draft.intent.startsOn} — {draft.intent.endsOn}
             </p>
-            {draft.intent.changes.length > 0 && <div className="adjust-rule-confirm">
+            {!!draft.intent.closures?.length && <div className="adjust-rule-confirm">
+              <h3>{t("停课安排", "School closures")}</h3>
+              {draft.intent.closures.map((closure, index) => <p key={index}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
+            </div>}
+            {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length) && <div className="adjust-rule-confirm">
               <h3>{t("规则调整", "Rule changes")}</h3>
               <p>{t("先保存学校日历规则，保存后再重新排班。", "Save the school calendar rules first, then regenerate the schedule.")}</p>
+              {draft.intent.closures?.map((closure, index) => <p key={`closure-${index}`}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
               {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
               {draft.status !== "RULES_APPLIED" && <><label><input type="checkbox" checked={rulesConfirmed} disabled={busy} onChange={event => setRulesConfirmed(event.target.checked)} />{t("我已核对这些规则调整。", "I reviewed these rule changes.")}</label><button className="button primary" type="button" disabled={!rulesConfirmed || busy} onClick={() => void applyRulesOnly()}>{busy ? t("保存中…", "Saving…") : t("确认规则并保存", "Confirm and save rules")}</button></>}
               {draft.status === "RULES_APPLIED" && <button className="button primary" type="button" disabled={busy} onClick={() => void regenerate()}>{busy ? t("重新排班中…", "Regenerating…") : t("重新排班", "Regenerate schedule")}</button>}
@@ -484,10 +490,9 @@ export function AdjustmentWorkspace({
                       "正在理解变化并检查相关安排…",
                       "Understanding changes and checking schedules…",
                     )
-                  : t(
-                      "提交调整要求后，在这里查看前后对照。",
-                      "Submit your change to review schedules here.",
-                    )}
+                  : draft?.intent?.question
+                    ? t("当前正在等待你的补充，尚未生成方案，也没有修改正式行程。", "Waiting for your detail. No plan was generated and no live ride was changed.")
+                    : t("提交调整要求后，在这里查看前后对照。", "Submit your change to review schedules here.")}
               </p>
             )}
             {draft?.result?.conflicts.map((c, i) => (

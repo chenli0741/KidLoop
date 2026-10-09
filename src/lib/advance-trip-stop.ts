@@ -9,7 +9,9 @@ import {sharedPickupCanDepart} from './shared-pickup-progress';
 export async function advanceTripStopRecord(c:PoolClient,user:AuthUser,tripId:string,action:'GO'|'ARRIVE'|'DROP_OFF',location?:unknown){
  if(!['DRIVER','ADMIN'].includes(user.role)||(user.role==='DRIVER'&&!user.driverId))throw new Error('Trip unavailable.');
 
-    await c.query("select pg_advisory_xact_lock(70919009)");
+    // Stop progression only serializes this ride. A tenant-wide scheduling lock
+    // can make every driver's action wait behind unrelated planning work.
+    await c.query("select pg_advisory_xact_lock(hashtextextended($1::text,70919011))",[tripId]);
     const row=(await c.query<{route_stops:RouteStop[]|null;current_stop_index:number;progress_state:'AT_STOP'|'IN_TRANSIT';status:string}>(`select t.route_stops,t.current_stop_index,t.progress_state,t.status from trips t join driver_shifts sh on sh.id=t.shift_id where t.id=$1 and t.operating_term_id=current_operating_term() and ($2::uuid is null or sh.driver_id=$2) for update`,[tripId,user.role==='DRIVER'?user.driverId:null])).rows[0];
     if(!row || !['PUBLISHED','IN_PROGRESS'].includes(row.status) || !row.route_stops?.length) throw new Error('Trip stops are unavailable.');
     const index=row.current_stop_index, stop=row.route_stops[index];

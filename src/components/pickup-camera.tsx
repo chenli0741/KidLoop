@@ -8,7 +8,6 @@ import {text,type Locale} from '@/lib/i18n';
 import type {TripExecution} from '@/lib/trip-execution';
 import {selectablePickups,type FaceMatch} from '@/lib/pickup-camera/matching';
 import {captureOperationLocation} from '@/lib/capture-operation-location';
-import {confirmPhotoPickup} from '@/app/driver/actions';
 import s from './pickup-camera.module.css';
 import {PickupGalleryButton} from './pickup-gallery-button';
 export function PickupCamera({trip,locale,onUpdated}:{trip:Trip;locale:Locale;onUpdated:(u:TripExecution)=>void}){
@@ -54,7 +53,7 @@ function CameraDialog({trip,locale,onUpdated,close,initialImage}:{trip:Trip;loca
  function retake(){abort.current?.abort();setShot('');setMatches([]);setSelected([]);setError('');setProgress('');setReady(false);setBusy(false);}
  const pickupIds=selectablePickups(selected,trip.riders);
  const chooserRiders=chooserIndex===null?[]:eligible.filter(r=>!matches.some((match,index)=>index!==chooserIndex&&selected[index]===r.id));
- function confirm(){if(!pickupIds.length){close();return;}startTransition(async()=>{try{const ids=pickupIds;const update=await confirmPhotoPickup(trip.id,ids,await captureOperationLocation());onUpdated(update);close();router.refresh();}catch{setError(text(locale,'未保存：名单可能已被另一辆车更新，或座位不足。请刷新名单后重新确认。','Not saved: the manifest changed or capacity was exceeded. Refresh and review again.'));router.refresh();}});}
+ function confirm(){if(!pickupIds.length){close();return;}startTransition(async()=>{try{const ids=pickupIds;const location=await captureOperationLocation();const response=await fetch('/api/photo-pickup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tripId:trip.id,ids,location}),signal:AbortSignal.timeout(20000)});if(!response.ok)throw new Error('Photo pickup was rejected');onUpdated(await response.json() as TripExecution);close();router.refresh();}catch{setError(text(locale,'未保存：名单可能已被另一辆车更新，或座位不足。请刷新名单后重新确认。','Not saved: the manifest changed or capacity was exceeded. Refresh and review again.'));router.refresh();}});}
  return <dialog ref={dialog} className={s.dialog} onCancel={e=>{e.preventDefault();if(!saving)close();}} aria-label={text(locale,'拍照识别','Scan pickup')}><header className={s.header}><strong>{text(locale,'拍照识别','Scan pickup')}</strong><button type="button" disabled={saving} onClick={close} aria-label={text(locale,'关闭','Close')}><X/></button></header>
  <div className={s.frame}>{shot?<><img src={shot} alt={text(locale,'本次车内画面','Current cabin snapshot')}/>{matches.map((m,i)=>{const displayId=m.assignmentId??selected[i],displayRider=trip.riders.find(r=>r.id===displayId);return <div key={i} className={s.box} data-unknown={!displayId} style={{left:`${Math.max(0,m.face.x)*100}%`,top:`${Math.max(0,m.face.y)*100}%`,width:`${m.face.width*100}%`,height:`${m.face.height*100}%`}}><span>{i+1} · {displayRider?.name??text(locale,'未识别','Unknown')}{m.assignmentId&&!eligible.some(r=>r.id===m.assignmentId)?text(locale,'（非待接）',' (not pending)'):''}</span></div>})}</>:<video ref={video} muted playsInline autoPlay/>}</div>
  <p role="status">{progress}</p>{error&&<p className={s.error} role="alert">{error}</p>}

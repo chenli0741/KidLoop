@@ -8,7 +8,7 @@ import { identityQuery } from "@/lib/identity-db";
 import { getLocale } from "@/lib/i18n-server";
 import { text } from "@/lib/i18n";
 import { ActionForm } from "@/components/action-form";
-import { logout } from "@/app/login/actions";
+import {LogoutButton} from '@/components/logout-button';
 import { enterOrganization,saveCompany } from "./actions";
 export default async function OrganizationsPage() {
  const account=await requireIdentity(),user=await getUser(),l=await getLocale();
@@ -38,6 +38,6 @@ export default async function OrganizationsPage() {
  {entry.error_code==='RATE_LIMIT'&&<p>{text(l,'Gmail 暂时限制发送，请稍后再试','Gmail sending limit reached. Try again later.')}</p>}
  </article>)}
  </section>}
- <form action={logout}><button className="button secondary">{text(l,'退出登录','Sign out')}</button></form>
+ <LogoutButton className="button secondary">{text(l,'退出登录','Sign out')}</LogoutButton>
  </section></div>;
 }

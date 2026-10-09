@@ -25,12 +25,27 @@ test("a locked route stays unchanged while its conflicting neighbor can move", (
   assert.equal(plan.candidates[0].days[0].after[0].driverId, "d2");
   assert.equal(plan.candidates[0].days[0].replaceIds.includes("r1"), false);
 });
+test("a dated school closure removes only that school's unstarted route", () => {
+  const { snapshot, intent } = fixture();
+  const closure = {
+    ...intent,
+    changes: [],
+    closures: [{ schoolId: "s2", startsOn: "2026-09-08", endsOn: "2026-09-08" }],
+  };
+  validateIntent(closure, snapshot, "2026-09-08");
+  const result = calculatePlan(snapshot, closure);
+  assert.ok(result.candidates.length, result.conflicts.join("; "));
+  const day = result.candidates[0].days[0];
+  assert.deepEqual(day.replaceIds, ["r2"]);
+  assert.deepEqual(day.after.flatMap((route) => route.students.map((student) => student.studentId)), ["a"]);
+});
 test("invalid dates, duplicated grade times and unknown resources cannot enter the planner", () => {
   const { snapshot, intent } = fixture();
   for (const value of [
     { ...intent, startsOn: "2026-02-30" },
     { ...intent, endsOn: "2026-09-30" },
     { ...intent, changes: [...intent.changes, ...intent.changes] },
+    { ...intent, changes: [], closures: [{ schoolId: "missing", startsOn: "2026-09-08", endsOn: "2026-09-08" }] },
     { ...intent, unavailableDriverIds: ["missing"] },
   ])
     assert.throws(() => validateIntent(value, snapshot, "2026-09-08"));

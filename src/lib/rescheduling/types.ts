@@ -6,6 +6,7 @@ import type { DriverUnavailability } from "../driver-availability";
 export type Intent = {
   startsOn: string;
   endsOn: string;
+  closures?: { schoolId: string; startsOn: string; endsOn: string }[];
   changes: { schoolId: string; grades: string[]; time: string }[];
   unavailableDriverIds: string[];
   unavailableVehicleIds: string[];
