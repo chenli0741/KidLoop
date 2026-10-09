@@ -129,6 +129,8 @@ test('independent institutions: migration, isolation, membership and scheduling'
     assert.equal(calls,3,'setup, business query and commit each take one round trip');
     assert.ok(rows.rows.length);assert.ok(rows.rows.every(r=>r.tenant_id===first && r.current_user==='kidloop_runtime'));
    } finally {c.query=original;}
+   const isolated=await tenantTransaction(c,user,client=>client.query("select current_setting('transaction_isolation') isolation"),{isolationLevel:'repeatable read'});
+   assert.equal(isolated.rows[0].isolation,'repeatable read');
    let ran=false;
    for(const invalid of [{...user,tenantId:second},{...user,contextKey:randomUUID()},{...user,role:'DRIVER' as const}]) {
     await assert.rejects(tenantTransaction(c,invalid,async()=>{ran=true;}),/revoked/);

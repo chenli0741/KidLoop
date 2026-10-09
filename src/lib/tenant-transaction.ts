@@ -2,14 +2,26 @@ import "server-only";
 import { escapeLiteral, type PoolClient, type QueryResult } from "pg";
 import type { AuthUser } from "./types";
 
+export type TenantTransactionOptions = {
+  isolationLevel?: "repeatable read";
+};
+
 /** One wire round trip for setup, while keeping permission locks until commit. */
-export async function tenantTransaction<T>(client: PoolClient, user: AuthUser, work: (client: PoolClient) => Promise<T>) {
+export async function tenantTransaction<T>(
+  client: PoolClient,
+  user: AuthUser,
+  work: (client: PoolClient) => Promise<T>,
+  options: TenantTransactionOptions = {},
+) {
   if (!user.tenantId || !user.accountId || !user.contextKey) throw new Error("An active institution is required");
   // Simple-protocol batches cannot bind parameters. Escape every value with pg;
   // no caller-provided SQL is accepted in the setup batch.
   const literal = (value: string | null | undefined) => value == null ? "null" : escapeLiteral(value);
   try {
-    const setup = await client.query(`begin;
+    const begin = options.isolationLevel === "repeatable read"
+      ? "begin isolation level repeatable read"
+      : "begin";
+    const setup = await client.query(`${begin};
       select set_config('kidloop.tenant_id',${literal(user.tenantId)},true),
              set_config('kidloop.actor_id',${literal(user.id)},true)
       from app_users u join tenants t on t.id=u.tenant_id

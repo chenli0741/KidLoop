@@ -2,14 +2,17 @@ import "server-only";
 import type { PoolClient, QueryResultRow } from "pg";
 import { identityPool } from "./identity-db";
 import { getUser, assertWorkspaceRequest } from "./auth";
-import { tenantTransaction } from "./tenant-transaction";
+import { tenantTransaction, type TenantTransactionOptions } from "./tenant-transaction";
 
-export async function transaction<T>(work: (client: PoolClient) => Promise<T>) {
+export async function transaction<T>(
+  work: (client: PoolClient) => Promise<T>,
+  options: TenantTransactionOptions = {},
+) {
   const user = await getUser();
   if (!user?.tenantId) throw new Error("An active institution is required");
   await assertWorkspaceRequest(user);
   const client = await identityPool.connect();
-  try { return await tenantTransaction(client, user, work); }
+  try { return await tenantTransaction(client, user, work, options); }
   finally { client.release(); }
 }
 export function query<T extends QueryResultRow>(sql: string, values: unknown[] = []) {

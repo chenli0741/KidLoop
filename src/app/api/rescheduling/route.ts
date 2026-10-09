@@ -170,7 +170,6 @@ export async function POST(request: Request) {
       else
         try {
           await transaction(async (c) => {
-            await c.query("set transaction isolation level repeatable read");
             await trial(
               c,
               input.id,
@@ -179,7 +178,7 @@ export async function POST(request: Request) {
               intent,
               todayInOperationsTimeZone(),
             );
-          });
+          }, { isolationLevel: "repeatable read" });
         } catch (error) {
           const safe =
             error instanceof Error && error.message.includes(" / ")
