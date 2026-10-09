@@ -168,17 +168,43 @@ export async function POST(request: Request) {
           [input.id, revision, JSON.stringify(intent)],
         );
       else
-        await transaction(async (c) => {
-          await c.query("set transaction isolation level repeatable read");
-          await trial(
-            c,
-            input.id,
-            user.id,
-            revision,
-            intent,
-            todayInOperationsTimeZone(),
+        try {
+          await transaction(async (c) => {
+            await c.query("set transaction isolation level repeatable read");
+            await trial(
+              c,
+              input.id,
+              user.id,
+              revision,
+              intent,
+              todayInOperationsTimeZone(),
+            );
+          });
+        } catch (error) {
+          const safe =
+            error instanceof Error && error.message.includes(" / ")
+              ? error.message
+              : "解析已完成，但排班试算未完成，请重试 / Parsed successfully, but planning did not complete; retry";
+          console.error(
+            JSON.stringify({
+              level: "error",
+              operation: "reschedulingTrial",
+              requestId: input.id,
+              revision,
+              errorName: error instanceof Error ? error.name : "Unknown",
+              errorCode:
+                typeof error === "object" && error && "code" in error
+                  ? String(error.code)
+                  : null,
+            }),
           );
-        });
+          await db.query(
+            "update reschedule_requests set intent=$4,status='FAILED',error=$5,updated_at=clock_timestamp() where id=$1 and user_id=$2 and revision=$3 and status<>'APPLIED'",
+            [input.id, user.id, revision, JSON.stringify(intent), safe],
+          );
+          attempted = undefined;
+          throw new Error(safe);
+        }
     } else throw new Error("操作无效 / Invalid action");
     return json(await getDraft(db, input.id, user.id));
   } catch (error) {

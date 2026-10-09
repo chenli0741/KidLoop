@@ -55,6 +55,26 @@ const intentSchema = {
     question: { type: "string" },
   },
 };
+export function normalizeIntent(intent: Intent): Intent {
+  const fullyClosed = new Set(
+    (intent.closures ?? [])
+      .filter(
+        (closure) =>
+          closure.startsOn <= intent.startsOn && closure.endsOn >= intent.endsOn,
+      )
+      .map((closure) => closure.schoolId),
+  );
+  return fullyClosed.size
+    ? {
+        ...intent,
+        // A full closure has no dismissal time. Some model responses also emit
+        // a blank/off time change for the same school; it is redundant and invalid.
+        changes: intent.changes.filter(
+          (change) => !fullyClosed.has(change.schoolId),
+        ),
+      }
+    : intent;
+}
 export async function recordUsage(
   c: SqlReader,
   requestId: string,
@@ -184,7 +204,7 @@ export async function parseRequest(
       throw new Error(
         "AI 未完成解析，请补充说明后重试 / AI could not complete the request",
       );
-    const intent = JSON.parse(output) as Intent;
+    const intent = normalizeIntent(JSON.parse(output) as Intent);
     if (typeof intent.question !== "string" || intent.question.length > 1500)
       throw new Error("AI 返回格式无效 / Invalid AI response");
     status = "COMPLETED";
