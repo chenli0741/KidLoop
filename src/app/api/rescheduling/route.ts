@@ -174,14 +174,22 @@ export async function POST(request: Request) {
       else
         try {
           await transaction(async (c) => {
-            await trial(
+            const today = todayInOperationsTimeZone();
+            const result = await trial(
               c,
               input.id,
               user.id,
               revision,
               intent,
-              todayInOperationsTimeZone(),
+              today,
             );
+            if (!result.candidates.length) return;
+            if (intent.changes.length || intent.closures?.length) {
+              await applyRules(c, input.id, user.id, revision, today);
+              await regenerateRulesSchedule(c, input.id, user.id, revision, today);
+            } else {
+              await applyDraft(c, input.id, user.id, revision, 0, today);
+            }
           }, { isolationLevel: "repeatable read" });
         } catch (error) {
           const safe =

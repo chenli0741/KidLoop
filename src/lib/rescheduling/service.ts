@@ -56,6 +56,7 @@ export async function trial(
   );
   if (!updated.rowCount)
     throw new Error("草案已有新版本 / A newer draft exists");
+  return result;
 }
 async function applyCalendar(
   c: PoolClient,

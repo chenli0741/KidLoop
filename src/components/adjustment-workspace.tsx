@@ -4,7 +4,7 @@ import { Mic, Square, Send, RefreshCw, Check, Plus } from "lucide-react";
 import { useLocale } from "./locale-provider";
 import { text } from "@/lib/i18n";
 import { AdjustmentUsage } from "./adjustment-usage";
-import type { DraftView, PlannedRoute } from "@/lib/rescheduling/types";
+import type { DraftView } from "@/lib/rescheduling/types";
 type Catalog = Record<
   "schools" | "drivers" | "vehicles" | "students" | "routes",
   Record<string, string>
@@ -23,10 +23,7 @@ export function AdjustmentWorkspace({
   const [draft, setDraft] = useState<DraftView | null>(null),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const [selected, setSelected] = useState<number | null>(null),
-    [confirmed, setConfirmed] = useState(false),
-    [rulesConfirmed, setRulesConfirmed] = useState(false),
+    [error, setError] = useState(""),
     [recording, setRecording] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
@@ -34,11 +31,6 @@ export function AdjustmentWorkspace({
   const currentId = useRef<string | null>(null),
     mounted = useRef(true);
   function keep(value: DraftView) {
-    if (draft?.id !== value.id || draft?.revision !== value.revision) {
-      setSelected(null);
-      setConfirmed(false);
-      setRulesConfirmed(false);
-    }
     setDraft(value);
     currentId.current = value.id;
     try {
@@ -101,8 +93,6 @@ export function AdjustmentWorkspace({
     if (busy || recording || !message.trim()) return;
     setBusy(true);
     setError("");
-    setSelected(null);
-    setConfirmed(false);
     try {
       const d = await ensureDraft();
       keep(
@@ -128,48 +118,6 @@ export function AdjustmentWorkspace({
     } finally {
       setBusy(false);
     }
-  }
-  async function apply() {
-    if (!draft || selected === null || !confirmed || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      keep(
-        await call({
-          action: "apply",
-          id: draft.id,
-          revision: draft.revision,
-          candidate: selected,
-          confirmed: true,
-        }),
-      );
-      setConfirmed(false);
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : t("请刷新以确认保存结果。", "Refresh to check the save result."),
-      );
-      await refresh().catch(() => {});
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function applyRulesOnly() {
-    if (!draft || !rulesConfirmed || busy) return;
-    setBusy(true); setError("");
-    try {
-      keep(await call({ action: "apply-rules", id: draft.id, revision: draft.revision, confirmed: true }));
-      setRulesConfirmed(false);
-    } catch (e) { setError(e instanceof Error ? e.message : t("规则保存失败，请刷新重试。", "Could not save rules; refresh and try again.")); await refresh().catch(() => {}); }
-    finally { setBusy(false); }
-  }
-  async function regenerate() {
-    if (!draft || busy) return;
-    setBusy(true); setError("");
-    try { keep(await call({ action: "regenerate", id: draft.id, revision: draft.revision })); }
-    catch (e) { setError(e instanceof Error ? e.message : t("重新排班失败，请刷新重试。", "Could not regenerate the schedule; refresh and try again.")); await refresh().catch(() => {}); }
-    finally { setBusy(false); }
   }
   async function startRecording() {
     setError("");
@@ -266,36 +214,9 @@ export function AdjustmentWorkspace({
   }
   const localized = (value: string) =>
     value.split(" / ")[locale === "en" ? 1 : 0] ?? value;
-  const card = (p: PlannedRoute, index: number) => (
-    <article className="adjust-route" key={`${p.sourceIds.join("-")}-${index}`}>
-      <strong>
-        {p.stops[0]?.time} – {p.stops.at(-1)?.time}
-      </strong>
-      <p>
-        {catalog.drivers[p.driverId] ?? "—"} ·{" "}
-        {catalog.vehicles[p.vehicleId] ?? "—"}
-      </p>
-      <ol>
-        {p.stops.map((s, i) => (
-          <li key={`${s.id}-${i}`}>
-            <time>{s.time}</time> {s.name}
-          </li>
-        ))}
-      </ol>
-      <details>
-        <summary>
-          {p.students.length} {t("名学生", "riders")}
-        </summary>
-        <ul>
-          {p.students.map((s) => (
-            <li key={s.studentId}>{catalog.students[s.studentId] ?? "—"}</li>
-          ))}
-        </ul>
-      </details>
-    </article>
-  );
   const isRuleAdjustment = !!draft?.intent &&
     (draft.intent.changes.length > 0 || !!draft.intent.closures?.length);
+  const appliedResult = draft?.result?.candidates[0];
   return (
     <div className="adjust-workspace">
       <section className="adjust-input">
@@ -307,8 +228,6 @@ export function AdjustmentWorkspace({
             onClick={() => {
               setDraft(null);
               currentId.current = null;
-              setSelected(null);
-              setConfirmed(false);
               setMessage("");
               setError("");
               try {
@@ -335,7 +254,7 @@ export function AdjustmentWorkspace({
         ))}
         {draft?.intent?.question && (
           <div className="adjust-question" role="status">
-            <strong>{t("需要补充，尚未生成方案", "More detail needed; no plan generated")}</strong>
+            <strong>{t("需要补充，尚未执行", "More detail needed; nothing applied")}</strong>
             <p>{draft.intent.question}</p>
           </div>
         )}
@@ -374,7 +293,7 @@ export function AdjustmentWorkspace({
             onClick={() => void submit()}
           >
             <Send size={17} />
-            {busy ? t("处理中…", "Working…") : draft?.intent?.question ? t("提交补充", "Submit detail") : t("生成方案", "Generate plans")}
+            {busy ? t("处理中…", "Working…") : draft?.intent?.question ? t("提交补充", "Submit detail") : t("执行调整", "Apply change")}
           </button>
         </div>
         {recording && (
@@ -415,11 +334,9 @@ export function AdjustmentWorkspace({
             </div>}
             {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length) && <div className="adjust-rule-confirm">
               <h3>{t("规则调整", "Rule changes")}</h3>
-              <p>{t("确认后，系统会保存学校日历规则并立即更新行程。", "After confirmation, the system saves the school calendar rule and updates the schedule immediately.")}</p>
+              <p>{draft.status === "APPLIED" ? t("系统已按这项学校日历规则更新行程。", "The schedule was updated from this school calendar rule.") : t("现有规则无法执行时，原因会显示在下方。", "If existing rules cannot apply the change, the reason appears below.")}</p>
               {draft.intent.closures?.map((closure, index) => <p key={`closure-${index}`}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
               {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
-              {draft.status === "READY" && <><label><input type="checkbox" checked={rulesConfirmed} disabled={busy} onChange={event => setRulesConfirmed(event.target.checked)} />{t("我已核对这项规则调整。", "I reviewed this rule change.")}</label><button className="button primary" type="button" disabled={!rulesConfirmed || busy} onClick={() => void applyRulesOnly()}>{busy ? t("更新中…", "Updating…") : t("确认并更新行程", "Confirm and update schedule")}</button></>}
-              {draft.status === "RULES_APPLIED" && <button className="button primary" type="button" disabled={busy} onClick={() => void regenerate()}>{busy ? t("更新中…", "Updating…") : t("完成行程更新", "Finish schedule update")}</button>}
             </div>}
             {draft.intent.changes.map((c, i) => (
               <p key={i}>
@@ -459,8 +376,8 @@ export function AdjustmentWorkspace({
             </p>
             <p>
               {t(
-                "仅按现有规则调整；确认前不会修改正式安排。",
-                "Existing rules apply. Schedules change only after confirmation.",
+                "要求明确时系统直接执行；存在歧义时会先询问。",
+                "Clear requests are applied directly; the system asks only when details are ambiguous.",
               )}
             </p>
           </div>
@@ -485,118 +402,32 @@ export function AdjustmentWorkspace({
                     "Drivers and parents can view the new schedule in their usual pages.",
                   )}
             </p>
+            {appliedResult && <p>{appliedResult.changedRoutes} {t("条线路已调整", "routes updated")} · {appliedResult.changedStudents} {t("人次涉及", "rider assignments affected")}</p>}
             <small>{draft.id}</small>
           </div>
-        ) : isRuleAdjustment ? (
-          <div className="adjust-notice" role="status">
-            <h2>{t("规则调整", "Rule update")}</h2>
-            <p>
-              {draft?.status === "RULES_APPLIED"
-                ? t("规则已经保存。请点击上方按钮完成这次行程更新。", "The rule is saved. Tap the button above to finish this schedule update.")
-                : t("这类调整只有一个确定结果，不需要选择多个方案。请在上方确认一次。", "This change has one deterministic result. Confirm it once above; no plan selection is needed.")}
-            </p>
-          </div>
         ) : (
-          <>
-            <h2>{t("联动方案", "Coordinated plans")}</h2>
-            {!draft?.result && (
-              <p className="adjust-empty">
-                {busy
-                  ? t(
-                      "正在理解变化并检查相关安排…",
-                      "Understanding changes and checking schedules…",
-                    )
-                  : draft?.intent?.question
-                    ? t("当前正在等待你的补充，尚未生成方案，也没有修改正式行程。", "Waiting for your detail. No plan was generated and no live ride was changed.")
-                    : t("提交调整要求后，在这里查看前后对照。", "Submit your change to review schedules here.")}
-              </p>
-            )}
+          <div className="adjust-notice" role="status">
+            <h2>{t("处理结果", "Result")}</h2>
+            <p className="adjust-empty">
+              {busy
+                ? t("正在理解要求并更新相关安排…", "Understanding the request and updating related schedules…")
+                : draft?.intent?.question
+                  ? t("要求存在歧义，请补充上面的问题；正式行程尚未修改。", "The request is ambiguous. Answer the question above; live rides have not changed.")
+                  : draft?.result?.conflicts.length
+                    ? t("现有规则无法完成这项调整，正式行程没有修改。", "Existing rules could not complete this change. Live rides were not modified.")
+                    : t("输入明确要求后，系统会直接执行并在这里显示结果。", "Enter a clear request and the system will apply it directly and show the result here.")}
+            </p>
             {draft?.result?.conflicts.map((c, i) => (
               <p className="adjust-error" key={i}>
                 {localized(c)}
               </p>
-            ))}
-            {draft?.result?.candidates.map((c, i) => (
-              <div
-                className={`adjust-candidate ${selected === i ? "selected" : ""}`}
-                key={i}
-              >
-                <div className="section-heading">
-                  <h3>
-                    {t("方案", "Plan")} {i + 1}
-                  </h3>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-pressed={selected === i}
-                    onClick={() => {
-                      setSelected(i);
-                      setConfirmed(false);
-                    }}
-                  >
-                    {selected === i
-                      ? t("已选择", "Selected")
-                      : t("选择", "Select")}
-                  </button>
-                </div>
-                <p>
-                  {c.changedRoutes} {t("条线路调整", "route changes")} ·{" "}
-                  {c.changedStudents}{" "}
-                  {t("人次涉及", "rider assignments affected")} ·{" "}
-                  {c.additionalDrivers} {t("名额外司机", "additional drivers")}
-                </p>
-                {c.days.map((d) => (
-                  <details key={d.date} open={c.days.length === 1}>
-                    <summary>
-                      {d.date} · {d.replaceIds.length}{" "}
-                      {t("条线路调整", "route changes")}
-                    </summary>
-                    <div className="adjust-comparison">
-                      <div>
-                        <h4>{t("原安排", "Before")}</h4>
-                        {d.before.map(card)}
-                      </div>
-                      <div>
-                        <h4>{t("新安排", "After")}</h4>
-                        {d.after.map(card)}
-                      </div>
-                    </div>
-                  </details>
-                ))}
-              </div>
             ))}
             {draft?.result?.warnings.map((w, i) => (
               <p className="adjust-notice" key={i}>
                 {localized(w)}
               </p>
             ))}
-            {selected !== null && draft?.status === "READY" && (
-              <div className="adjust-confirm">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    disabled={busy}
-                    onChange={(e) => setConfirmed(e.target.checked)}
-                  />
-                  {t(
-                    "我已核对所选方案的日期、学生、人车及时间变化。",
-                    "I reviewed the dates, riders, resources and time changes.",
-                  )}
-                </label>
-                <button
-                  className="button primary"
-                  type="button"
-                  disabled={!confirmed || busy}
-                  onClick={() => void apply()}
-                >
-                  {busy
-                    ? t("处理中…", "Working…")
-                    : t("确认应用所选方案", "Apply selected plan")}
-                </button>
-              </div>
-            )}
-          </>
+          </div>
         )}
         <AdjustmentUsage usage={draft?.usage ?? []} locale={locale} />
       </section>
