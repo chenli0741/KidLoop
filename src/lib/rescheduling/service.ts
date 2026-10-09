@@ -348,14 +348,19 @@ export async function regenerateRulesSchedule(
   revision: number,
   today: string,
 ) {
-  const row = (await c.query<{intent:Intent;status:string;operating_term_id:string}>(`select intent,status,operating_term_id from reschedule_requests where id=$1 and user_id=$2`, [id, userId])).rows[0];
+  await lockRoutes(c);
+  const row = (await c.query<{intent:Intent;status:string;revision:number;operating_term_id:string}>(`select intent,status,revision,operating_term_id from reschedule_requests where id=$1 and user_id=$2 for update`, [id, userId])).rows[0];
   if (!row) throw new Error("调整记录不存在 / Adjustment not found");
-  if (row.status !== 'RULES_APPLIED' || revision < 1) throw new Error("请先保存规则 / Save the rules first");
+  if (row.status === 'APPLIED' && row.revision === revision) return;
+  if (revision < 1 || row.status !== 'RULES_APPLIED' || row.revision !== revision) throw new Error("请先保存规则 / Save the rules first");
   const dates: string[] = [];
   for (let value = row.intent.startsOn; value <= row.intent.endsOn; ) {
     dates.push(value);
     const next = new Date(`${value}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1); value = next.toISOString().slice(0, 10);
   }
-  await lockRoutes(c);
   for (const date of dates) await materializeRoutes(c, date, today);
+  await c.query(
+    "update reschedule_requests set status='APPLIED',updated_at=clock_timestamp() where id=$1 and user_id=$2 and revision=$3",
+    [id, userId, revision],
+  );
 }

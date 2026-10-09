@@ -10,7 +10,7 @@ import {
 } from "../src/lib/fixed-routes";
 import { readSnapshot } from "../src/lib/rescheduling/snapshot";
 import { calculatePlan, validateIntent } from "../src/lib/rescheduling/planner";
-import { trial, applyDraft, getDraft, saveTemporary } from "../src/lib/rescheduling/service";
+import { trial, applyDraft, applyRules, regenerateRulesSchedule, getDraft, saveTemporary } from "../src/lib/rescheduling/service";
 import { parseRequest } from "../src/lib/rescheduling/ai";
 import type { Intent } from "../src/lib/rescheduling/types";
 
@@ -390,6 +390,24 @@ test("rescheduling: read-only trial, atomic date-limited application, retained h
     assert.ok((await roster('2026-09-17')).every(r=>r.time==='12:00'));
     for (const date of ['2026-09-16','2026-09-17','2026-09-18']) await tx(() => materializeRoutes(c,date,'2026-09-01',backup));
     assert.deepEqual(await roster('2026-09-16'),left);assert.deepEqual(await roster('2026-09-18'),right);
+    // Saving a calendar rule is an intermediate state; successful regeneration
+    // completes the request and remains safe if the response is retried.
+    const rulesRequest = await create();
+    const closure: Intent = {
+      ...intent,
+      startsOn: '2026-09-22',
+      endsOn: '2026-09-22',
+      changes: [],
+      closures: [{ schoolId: school, startsOn: '2026-09-22', endsOn: '2026-09-22' }],
+    };
+    await c.query("update reschedule_requests set revision=1 where id=$1",[rulesRequest]);
+    await tx(() => trial(c,rulesRequest,admin,1,closure,'2026-09-01'));
+    await tx(() => applyRules(c,rulesRequest,admin,1,'2026-09-01'));
+    assert.equal((await getDraft(c,rulesRequest,admin)).status,'RULES_APPLIED');
+    await tx(() => regenerateRulesSchedule(c,rulesRequest,admin,1,'2026-09-01'));
+    assert.equal((await getDraft(c,rulesRequest,admin)).status,'APPLIED');
+    await tx(() => regenerateRulesSchedule(c,rulesRequest,admin,1,'2026-09-01'));
+    assert.equal((await getDraft(c,rulesRequest,admin)).status,'APPLIED');
     // Provider transport is mocked; no live API requests or spend in tests.
     const oldFetch = globalThis.fetch,
       oldKey = process.env.OPENAI_API_KEY,

@@ -125,7 +125,11 @@ export async function POST(request: Request) {
       );
     } else if (input.action === "apply-rules") {
       if (input.confirmed !== true) throw new Error("请确认规则调整 / Confirm the rule changes");
-      await transaction((c) => applyRules(c, input.id, user.id, input.revision, todayInOperationsTimeZone()));
+      await transaction(async (c) => {
+        const today = todayInOperationsTimeZone();
+        await applyRules(c, input.id, user.id, input.revision, today);
+        await regenerateRulesSchedule(c, input.id, user.id, input.revision, today);
+      });
     } else if (input.action === "regenerate") {
       await transaction((c) => regenerateRulesSchedule(c, input.id, user.id, input.revision, todayInOperationsTimeZone()));
     } else if (input.action === "trial") {

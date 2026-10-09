@@ -294,6 +294,8 @@ export function AdjustmentWorkspace({
       </details>
     </article>
   );
+  const isRuleAdjustment = !!draft?.intent &&
+    (draft.intent.changes.length > 0 || !!draft.intent.closures?.length);
   return (
     <div className="adjust-workspace">
       <section className="adjust-input">
@@ -413,11 +415,11 @@ export function AdjustmentWorkspace({
             </div>}
             {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length) && <div className="adjust-rule-confirm">
               <h3>{t("规则调整", "Rule changes")}</h3>
-              <p>{t("先保存学校日历规则，保存后再重新排班。", "Save the school calendar rules first, then regenerate the schedule.")}</p>
+              <p>{t("确认后，系统会保存学校日历规则并立即更新行程。", "After confirmation, the system saves the school calendar rule and updates the schedule immediately.")}</p>
               {draft.intent.closures?.map((closure, index) => <p key={`closure-${index}`}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
               {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
-              {draft.status === "READY" && <><label><input type="checkbox" checked={rulesConfirmed} disabled={busy} onChange={event => setRulesConfirmed(event.target.checked)} />{t("我已核对这些规则调整。", "I reviewed these rule changes.")}</label><button className="button primary" type="button" disabled={!rulesConfirmed || busy} onClick={() => void applyRulesOnly()}>{busy ? t("保存中…", "Saving…") : t("确认规则并保存", "Confirm and save rules")}</button></>}
-              {draft.status === "RULES_APPLIED" && <button className="button primary" type="button" disabled={busy} onClick={() => void regenerate()}>{busy ? t("重新排班中…", "Regenerating…") : t("重新排班", "Regenerate schedule")}</button>}
+              {draft.status === "READY" && <><label><input type="checkbox" checked={rulesConfirmed} disabled={busy} onChange={event => setRulesConfirmed(event.target.checked)} />{t("我已核对这项规则调整。", "I reviewed this rule change.")}</label><button className="button primary" type="button" disabled={!rulesConfirmed || busy} onClick={() => void applyRulesOnly()}>{busy ? t("更新中…", "Updating…") : t("确认并更新行程", "Confirm and update schedule")}</button></>}
+              {draft.status === "RULES_APPLIED" && <button className="button primary" type="button" disabled={busy} onClick={() => void regenerate()}>{busy ? t("更新中…", "Updating…") : t("完成行程更新", "Finish schedule update")}</button>}
             </div>}
             {draft.intent.changes.map((c, i) => (
               <p key={i}>
@@ -473,12 +475,26 @@ export function AdjustmentWorkspace({
               {draft.intent?.startsOn} — {draft.intent?.endsOn}
             </p>
             <p>
-              {t(
-                "司机和家长可在现有日程页面查看新安排。",
-                "Drivers and parents can view the new schedule in their usual pages.",
-              )}
+              {isRuleAdjustment
+                ? t(
+                    "学校日历规则和未开始行程已经更新；已开始的行程及其他学校保持不变。",
+                    "The school calendar rule and unstarted rides are updated. Started rides and other schools remain unchanged.",
+                  )
+                : t(
+                    "司机和家长可在现有日程页面查看新安排。",
+                    "Drivers and parents can view the new schedule in their usual pages.",
+                  )}
             </p>
             <small>{draft.id}</small>
+          </div>
+        ) : isRuleAdjustment ? (
+          <div className="adjust-notice" role="status">
+            <h2>{t("规则调整", "Rule update")}</h2>
+            <p>
+              {draft?.status === "RULES_APPLIED"
+                ? t("规则已经保存。请点击上方按钮完成这次行程更新。", "The rule is saved. Tap the button above to finish this schedule update.")
+                : t("这类调整只有一个确定结果，不需要选择多个方案。请在上方确认一次。", "This change has one deterministic result. Confirm it once above; no plan selection is needed.")}
+            </p>
           </div>
         ) : (
           <>
