@@ -42,7 +42,7 @@ export async function trial(
   validateIntent(intent, snapshot, today);
   const result = calculatePlan(snapshot, intent);
   const updated = await c.query(
-    `update reschedule_requests set intent=$4,result=$5,snapshot_hash=$6,status=$7,updated_at=clock_timestamp()
+    `update reschedule_requests set intent=$4,result=$5,snapshot_hash=$6,status=$7,error=null,updated_at=clock_timestamp()
     where id=$1 and user_id=$2 and revision=$3 and status<>'APPLIED'`,
     [
       id,
@@ -358,7 +358,10 @@ export async function regenerateRulesSchedule(
   await lockRoutes(c);
   const row = (await c.query<{intent:Intent;status:string;revision:number;operating_term_id:string}>(`select intent,status,revision,operating_term_id from reschedule_requests where id=$1 and user_id=$2 for update`, [id, userId])).rows[0];
   if (!row) throw new Error("调整记录不存在 / Adjustment not found");
-  if (row.status === 'APPLIED' && row.revision === revision) return;
+  if (row.status === 'APPLIED' && row.revision === revision) {
+    await c.query("update reschedule_requests set error=null,updated_at=clock_timestamp() where id=$1", [id]);
+    return;
+  }
   if (revision < 1 || row.status !== 'RULES_APPLIED' || row.revision !== revision) throw new Error("请先保存规则 / Save the rules first");
   const dates: string[] = [];
   for (let value = row.intent.startsOn; value <= row.intent.endsOn; ) {
@@ -367,7 +370,7 @@ export async function regenerateRulesSchedule(
   }
   for (const date of dates) await materializeRoutes(c, date, today);
   await c.query(
-    "update reschedule_requests set status='APPLIED',updated_at=clock_timestamp() where id=$1 and user_id=$2 and revision=$3",
+    "update reschedule_requests set status='APPLIED',error=null,updated_at=clock_timestamp() where id=$1 and user_id=$2 and revision=$3",
     [id, userId, revision],
   );
 }
