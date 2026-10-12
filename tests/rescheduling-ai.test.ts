@@ -21,3 +21,14 @@ test('a partial closure keeps a time change that can apply outside the closure',
  const intent={...base,endsOn:'2026-10-10'};
  assert.equal(normalizeIntent(intent).changes.length,1);
 });
+
+test('restoring the regular calendar discards a model-generated blank time change',()=>{
+ const intent:Intent={
+  ...base,
+  closures:[],
+  restorations:[{schoolId:'school',startsOn:'2026-10-09',endsOn:'2026-10-09'}],
+ };
+ const normalized=normalizeIntent(intent);
+ assert.deepEqual(normalized.changes,[]);
+ assert.equal(normalized.restorations?.length,1);
+});

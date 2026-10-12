@@ -11,6 +11,7 @@ export async function readPickupMatches(
   c: SqlReader,
   ids: string[],
   date: string,
+  regularCalendarSchoolIds: string[] = [],
 ): Promise<PickupMatch[]> {
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
   return (
@@ -19,12 +20,12 @@ export async function readPickupMatches(
     school_special_pickup_time(e.grade_times,s.grade,e.pickup_time,p.pickup_time)::text as time
     from students s join school_terms t on t.operating_term_id=current_operating_term() and t.school_id=s.school_id and $2::date between t.starts_on and t.ends_on
     join school_pickup_rules p on p.operating_term_id=current_operating_term() and p.school_id=s.school_id and trim(s.grade)=any(p.grades) and $3=any(p.weekdays)
- left join school_calendar_schedules e on e.operating_term_id=current_operating_term() and e.school_id=s.school_id and $2::date between e.starts_on and e.ends_on
+ left join school_calendar_schedules e on e.operating_term_id=current_operating_term() and e.school_id=s.school_id and $2::date between e.starts_on and e.ends_on and not (e.school_id=any($4::uuid[]))
     where s.id=any($1::uuid[]) and s.active and not ($3=any(s.no_pickup_weekdays))
     and exists(select 1 from student_service_periods sp where sp.student_id=s.id
       and sp.operating_term_id=current_operating_term() and $2::date between sp.starts_on and sp.ends_on)
     and (e.id is null or e.pickup_time is not null or jsonb_array_length(e.grade_times)>0)`,
-      [ids, date, weekday],
+      [ids, date, weekday, regularCalendarSchoolIds],
     )
   ).rows;
 }

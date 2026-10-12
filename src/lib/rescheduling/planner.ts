@@ -53,6 +53,7 @@ export function validateIntent(
     !Array.isArray(x.changes) ||
     x.changes.length > 10 ||
     (x.closures !== undefined && (!Array.isArray(x.closures) || x.closures.length > 20)) ||
+    (x.restorations !== undefined && (!Array.isArray(x.restorations) || x.restorations.length > 20)) ||
     typeof x.preferExistingDrivers !== "boolean" ||
     typeof x.noAdditionalDrivers !== "boolean" ||
     typeof x.question !== "string"
@@ -83,6 +84,24 @@ export function validateIntent(
     )
       throw new Error("请核对停课学校和日期 / Check closure school and dates");
   }
+  for (const restoration of x.restorations ?? []) {
+    if (
+      !restoration ||
+      !snapshot.students.some((s) => s.schoolId === restoration.schoolId) ||
+      !dateValid(restoration.startsOn) ||
+      !dateValid(restoration.endsOn) ||
+      restoration.startsOn > restoration.endsOn ||
+      restoration.startsOn < x.startsOn ||
+      restoration.endsOn > x.endsOn ||
+      (x.closures ?? []).some(
+        (closure) =>
+          closure.schoolId === restoration.schoolId &&
+          closure.startsOn <= restoration.endsOn &&
+          closure.endsOn >= restoration.startsOn,
+      )
+    )
+      throw new Error("请核对恢复接送的学校和日期 / Check restored pickup school and dates");
+  }
   for (const c of x.changes) {
     if (
       !c ||
@@ -103,6 +122,7 @@ export function validateIntent(
   if (
     !x.changes.length &&
     !(x.closures?.length) &&
+    !(x.restorations?.length) &&
     !x.unavailableDriverIds.length &&
     !x.unavailableVehicleIds.length
   )

@@ -21,6 +21,7 @@ export async function readSnapshot(
   c: PoolClient,
   start: string,
   end: string,
+  restorations: { schoolId: string; startsOn: string; endsOn: string }[] = [],
 ): Promise<Snapshot> {
   const term = await openTerm(c);
   if (!term) throw new Error("请先设置运营学期 / Set up an operating term");
@@ -54,10 +55,14 @@ export async function readSnapshot(
   )).rows;
   const days: Snapshot["days"] = [];
   for (const date of datesBetween(start, end)) {
+    const regularCalendarSchoolIds = restorations
+      .filter((restoration) => restoration.startsOn <= date && restoration.endsOn >= date)
+      .map((restoration) => restoration.schoolId);
     const matches = await readPickupMatches(
       c,
       students.map((s) => s.id),
       date,
+      regularCalendarSchoolIds,
     );
     const tasks = (
       await c.query<Task>(

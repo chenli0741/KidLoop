@@ -215,7 +215,7 @@ export function AdjustmentWorkspace({
   const localized = (value: string) =>
     value.split(" / ")[locale === "en" ? 1 : 0] ?? value;
   const isRuleAdjustment = !!draft?.intent &&
-    (draft.intent.changes.length > 0 || !!draft.intent.closures?.length);
+    (draft.intent.changes.length > 0 || !!draft.intent.closures?.length || !!draft.intent.restorations?.length);
   const appliedResult = draft?.result?.candidates[0];
   return (
     <div className="adjust-workspace">
@@ -332,10 +332,15 @@ export function AdjustmentWorkspace({
               <h3>{t("停课安排", "School closures")}</h3>
               {draft.intent.closures.map((closure, index) => <p key={index}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
             </div>}
-            {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length) && <div className="adjust-rule-confirm">
+            {!!draft.intent.restorations?.length && <div className="adjust-rule-confirm">
+              <h3>{t("恢复常规接送", "Restore regular pickup")}</h3>
+              {draft.intent.restorations.map((restoration, index) => <p key={index}>{catalog.schools[restoration.schoolId]} · {restoration.startsOn}{restoration.endsOn !== restoration.startsOn ? ` — ${restoration.endsOn}` : ""} · {t("按常规校历接送", "Use regular calendar")}</p>)}
+            </div>}
+            {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length || !!draft.intent.restorations?.length) && <div className="adjust-rule-confirm">
               <h3>{t("规则调整", "Rule changes")}</h3>
               <p>{draft.status === "APPLIED" ? t("系统已按这项学校日历规则更新行程。", "The schedule was updated from this school calendar rule.") : t("现有规则无法执行时，原因会显示在下方。", "If existing rules cannot apply the change, the reason appears below.")}</p>
               {draft.intent.closures?.map((closure, index) => <p key={`closure-${index}`}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
+              {draft.intent.restorations?.map((restoration, index) => <p key={`restoration-${index}`}>{catalog.schools[restoration.schoolId]} · {restoration.startsOn}{restoration.endsOn !== restoration.startsOn ? ` — ${restoration.endsOn}` : ""} · {t("恢复常规接送", "Restore regular pickup")}</p>)}
               {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
             </div>}
             {draft.intent.changes.map((c, i) => (

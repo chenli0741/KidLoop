@@ -408,6 +408,24 @@ test("rescheduling: read-only trial, atomic date-limited application, retained h
     assert.equal((await getDraft(c,rulesRequest,admin)).status,'APPLIED');
     await tx(() => regenerateRulesSchedule(c,rulesRequest,admin,1,'2026-09-01'));
     assert.equal((await getDraft(c,rulesRequest,admin)).status,'APPLIED');
+    assert.equal((await roster('2026-09-22')).length,0);
+    const restorationRequest = await create();
+    const restoration: Intent = {
+      ...intent,
+      startsOn: '2026-09-22',
+      endsOn: '2026-09-22',
+      changes: [],
+      closures: [],
+      restorations: [{ schoolId: school, startsOn: '2026-09-22', endsOn: '2026-09-22' }],
+    };
+    await c.query("update reschedule_requests set revision=1 where id=$1",[restorationRequest]);
+    await tx(() => trial(c,restorationRequest,admin,1,restoration,'2026-09-01'));
+    assert.ok((await getDraft(c,restorationRequest,admin)).result!.candidates.length);
+    await tx(() => applyRules(c,restorationRequest,admin,1,'2026-09-01'));
+    await tx(() => regenerateRulesSchedule(c,restorationRequest,admin,1,'2026-09-01'));
+    assert.equal((await getDraft(c,restorationRequest,admin)).status,'APPLIED');
+    assert.equal((await roster('2026-09-22')).length,4);
+    assert.equal((await c.query("select count(*)::int n from school_calendar_schedules where school_id=$1 and '2026-09-22' between starts_on and ends_on",[school])).rows[0].n,0);
     // Provider transport is mocked; no live API requests or spend in tests.
     const oldFetch = globalThis.fetch,
       oldKey = process.env.OPENAI_API_KEY,

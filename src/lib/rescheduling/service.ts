@@ -38,7 +38,7 @@ export async function trial(
   intent: Intent,
   today: string,
 ) {
-  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn);
+  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn, intent.restorations);
   validateIntent(intent, snapshot, today);
   const result = calculatePlan(snapshot, intent);
   const updated = await c.query(
@@ -68,13 +68,18 @@ async function applyCalendar(
   const closureSchools = (intent.closures ?? [])
     .filter((closure) => closure.startsOn <= day && closure.endsOn >= day)
     .map((closure) => closure.schoolId);
-  for (const schoolId of new Set([...intent.changes.map((x) => x.schoolId), ...closureSchools])) {
+  const restorationSchools = (intent.restorations ?? [])
+    .filter((restoration) => restoration.startsOn <= day && restoration.endsOn >= day)
+    .map((restoration) => restoration.schoolId);
+  for (const schoolId of new Set([...intent.changes.map((x) => x.schoolId), ...closureSchools, ...restorationSchools])) {
     const changes = intent.changes.filter((x) => x.schoolId === schoolId);
     const closed = closureSchools.includes(schoolId);
+    const restored = restorationSchools.includes(schoolId);
     // A closure is an explicit calendar change; time-only adjustments keep
     // an existing non-service day unchanged.
     if (
       !closed &&
+      !restored &&
       !matches.some(
         (m) =>
           m.school_id === schoolId &&
@@ -132,6 +137,7 @@ async function applyCalendar(
           ],
         );
     }
+    if (restored) continue;
     const f = new FormData();
     for (const [k, v] of Object.entries({
       schoolId,
@@ -231,7 +237,7 @@ export async function applyDraft(
   await c.query("select id from students order by id for update");
   await c.query("select id from drivers order by id for update");
   await c.query("select id from vehicles order by id for update");
-  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn);
+  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn, intent.restorations);
   validateIntent(intent, snapshot, today);
   if (
     snapshot.term.id !== row.operating_term_id ||
@@ -333,7 +339,7 @@ export async function applyRules(
   if (!['READY','RULES_APPLIED'].includes(row.status) || row.revision !== revision)
     throw new Error("请先完成规则解析 / Complete the rule review first");
   const intent = row.intent as Intent;
-  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn);
+  const snapshot = await readSnapshot(c, intent.startsOn, intent.endsOn, intent.restorations);
   validateIntent(intent, snapshot, today);
   if (snapshot.term.id !== row.operating_term_id || snapshot.hash !== row.snapshot_hash)
     throw new Error("排班或规则已变化，请重新解析 / Schedule or rules changed; parse again");
