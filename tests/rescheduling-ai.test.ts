@@ -73,7 +73,7 @@ test('duplicate student names require school disambiguation before writing',()=>
  assert.equal(resolved.studentChanges?.[0].studentId,'laura-one');
 });
 
-test('a whole-school anchor time expands to every pickup school on its configured line',()=>{
+test('a whole-school time applies only to the named school regardless of its route',()=>{
  const intent:Intent={...base,closures:[],changes:[{schoolId:'cumberland',grades:['TK','K','1','2','3','4','5','6','7'],time:'12:45'}]};
  const resolved=resolveIntentSchools(intent,{
   schools:[{id:'cumberland',name:'Cumberland'},{id:'cherry',name:'Cherry Chase'}],
@@ -83,7 +83,7 @@ test('a whole-school anchor time expands to every pickup school on its configure
    {position:2,name:'Little Tree',address:'Sunnyvale',schoolId:null,programId:'program'},
   ]}],
  },['今天 Cumberland 全校 12:45 放学']);
- assert.deepEqual(resolved.changes.map(change=>change.schoolId).sort(),['cherry','cumberland']);
+ assert.deepEqual(resolved.changes.map(change=>change.schoolId),['cumberland']);
 });
 
 test('an explicit school-only request does not expand across the line',()=>{
@@ -116,14 +116,19 @@ test('empty whole-school grades are filled and provider-invented schools are dis
    ]},
   ],
  },['今天 Cumberland 12:45 放学']);
- assert.deepEqual(resolved.changes.map(change=>change.schoolId).sort(),['cherry','cumberland']);
+ assert.deepEqual(resolved.changes.map(change=>change.schoolId),['cumberland']);
  assert.ok(resolved.changes.every(change=>change.grades.length===9));
 });
 
-test('a named service area resolves the whole configured destination line',()=>{
+test('a named city resolves schools by their own addresses instead of a route destination',()=>{
  const intent:Intent={...base,closures:[],changes:[],question:'Which school?'};
  const resolved=resolveIntentSchools(intent,{
-  schools:[{id:'cumberland',name:'Cumberland'},{id:'cherry',name:'Cherry Chase'},{id:'ellis',name:'Ellis'}],
+  schools:[
+   {id:'cumberland',name:'Cumberland',address:'824 Cumberland Dr, Sunnyvale, CA 94087'},
+   {id:'cherry',name:'Cherry Chase',address:'1138 Heatherstone Way, Sunnyvale, CA 94087'},
+   {id:'ellis',name:'Ellis',address:'550 E Olive Ave, Sunnyvale, CA 94086'},
+   {id:'cupertino',name:'Cupertino School',address:'10301 Vista Dr, Cupertino, CA 95014'},
+  ],
   routes:[
    {id:'sunnyvale',name:'LittleTree 1 Line',routeType:'RECURRING',startsOn:'2026-08-01',endsOn:'2026-12-31',stops:[
     {position:0,name:'Cumberland',address:'Sunnyvale',schoolId:'cumberland',programId:null},
@@ -137,6 +142,34 @@ test('a named service area resolves the whole configured destination line',()=>{
   ],
  },['今天 Sunnyvale 早放学 12:45']);
  assert.equal(resolved.question,'');
- assert.deepEqual(resolved.changes.map(change=>change.schoolId).sort(),['cherry','cumberland']);
+ assert.deepEqual(resolved.changes.map(change=>change.schoolId).sort(),['cherry','cumberland','ellis']);
+ assert.ok(resolved.changes.every(change=>change.time==='12:45'&&change.grades.length===9));
+});
+
+test('a named city ignores route count, overlap, destination, and driver when changing dismissal time',()=>{
+ const intent:Intent={...base,startsOn:'2026-10-20',endsOn:'2026-10-20',closures:[],changes:[{schoolId:'cumberland',grades:[],time:'12:45'}],question:'找到多条线路，请说明线路名称或司机'};
+ const resolved=resolveIntentSchools(intent,{
+  schools:[
+   {id:'cumberland',name:'Cumberland',address:'824 Cumberland Dr, Sunnyvale, CA 94087'},
+   {id:'cherry',name:'Cherry Chase',address:'1138 Heatherstone Way, Sunnyvale, CA 94087'},
+   {id:'ellis',name:'Ellis',address:'550 E Olive Ave, Sunnyvale, CA 94086'},
+  ],
+  routes:[
+   {id:'cherry-line',name:'Cumberland → Cherry Chase → Little Tree Sunnyvale',routeType:'RECURRING',startsOn:'2026-08-01',endsOn:'2026-12-31',driverId:'driver-one',stops:[
+    {position:0,name:'Cumberland',address:'Sunnyvale',schoolId:'cumberland',programId:null},
+    {position:1,name:'Cherry Chase',address:'Sunnyvale',schoolId:'cherry',programId:null},
+    {position:2,name:'Little Tree Sunnyvale',address:'420 S Pastoria Ave, Sunnyvale, CA 94086',schoolId:null,programId:'little-tree'},
+   ]},
+   {id:'ellis-line',name:'Cumberland → Ellis → Another Program',routeType:'RECURRING',startsOn:'2026-08-01',endsOn:'2026-12-31',driverId:'driver-two',stops:[
+    {position:0,name:'Cumberland',address:'Sunnyvale',schoolId:'cumberland',programId:null},
+    {position:1,name:'Ellis',address:'Sunnyvale',schoolId:'ellis',programId:null},
+    {position:2,name:'Another Program',address:'100 Main St, Cupertino, CA 95014',schoolId:null,programId:'another-program'},
+   ]},
+  ],
+ },['今天 Sunnyvale 早放学 12:45']);
+ assert.equal(resolved.question,'');
+ assert.equal(resolved.startsOn,'2026-10-20');
+ assert.equal(resolved.endsOn,'2026-10-20');
+ assert.deepEqual(resolved.changes.map(change=>change.schoolId).sort(),['cherry','cumberland','ellis']);
  assert.ok(resolved.changes.every(change=>change.time==='12:45'&&change.grades.length===9));
 });
