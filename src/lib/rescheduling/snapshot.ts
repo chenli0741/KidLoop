@@ -7,6 +7,7 @@ import { openTerm } from "../operating-terms";
 import { readPickupMatches } from "../route-plan";
 import type { Snapshot, Rider, Resource, Task } from "./types";
 import type { DriverUnavailability } from "../driver-availability";
+import type { PickupBatch } from "../automatic-roster";
 export function datesBetween(start: string, end: string) {
   const days: string[] = [];
   for (
@@ -44,6 +45,12 @@ export async function readSnapshot(
       "select id,name,active,status,capacity from vehicles order by id",
     )
   ).rows;
+  const batches = (await c.query<PickupBatch>(
+    `select id,school_id as "schoolId",to_char(pickup_time,'HH24:MI') as "pickupTime",weekday,shared,
+      excluded_student_ids as "excludedStudentIds",updated_at::text as "updatedAt"
+     from school_pickup_batches where operating_term_id=current_operating_term()
+     order by school_id,weekday,pickup_time,id`,
+  )).rows;
   const travelTimes = (await c.query<{ fromName: string; toName: string; minutes: number; originDwellMinutes: number }>(
     "select from_name as \"fromName\",to_name as \"toName\",estimated_minutes + buffer_minutes as minutes,origin_dwell_minutes as \"originDwellMinutes\" from travel_time_profiles where active order by from_name,to_name",
   )).rows;
@@ -108,7 +115,7 @@ export async function readSnapshot(
     )
   ).rows[0];
   const driverRuns = await readDriverRuns(c,start,end);
-  const snapshot = { term, routes, students, drivers, vehicles, days, driverRuns, driverUnavailability };
+  const snapshot = { term, routes, students, drivers, vehicles, batches, days, driverRuns, driverUnavailability };
   return {
     ...snapshot,
     travelTimes,

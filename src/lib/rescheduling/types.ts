@@ -3,6 +3,7 @@ import type { DriverRun } from '../driver-familiarity';
 import type { FixedRoute, RouteStop, RouteStudent } from "../fixed-route-types";
 import type { PickupMatch } from "../route-plan";
 import type { DriverUnavailability } from "../driver-availability";
+import type { PickupBatch } from "../automatic-roster";
 export type Intent = {
   startsOn: string;
   endsOn: string;
@@ -52,6 +53,7 @@ export type Snapshot = {
   students: Rider[];
   drivers: Resource[];
   vehicles: Resource[];
+  batches: PickupBatch[];
   travelTimes: TravelTime[];
   days: {
     date: string;

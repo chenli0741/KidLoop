@@ -358,7 +358,12 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
       const early=candidates.length<eligible.length||new Set(candidates.map(s=>available.find(m=>m.student_id===s.studentId)!.time)).size>1?candidates:[];
       const groups=new Map<string,typeof early>();
       for(const rider of early){const time=available.find(m=>m.student_id===rider.studentId)!.time;const key=`${rider.pickupStopId}:${rider.dropoffStopId}:${time}`;groups.set(key,[...groups.get(key)??[],rider]);}
-      for(const students of groups.values())earlyRequests.push({sourceRouteId:r.id,preferredDriverId:r.driverId,preferredVehicleId:r.vehicleId,time:available.find(m=>m.student_id===students[0].studentId)!.time.slice(0,5),pickup:r.stops.find(s=>s.id===students[0].pickupStopId)!,dropoff:r.stops.find(s=>s.id===students[0].dropoffStopId)!,students,shared:{}});
+      for(const students of groups.values()){
+        const pickup=r.stops.find(s=>s.id===students[0].pickupStopId)!;
+        const oldTime=day.matches.find(m=>m.student_id===students[0].studentId)?.time.slice(0,5);
+        const batch=snapshot.batches.find(b=>b.schoolId===pickup.schoolId&&b.weekday===(new Date(`${day.date}T12:00:00Z`).getUTCDay()||7)&&b.pickupTime===oldTime&&b.shared);
+        earlyRequests.push({sourceRouteId:r.id,preferredDriverId:r.driverId,preferredVehicleId:r.vehicleId,time:available.find(m=>m.student_id===students[0].studentId)!.time.slice(0,5),pickup,dropoff:r.stops.find(s=>s.id===students[0].dropoffStopId)!,students,shared:Object.fromEntries(batch?students.map(student=>[student.studentId,batch.id]):[])});
+      }
       const plan=asPlan({...r,students:r.students.filter(s=>!early.includes(s))},available,snapshot.travelTimes);
       return plan.students.length?[{...plan,preserveAssignment:!intent.unavailableDriverIds.includes(plan.driverId)&&!intent.unavailableVehicleIds.includes(plan.vehicleId)}]:[];
     });
@@ -475,7 +480,11 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         );
         for (const d of ds)
           for (const v of vs) {
-            if (overCapacity(task.stops, task.students, v.capacity!)) continue;
+            // Automatic extra trips have already been capacity-checked by the
+            // allocator. A shared pool deliberately projects the same riders
+            // onto each participating vehicle, so counting that projection as
+            // each vehicle's onboard load would reject every valid split.
+            if (!task.automaticExtra && overCapacity(task.stops, task.students, v.capacity!)) continue;
             if (
               [
                 ...blockers,

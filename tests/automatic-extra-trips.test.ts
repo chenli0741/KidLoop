@@ -95,10 +95,24 @@ test('started students are retained without a second early pickup',()=>{
 });
 test('AI rescheduling uses the same partial-grade direct extra plan',()=>{
  const input=extraFixture();
- const snapshot:Snapshot={term:{id:'term',startsOn:'2026-09-01',endsOn:'2026-09-30'},routes:input.routes,students:input.children.map(s=>({...s,name:s.id,reviewed:true})),drivers:input.drivers.map(d=>({...d,name:d.id})),vehicles:input.vehicles.map(v=>({...v,name:v.id})),travelTimes:input.travelTimes!,hash:'',days:[{date,matches:input.children.map(s=>({student_id:s.id,school_id:s.schoolId,time:'14:30'})),tasks:[],absentIds:[]}]};
+ const snapshot:Snapshot={term:{id:'term',startsOn:'2026-09-01',endsOn:'2026-09-30'},routes:input.routes,students:input.children.map(s=>({...s,name:s.id,reviewed:true})),drivers:input.drivers.map(d=>({...d,name:d.id})),vehicles:input.vehicles.map(v=>({...v,name:v.id})),batches:input.batches,travelTimes:input.travelTimes!,hash:'',days:[{date,matches:input.children.map(s=>({student_id:s.id,school_id:s.schoolId,time:'14:30'})),tasks:[],absentIds:[]}]};
  const intent:Intent={startsOn:date,endsOn:date,changes:[{schoolId:'school-a',grades:['K'],time:'12:45'}],unavailableDriverIds:[],unavailableVehicleIds:[],lockedRouteIds:[],preferExistingDrivers:true,noAdditionalDrivers:false,question:''};
  const result=calculatePlan(snapshot,intent);assert.ok(result.candidates.length,result.conflicts.join(';'));const after=result.candidates[0].days[0].after;
  assert.equal(after.length,2);assert.deepEqual(after.find(p=>p.automaticExtra)?.stops.map(s=>s.time),['12:45','13:00']);assert.deepEqual(after.find(p=>!p.automaticExtra)?.stops.map(s=>s.time),['14:30','14:40','14:50']);
+});
+
+test('AI rescheduling preserves a shared early pickup pool across participating vehicles',()=>{
+ const input=extraFixture();input.routes.push({...structuredClone(input.routes[0]),id:'route-2',driverId:'backup',vehicleId:'spare'});
+ for(let n=2;n<=5;n++)input.children.push({id:`k${n}`,schoolId:'school-a',programId:'program',grade:'K',reviewed:true});
+ input.routes.forEach(route=>route.students.push(...input.children.slice(3).map(child=>({studentId:child.id,pickupStopId:'a',dropoffStopId:'p'}))));
+ input.vehicles.forEach(vehicle=>vehicle.capacity=4);
+ input.batches=[{id:'shared-a',schoolId:'school-a',pickupTime:'14:30',weekday:2,shared:true,excludedStudentIds:[],updatedAt:''}];
+ const snapshot:Snapshot={term:{id:'term',startsOn:'2026-09-01',endsOn:'2026-09-30'},routes:input.routes,students:input.children.map(s=>({...s,name:s.id,reviewed:true})),drivers:input.drivers.map(d=>({...d,name:d.id})),vehicles:input.vehicles.map(v=>({...v,name:v.id})),batches:input.batches,travelTimes:input.travelTimes!,hash:'',days:[{date,matches:input.children.map(s=>({student_id:s.id,school_id:s.schoolId,time:'14:30'})),tasks:[],absentIds:[]}]};
+ const intent:Intent={startsOn:date,endsOn:date,changes:[{schoolId:'school-a',grades:['K','3'],time:'12:45'}],unavailableDriverIds:[],unavailableVehicleIds:[],lockedRouteIds:[],preferExistingDrivers:true,noAdditionalDrivers:false,question:''};
+ const result=calculatePlan(snapshot,intent);assert.ok(result.candidates.length,result.conflicts.join(';'));
+ const early=result.candidates[0].days[0].after.filter(plan=>plan.automaticExtra);
+ assert.equal(early.length,2);assert.ok(early.every(plan=>plan.students.length===6));
+ assert.equal(new Set(early.map(plan=>plan.driverId)).size,2);assert.equal(new Set(early.map(plan=>plan.vehicleId)).size,2);
 });
 
 test('explicit school preference outranks history, allows cover, and ONLY prevents unrelated assignments',()=>{

@@ -74,6 +74,7 @@ export function reschedulingExample() {
       { id: "v1", name: "V1", active: true, status: "AVAILABLE", capacity: 1 },
       { id: "v2", name: "V2", active: true, status: "AVAILABLE", capacity: 1 },
     ],
+    batches: [],
     travelTimes: [{fromName:"s1",toName:"Program",minutes:30},{fromName:"s2",toName:"Program",minutes:30}],
     days: [
       {
