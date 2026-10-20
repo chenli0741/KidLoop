@@ -11,6 +11,7 @@ import pg from 'pg';
 import {materializeRoutes} from '../src/lib/fixed-routes';
 import {readTrialRange} from '../src/lib/schedule-trial-data';
 import {readDriverRuns} from '../src/lib/driver-familiarity-data';
+import {readSnapshot} from '../src/lib/rescheduling/snapshot';
 
 test('extra trips persist idempotently, preview never writes trips, history learns only actual service, started trips survive rule changes',async()=>{
  const url=process.env.KIDLOOP_TEST_DATABASE_URL;assert.ok(url&&['localhost','127.0.0.1'].includes(new URL(url).hostname));
@@ -45,10 +46,13 @@ test('extra trips persist idempotently, preview never writes trips, history lear
   const preview=await readTrialRange(c as unknown as pg.PoolClient,['2026-09-15'],true);assert.equal(preview.days[0].plans.length,2);assert.equal((await c.query('select count(*)::int n from trips')).rows[0].n,0);
   const generate=async()=>{await c.query('begin');try{await c.query('set local role kidloop_runtime');await materializeRoutes(c as unknown as pg.PoolClient,'2026-09-15','2026-09-14');await c.query('commit');}catch(e){await c.query('rollback');throw e;}};
   await generate();const first=(await c.query('select id,generated_plan_id,status from trips order by id')).rows;assert.equal(first.length,2);assert.equal(first.filter(t=>t.generated_plan_id).length,1);
+  const generated=first.find(t=>t.generated_plan_id)!;
+  const reschedulingSnapshot=await readSnapshot(c as unknown as pg.PoolClient,'2026-09-15','2026-09-15');
+  assert.equal(reschedulingSnapshot.days[0].tasks.find(t=>t.tripId===generated.id)?.routeId,generated.generated_plan_id,'an unstarted generated ride remains replaceable during rescheduling');
   const assignments=(await c.query('select id,student_id,trip_id from trip_students order by id')).rows;assert.equal(assignments.length,3);
   await generate();assert.deepEqual((await c.query('select id,generated_plan_id,status from trips order by id')).rows,first);assert.deepEqual((await c.query('select id,student_id,trip_id from trip_students order by id')).rows,assignments);
   assert.equal((await readDriverRuns(c as unknown as pg.PoolClient,'2026-09-15','2026-09-17')).length,0);
-  const extra=first.find(t=>t.generated_plan_id)!;const pickup=(await c.query('select id from trip_students where trip_id=$1',[extra.id])).rows[0].id;
+  const extra=generated;const pickup=(await c.query('select id from trip_students where trip_id=$1',[extra.id])).rows[0].id;
   await c.query("update trip_students set status='PICKED_UP',picked_up_at=now() where id=$1",[pickup]);await c.query("update trips set status='IN_PROGRESS' where id=$1",[extra.id]);
   assert.equal((await readDriverRuns(c as unknown as pg.PoolClient,'2026-09-15','2026-09-17')).length,1);
   await c.query('delete from school_calendar_schedules where school_id=$1',[school]);await generate();

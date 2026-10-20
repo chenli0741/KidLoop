@@ -10,6 +10,12 @@ import { calculatePlan, validateIntent } from "./planner";
 import type { DraftView, Intent, PlanResult, PlannedRoute } from "./types";
 import { retireTemporarySources } from "./temporary-replacement";
 
+export const hasRuleAdjustments = (intent: Intent) =>
+  intent.changes.length > 0 ||
+  Boolean(intent.closures?.length) ||
+  Boolean(intent.restorations?.length) ||
+  Boolean(intent.studentChanges?.length);
+
 export async function getDraft(
   c: SqlReader,
   id: string,
@@ -73,7 +79,7 @@ export async function trial(
       JSON.stringify(intent),
       JSON.stringify(result),
       snapshot.hash,
-      result.candidates.length ? "READY" : "DRAFT",
+      result.candidates.length || hasRuleAdjustments(intent) ? "READY" : "DRAFT",
     ],
   );
   if (!updated.rowCount)

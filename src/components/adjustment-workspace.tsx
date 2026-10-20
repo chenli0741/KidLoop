@@ -365,7 +365,12 @@ export function AdjustmentWorkspace({
             </p>
             <p>
               {isRuleAdjustment
-                ? t(
+                ? draft.result?.conflicts.length
+                  ? t(
+                    "学校日历规则已保存并重算未开始行程；部分接送仍缺少可行安排，请在每日核对中处理。",
+                    "The school calendar rule was saved and unstarted rides were recalculated. Some pickups still need a feasible assignment in daily review.",
+                  )
+                  : t(
                     "学校日历规则和未开始行程已经更新；已开始的行程及其他学校保持不变。",
                     "The school calendar rule and unstarted rides are updated. Started rides and other schools remain unchanged.",
                   )
@@ -374,6 +379,9 @@ export function AdjustmentWorkspace({
                     "Drivers and parents can view the new schedule in their usual pages.",
                   )}
             </p>
+            {draft.result?.conflicts.map((conflict, index) => (
+              <p className="adjust-error" key={index}>{localized(conflict)}</p>
+            ))}
             {appliedResult && <p>{appliedResult.changedRoutes} {t("条线路已调整", "routes updated")} · {appliedResult.changedStudents} {t("人次涉及", "rider assignments affected")}</p>}
             <div className="adjust-rule-confirm">
               <h3>{t("数据库中的实际行程", "Actual published rides")}</h3>

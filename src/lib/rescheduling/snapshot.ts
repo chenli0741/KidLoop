@@ -73,7 +73,7 @@ export async function readSnapshot(
     );
     const tasks = (
       await c.query<Task>(
-        `select t.fixed_route_id as "routeId",t.id as "tripId",sh.driver_id as "driverId",sh.vehicle_id as "vehicleId",to_char(sh.start_time,'HH24:MI') as start,to_char(sh.end_time,'HH24:MI') as end,
+        `select coalesce(t.generated_plan_id,t.fixed_route_id) as "routeId",t.id as "tripId",sh.driver_id as "driverId",sh.vehicle_id as "vehicleId",to_char(sh.start_time,'HH24:MI') as start,to_char(sh.end_time,'HH24:MI') as end,
       (exists(select 1 from trip_segment_completions f where f.trip_id=t.id) or exists(select 1 from trip_students x where x.trip_id=t.id and (x.picked_up_at is not null or x.status in ('PICKED_UP','DROPPED_OFF','EXCEPTION') or (x.status='ABSENT' and not x.parent_absence)))) as started,
       coalesce(t.route_stops,'[]') as stops,
       coalesce((select jsonb_agg(jsonb_build_object('studentId',x.student_id,'pickupStopId',x.pickup_stop_id,'dropoffStopId',x.dropoff_stop_id) order by x.student_id) from trip_students x where x.trip_id=t.id),'[]') as students

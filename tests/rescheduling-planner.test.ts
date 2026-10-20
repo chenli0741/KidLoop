@@ -18,6 +18,34 @@ test("a time change causing a downstream overlap reallocates real resources; ori
     0,
   );
 });
+test("riders already at the requested early time stay with newly changed riders on the same route", () => {
+  const { snapshot, intent } = fixture();
+  const route = snapshot.routes[0];
+  route.stops = [
+    route.stops[0],
+    { ...snapshot.routes[1].stops[0], id: "r1-middle", time: "14:30" },
+    { ...route.stops[1], time: "15:00" },
+  ];
+  route.students.push({ studentId: "b", pickupStopId: "r1-middle", dropoffStopId: route.stops[2].id });
+  snapshot.routes = [route];
+  snapshot.drivers = snapshot.drivers.slice(0, 1);
+  snapshot.vehicles = snapshot.vehicles.slice(0, 1).map((vehicle) => ({ ...vehicle, capacity: 2 }));
+  snapshot.days[0].matches = [
+    { student_id: "a", school_id: "s1", time: "12:00" },
+    { student_id: "b", school_id: "s2", time: "14:30" },
+  ];
+  snapshot.travelTimes = [
+    { fromName: "s1", toName: "s2", minutes: 10 },
+    { fromName: "s2", toName: "Program", minutes: 10 },
+  ];
+  const result = calculatePlan(snapshot, {
+    ...intent,
+    changes: [{ schoolId: "s2", grades: ["K"], time: "12:00" }],
+  });
+  assert.ok(result.candidates.length, result.conflicts.join("; "));
+  assert.equal(result.candidates[0].days[0].after.length, 1);
+  assert.deepEqual(result.candidates[0].days[0].after[0].students.map((student) => student.studentId).sort(), ["a", "b"]);
+});
 test("a locked route stays unchanged while its conflicting neighbor can move", () => {
   const { snapshot, intent } = fixture();
   const plan = calculatePlan(snapshot, { ...intent, lockedRouteIds: ["r1"] });

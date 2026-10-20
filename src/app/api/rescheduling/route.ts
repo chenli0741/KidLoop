@@ -2,7 +2,7 @@ import { getUser, assertWorkspaceRequest } from "@/lib/auth";
 import { db, transaction } from "@/lib/db";
 import { todayInOperationsTimeZone } from "@/lib/date";
 import { openTerm } from "@/lib/operating-terms";
-import { getDraft, trial, applyDraft, applyRules, regenerateRulesSchedule } from "@/lib/rescheduling/service";
+import { getDraft, trial, applyDraft, applyRules, regenerateRulesSchedule, hasRuleAdjustments } from "@/lib/rescheduling/service";
 import { parseRequest, transcribe } from "@/lib/rescheduling/ai";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -183,11 +183,10 @@ export async function POST(request: Request) {
               intent,
               today,
             );
-            if (!result.candidates.length) return;
-            if (intent.changes.length || intent.closures?.length || intent.restorations?.length || intent.studentChanges?.length) {
+            if (hasRuleAdjustments(intent)) {
               await applyRules(c, input.id, user.id, revision, today);
               await regenerateRulesSchedule(c, input.id, user.id, revision, today);
-            } else {
+            } else if (result.candidates.length) {
               await applyDraft(c, input.id, user.id, revision, 0, today);
             }
           }, { isolationLevel: "repeatable read" });

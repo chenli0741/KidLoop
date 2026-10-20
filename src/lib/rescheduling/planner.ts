@@ -379,7 +379,11 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
       const available=routeMatches(r,matches);
       const candidates=r.students.filter(s=>available.some(m=>m.student_id===s.studentId&&day.matches.some(old=>old.student_id===s.studentId&&minutes(m.time)<minutes(old.time))));
       const eligible=r.students.filter(s=>available.some(m=>m.student_id===s.studentId));
-      const early=candidates.length<eligible.length||new Set(candidates.map(s=>available.find(m=>m.student_id===s.studentId)!.time)).size>1?candidates:[];
+      // Split only when riders on the route still have different final dismissal
+      // times. Riders already at the requested early time belong in the same
+      // replanned route as riders newly changed to that time.
+      const finalTimes=new Set(eligible.map(s=>available.find(m=>m.student_id===s.studentId)!.time));
+      const early=finalTimes.size>1?candidates:[];
       const groups=new Map<string,typeof early>();
       for(const rider of early){const time=available.find(m=>m.student_id===rider.studentId)!.time;const key=`${rider.pickupStopId}:${rider.dropoffStopId}:${time}`;groups.set(key,[...groups.get(key)??[],rider]);}
       for(const students of groups.values()){
