@@ -184,7 +184,7 @@ export async function POST(request: Request) {
               today,
             );
             if (!result.candidates.length) return;
-            if (intent.changes.length || intent.closures?.length || intent.restorations?.length) {
+            if (intent.changes.length || intent.closures?.length || intent.restorations?.length || intent.studentChanges?.length) {
               await applyRules(c, input.id, user.id, revision, today);
               await regenerateRulesSchedule(c, input.id, user.id, revision, today);
             } else {

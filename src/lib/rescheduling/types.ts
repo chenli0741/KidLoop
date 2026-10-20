@@ -10,6 +10,7 @@ export type Intent = {
   closures?: { schoolId: string; startsOn: string; endsOn: string }[];
   restorations?: { schoolId: string; startsOn: string; endsOn: string }[];
   changes: { schoolId: string; grades: string[]; time: string }[];
+  studentChanges?: { studentId: string; startsOn: string; endsOn: string; attending: boolean }[];
   unavailableDriverIds: string[];
   unavailableVehicleIds: string[];
   lockedRouteIds: string[];
@@ -100,6 +101,7 @@ export type DraftView = {
   intent: Intent | null;
   result: PlanResult | null;
   appliedCandidate: number | null;
+  appliedTrips?: { date: string; name: string; driverId: string; studentCount: number; stops: RouteStop[] }[];
   usage: {
     id?: string;
     created_at?: string;

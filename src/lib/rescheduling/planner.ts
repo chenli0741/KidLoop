@@ -52,6 +52,7 @@ export function validateIntent(
   if (
     !Array.isArray(x.changes) ||
     x.changes.length > 10 ||
+    (x.studentChanges !== undefined && (!Array.isArray(x.studentChanges) || x.studentChanges.length > 100)) ||
     (x.closures !== undefined && (!Array.isArray(x.closures) || x.closures.length > 20)) ||
     (x.restorations !== undefined && (!Array.isArray(x.restorations) || x.restorations.length > 20)) ||
     typeof x.preferExistingDrivers !== "boolean" ||
@@ -72,6 +73,19 @@ export function validateIntent(
       throw new Error("资源或线路无法匹配 / Resource or route not found");
   }
   const changed = new Set<string>();
+  for (const change of x.studentChanges ?? []) {
+    if (
+      !change ||
+      !snapshot.students.some((student) => student.id === change.studentId) ||
+      !dateValid(change.startsOn) ||
+      !dateValid(change.endsOn) ||
+      change.startsOn > change.endsOn ||
+      change.startsOn < x.startsOn ||
+      change.endsOn > x.endsOn ||
+      typeof change.attending !== "boolean"
+    )
+      throw new Error("请核对学生和接送日期 / Check student and pickup dates");
+  }
   for (const closure of x.closures ?? []) {
     if (
       !closure ||
@@ -123,6 +137,7 @@ export function validateIntent(
     !x.changes.length &&
     !(x.closures?.length) &&
     !(x.restorations?.length) &&
+    !(x.studentChanges?.length) &&
     !x.unavailableDriverIds.length &&
     !x.unavailableVehicleIds.length
   )
@@ -257,7 +272,16 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         .filter((closure) => closure.startsOn <= day.date && closure.endsOn >= day.date)
         .map((closure) => closure.schoolId),
     );
-    const changedMatches = day.matches.filter((m) => !closedSchools.has(m.school_id)).map((m) => {
+    const absentStudents = new Set([
+      ...day.absentIds,
+      ...(intent.studentChanges ?? [])
+        .filter((change) => !change.attending && change.startsOn <= day.date && change.endsOn >= day.date)
+        .map((change) => change.studentId),
+    ]);
+    for (const change of intent.studentChanges ?? [])
+      if (change.attending && change.startsOn <= day.date && change.endsOn >= day.date)
+        absentStudents.delete(change.studentId);
+    const changedMatches = day.matches.filter((m) => !closedSchools.has(m.school_id) && !absentStudents.has(m.student_id)).map((m) => {
       const student = snapshot.students.find((s) => s.id === m.student_id);
       const change = intent.changes.find(
         (c) =>
@@ -368,7 +392,7 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
       return plan.students.length?[{...plan,preserveAssignment:!intent.unavailableDriverIds.includes(plan.driverId)&&!intent.unavailableVehicleIds.includes(plan.vehicleId)}]:[];
     });
     if(earlyRequests.length){
-      const extraInput:TrialInput={routes:snapshot.routes,children:[],rules:[],batches:[],terms:[],exceptions:[],absences:day.absentIds.map(studentId=>({date:day.date,studentId})),
+      const extraInput:TrialInput={routes:snapshot.routes,children:[],rules:[],batches:[],terms:[],exceptions:[],absences:[...absentStudents].map(studentId=>({date:day.date,studentId})),
         drivers:snapshot.drivers.filter(d=>!intent.unavailableDriverIds.includes(d.id)&&(!intent.noAdditionalDrivers||before.some(p=>p.driverId===d.id))),vehicles:snapshot.vehicles.filter(v=>!intent.unavailableVehicleIds.includes(v.id)).map(v=>({...v,capacity:v.capacity??0})),driverRuns:snapshot.driverRuns,driverUnavailability:snapshot.driverUnavailability,travelTimes:snapshot.travelTimes,
         existing:blockers.map(t=>({...t,date:day.date,students:t.students.map(s=>s.studentId)}))};
       const extraIssues:TrialIssue[]=[];

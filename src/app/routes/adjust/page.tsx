@@ -16,7 +16,7 @@ export default async function AdjustmentPage({ searchParams }: { searchParams: P
     (select coalesce(jsonb_object_agg(id,name),'{}') from drivers) as drivers,
     (select coalesce(jsonb_object_agg(id,name),'{}') from vehicles) as vehicles,
     (select coalesce(jsonb_object_agg(id,name),'{}') from fixed_routes where operating_term_id=current_operating_term()) as routes,
-    (select coalesce(jsonb_object_agg(s.id,s.name),'{}') from students s join term_students ts on ts.student_id=s.id where ts.operating_term_id=current_operating_term()) as students`)
+    (select coalesce(jsonb_object_agg(s.id,s.name||' · '||coalesce(sc.short_name,sc.name)||' · '||s.grade),'{}') from students s join schools sc on sc.id=s.school_id join term_students ts on ts.student_id=s.id where ts.operating_term_id=current_operating_term()) as students`)
   ).rows[0];
   return (
     <div className="page-container">

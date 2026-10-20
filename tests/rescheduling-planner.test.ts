@@ -39,6 +39,18 @@ test("a dated school closure removes only that school's unstarted route", () => 
   assert.deepEqual(day.replaceIds, ["r2"]);
   assert.deepEqual(day.after.flatMap((route) => route.students.map((student) => student.studentId)), ["a"]);
 });
+test("a dated student absence changes configuration input before deterministic scheduling", () => {
+  const { snapshot, intent } = fixture();
+  const request = {
+    ...intent,
+    changes: [],
+    studentChanges: [{ studentId: "a", startsOn: "2026-09-08", endsOn: "2026-09-08", attending: false }],
+  };
+  validateIntent(request, snapshot, "2026-09-08");
+  const result = calculatePlan(snapshot, request);
+  assert.ok(result.candidates.length, result.conflicts.join("; "));
+  assert.deepEqual(result.candidates[0].days[0].after.flatMap((route) => route.students.map((student) => student.studentId)), ["b"]);
+});
 test("invalid dates, duplicated grade times and unknown resources cannot enter the planner", () => {
   const { snapshot, intent } = fixture();
   for (const value of [

@@ -215,8 +215,34 @@ export function AdjustmentWorkspace({
   const localized = (value: string) =>
     value.split(" / ")[locale === "en" ? 1 : 0] ?? value;
   const isRuleAdjustment = !!draft?.intent &&
-    (draft.intent.changes.length > 0 || !!draft.intent.closures?.length || !!draft.intent.restorations?.length);
+    (draft.intent.changes.length > 0 || !!draft.intent.closures?.length || !!draft.intent.restorations?.length || !!draft.intent.studentChanges?.length);
   const appliedResult = draft?.result?.candidates[0];
+  const resolvedChanges = draft?.intent ? [
+    ...(draft.intent.closures ?? []).map((item) => ({
+      key: `closed:${item.schoolId}:${item.startsOn}:${item.endsOn}`,
+      value: `${catalog.schools[item.schoolId] ?? item.schoolId} · ${item.startsOn}${item.endsOn === item.startsOn ? "" : ` — ${item.endsOn}`} · ${t("放假，不接送", "Closed, no pickup")}`,
+    })),
+    ...(draft.intent.restorations ?? []).map((item) => ({
+      key: `restored:${item.schoolId}:${item.startsOn}:${item.endsOn}`,
+      value: `${catalog.schools[item.schoolId] ?? item.schoolId} · ${item.startsOn}${item.endsOn === item.startsOn ? "" : ` — ${item.endsOn}`} · ${t("恢复常规接送", "Restore regular pickup")}`,
+    })),
+    ...draft.intent.changes.map((item) => ({
+      key: `time:${item.schoolId}:${item.grades.join(",")}:${item.time}`,
+      value: `${catalog.schools[item.schoolId] ?? item.schoolId} · ${draft.intent!.startsOn}${draft.intent!.endsOn === draft.intent!.startsOn ? "" : ` — ${draft.intent!.endsOn}`} · ${t("年级", "Grades")} ${item.grades.join(", ")} · ${item.time}`,
+    })),
+    ...(draft.intent.studentChanges ?? []).map((item) => ({
+      key: `student:${item.studentId}:${item.startsOn}:${item.endsOn}:${item.attending}`,
+      value: `${catalog.students[item.studentId] ?? item.studentId} · ${item.startsOn}${item.endsOn === item.startsOn ? "" : ` — ${item.endsOn}`} · ${item.attending ? t("需要接送", "Pickup needed") : t("不接送", "No pickup")}`,
+    })),
+    ...draft.intent.unavailableDriverIds.map((id) => ({
+      key: `driver:${id}`,
+      value: `${catalog.drivers[id] ?? id} · ${draft.intent!.startsOn}${draft.intent!.endsOn === draft.intent!.startsOn ? "" : ` — ${draft.intent!.endsOn}`} · ${t("司机不可用", "Driver unavailable")}`,
+    })),
+    ...draft.intent.unavailableVehicleIds.map((id) => ({
+      key: `vehicle:${id}`,
+      value: `${catalog.vehicles[id] ?? id} · ${draft.intent!.startsOn}${draft.intent!.endsOn === draft.intent!.startsOn ? "" : ` — ${draft.intent!.endsOn}`} · ${t("车辆不可用", "Vehicle unavailable")}`,
+    })),
+  ] : [];
   return (
     <div className="adjust-workspace">
       <section className="adjust-input">
@@ -324,67 +350,8 @@ export function AdjustmentWorkspace({
         )}
         {draft?.intent && !draft.intent.question && (
           <div className="adjust-understanding">
-            <h3>{t("本次范围", "Scope")}</h3>
-            <p>
-              {draft.intent.startsOn} — {draft.intent.endsOn}
-            </p>
-            {!!draft.intent.closures?.length && <div className="adjust-rule-confirm">
-              <h3>{t("停课安排", "School closures")}</h3>
-              {draft.intent.closures.map((closure, index) => <p key={index}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
-            </div>}
-            {!!draft.intent.restorations?.length && <div className="adjust-rule-confirm">
-              <h3>{t("恢复常规接送", "Restore regular pickup")}</h3>
-              {draft.intent.restorations.map((restoration, index) => <p key={index}>{catalog.schools[restoration.schoolId]} · {restoration.startsOn}{restoration.endsOn !== restoration.startsOn ? ` — ${restoration.endsOn}` : ""} · {t("按常规校历接送", "Use regular calendar")}</p>)}
-            </div>}
-            {(draft.intent.changes.length > 0 || !!draft.intent.closures?.length || !!draft.intent.restorations?.length) && <div className="adjust-rule-confirm">
-              <h3>{t("规则调整", "Rule changes")}</h3>
-              <p>{draft.status === "APPLIED" ? t("系统已按这项学校日历规则更新行程。", "The schedule was updated from this school calendar rule.") : t("现有规则无法执行时，原因会显示在下方。", "If existing rules cannot apply the change, the reason appears below.")}</p>
-              {draft.intent.closures?.map((closure, index) => <p key={`closure-${index}`}>{catalog.schools[closure.schoolId]} · {closure.startsOn}{closure.endsOn !== closure.startsOn ? ` — ${closure.endsOn}` : ""} · {t("放假，不接送", "Closed, no pickup")}</p>)}
-              {draft.intent.restorations?.map((restoration, index) => <p key={`restoration-${index}`}>{catalog.schools[restoration.schoolId]} · {restoration.startsOn}{restoration.endsOn !== restoration.startsOn ? ` — ${restoration.endsOn}` : ""} · {t("恢复常规接送", "Restore regular pickup")}</p>)}
-              {draft.intent.changes.map((change, index) => <p key={index}>{catalog.schools[change.schoolId]} · {change.grades.join(", ")} · {change.time}</p>)}
-            </div>}
-            {draft.intent.changes.map((c, i) => (
-              <p key={i}>
-                {catalog.schools[c.schoolId]} · {c.grades.join(", ")} · {c.time}
-              </p>
-            ))}
-            {!!draft.intent.unavailableDriverIds.length && (
-              <p>
-                {t("不可用司机：", "Unavailable drivers: ")}
-                {draft.intent.unavailableDriverIds
-                  .map((id) => catalog.drivers[id])
-                  .join(", ")}
-              </p>
-            )}
-            {!!draft.intent.unavailableVehicleIds.length && (
-              <p>
-                {t("不可用车辆：", "Unavailable vehicles: ")}
-                {draft.intent.unavailableVehicleIds
-                  .map((id) => catalog.vehicles[id])
-                  .join(", ")}
-              </p>
-            )}
-            {!!draft.intent.lockedRouteIds.length && (
-              <p>
-                {t("保持不变：", "Keep unchanged: ")}
-                {draft.intent.lockedRouteIds
-                  .map((id) => catalog.routes[id])
-                  .join(", ")}
-              </p>
-            )}
-            <p>
-              {draft.intent.noAdditionalDrivers
-                ? t("不增加司机", "Do not add drivers")
-                : draft.intent.preferExistingDrivers
-                  ? t("优先使用现有司机", "Prefer existing drivers")
-                  : t("按现有可用人车试算", "Use available resources")}
-            </p>
-            <p>
-              {t(
-                "要求明确时系统直接执行；存在歧义时会先询问。",
-                "Clear requests are applied directly; the system asks only when details are ambiguous.",
-              )}
-            </p>
+            <h3>{draft.status === "APPLIED" ? t("实际写入的修改", "Changes applied") : t("系统识别的修改", "Changes understood")}</h3>
+            {resolvedChanges.map((item) => <p key={item.key}>{item.value}</p>)}
           </div>
         )}
       </section>
@@ -408,6 +375,14 @@ export function AdjustmentWorkspace({
                   )}
             </p>
             {appliedResult && <p>{appliedResult.changedRoutes} {t("条线路已调整", "routes updated")} · {appliedResult.changedStudents} {t("人次涉及", "rider assignments affected")}</p>}
+            <div className="adjust-rule-confirm">
+              <h3>{t("数据库中的实际行程", "Actual published rides")}</h3>
+              {draft.appliedTrips?.length
+                ? draft.appliedTrips.map((trip, index) => <p key={`${trip.date}:${trip.name}:${index}`}>
+                    {trip.date} · {trip.name} · {catalog.drivers[trip.driverId] ?? trip.driverId} · {trip.studentCount} {t("名学生", "students")} · {trip.stops.map((stop) => `${stop.time} ${stop.name}`).join(" → ")}
+                  </p>)
+                : <p>{t("相关日期没有已发布的接送行程。", "No published pickup rides remain for the affected dates.")}</p>}
+            </div>
             <small>{draft.id}</small>
           </div>
         ) : (

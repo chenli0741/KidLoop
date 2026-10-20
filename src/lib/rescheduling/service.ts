@@ -22,6 +22,28 @@ export async function getDraft(
     )
   ).rows[0];
   if (!row) throw new Error("调整记录不存在 / Adjustment not found");
+  if (row.status === "APPLIED" && row.intent) {
+    const intent = row.intent as Intent;
+    const schoolIds = [...new Set([
+      ...intent.changes.map((item) => item.schoolId),
+      ...(intent.closures ?? []).map((item) => item.schoolId),
+      ...(intent.restorations ?? []).map((item) => item.schoolId),
+    ])];
+    const studentIds = [...new Set((intent.studentChanges ?? []).map((item) => item.studentId))];
+    row.appliedTrips = (await c.query<NonNullable<DraftView["appliedTrips"]>[number]>(
+      `select t.scheduled_date::text as date,t.route_name as name,sh.driver_id as "driverId",
+       (select count(*)::int from trip_students x where x.trip_id=t.id and x.status<>'ABSENT') as "studentCount",
+       t.route_stops as stops
+       from trips t join driver_shifts sh on sh.id=t.shift_id
+       where t.operating_term_id=current_operating_term() and t.scheduled_date between $1 and $2
+       and t.status not in ('CANCELED','DRAFT')
+       and (
+         exists(select 1 from jsonb_array_elements(t.route_stops) stop where stop->>'schoolId'=any($3::text[]))
+         or exists(select 1 from trip_students x where x.trip_id=t.id and x.student_id=any($4::uuid[]))
+       ) order by t.scheduled_date,t.departure_time,t.id limit 100`,
+      [intent.startsOn, intent.endsOn, schoolIds, studentIds],
+    )).rows;
+  }
   row.usage = (
     await c.query<DraftView["usage"][number]>(
       "select id,created_at,kind,model,usage,elapsed_ms,status,estimated_usd from reschedule_usage where request_id=$1 order by created_at",
@@ -152,6 +174,26 @@ async function applyCalendar(
     }))
       f.set(k, v);
     await savePickupSetting(c, f);
+  }
+}
+async function applyStudentChanges(c: PoolClient, intent: Intent, actorId: string) {
+  for (const change of intent.studentChanges ?? []) {
+    for (let date = change.startsOn; date <= change.endsOn; ) {
+      const absent = !change.attending;
+      await c.query(
+        `insert into student_day_plans(student_id,service_date,absent,note,updated_by)
+         values($1,$2,$3,$4,$5)
+         on conflict(student_id,service_date) do update set absent=excluded.absent,note=excluded.note,updated_by=excluded.updated_by,updated_at=clock_timestamp()`,
+        [change.studentId, date, absent, "Schedule adjustment", actorId],
+      );
+      await c.query(
+        "insert into student_day_plan_history(student_id,service_date,absent,note,actor_id) values($1,$2,$3,$4,$5)",
+        [change.studentId, date, absent, "Schedule adjustment", actorId],
+      );
+      const next = new Date(`${date}T12:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      date = next.toISOString().slice(0, 10);
+    }
   }
 }
 export async function saveTemporary(
@@ -345,6 +387,7 @@ export async function applyRules(
     throw new Error("排班或规则已变化，请重新解析 / Schedule or rules changed; parse again");
   for (const day of snapshot.days)
     await applyCalendar(c, intent, day.date, day.matches, snapshot.students);
+  await applyStudentChanges(c, intent, userId);
   await c.query("update reschedule_requests set status='RULES_APPLIED',updated_at=clock_timestamp() where id=$1", [id]);
 }
 
