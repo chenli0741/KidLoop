@@ -393,7 +393,18 @@ export function calculatePlan(snapshot: Snapshot, intent: Intent): PlanResult {
         earlyRequests.push({sourceRouteId:r.id,preferredDriverId:r.driverId,preferredVehicleId:r.vehicleId,time:available.find(m=>m.student_id===students[0].studentId)!.time.slice(0,5),pickup,dropoff:r.stops.find(s=>s.id===students[0].dropoffStopId)!,students,shared:Object.fromEntries(batch?students.map(student=>[student.studentId,batch.id]):[])});
       }
       const plan=asPlan({...r,students:r.students.filter(s=>!early.includes(s))},available,snapshot.travelTimes);
-      return plan.students.length?[{...plan,preserveAssignment:!intent.unavailableDriverIds.includes(plan.driverId)&&!intent.unavailableVehicleIds.includes(plan.vehicleId)}]:[];
+      if(!plan.students.length)return [];
+      const regularDriver=snapshot.drivers.find(driver=>driver.id===plan.driverId);
+      const regularVehicle=snapshot.vehicles.find(vehicle=>vehicle.id===plan.vehicleId);
+      const schools=plan.stops.filter(stop=>stop.schoolId&&plan.students.some(student=>student.pickupStopId===stop.id)).map(stop=>stop.schoolId!);
+      const dismissals=plan.students.map(student=>available.find(match=>match.student_id===student.studentId)?.time).filter((time):time is string=>Boolean(time));
+      const preserveAssignment=Boolean(
+        regularDriver?.active&&regularDriver.status==='AVAILABLE'&&regularVehicle?.active&&regularVehicle.status!=='MAINTENANCE'&&
+        !intent.unavailableDriverIds.includes(plan.driverId)&&!intent.unavailableVehicleIds.includes(plan.vehicleId)&&
+        driverAllowsSchools(regularDriver,schools)&&dismissals.every(time=>driverAllowsTime(regularDriver,time))&&
+        driverIsAvailable(snapshot.driverUnavailability,regularDriver.id,day.date,plan.stops[0].time,plan.stops.at(-1)!.time)
+      );
+      return [{...plan,preserveAssignment}];
     });
     if(earlyRequests.length){
       const extraInput:TrialInput={routes:snapshot.routes,children:[],rules:[],batches:[],terms:[],exceptions:[],absences:[...absentStudents].map(studentId=>({date:day.date,studentId})),

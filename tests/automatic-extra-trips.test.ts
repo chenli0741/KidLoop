@@ -101,6 +101,15 @@ test('AI rescheduling uses the same partial-grade direct extra plan',()=>{
  assert.equal(after.length,2);assert.deepEqual(after.find(p=>p.automaticExtra)?.stops.map(s=>s.time),['12:45','13:00']);assert.deepEqual(after.find(p=>!p.automaticExtra)?.stops.map(s=>s.time),['14:30','14:40','14:50']);
 });
 
+test('AI rescheduling reassigns a whole early route when its regular driver starts later',()=>{
+ const input=extraFixture();input.drivers[0].earliestDismissalTime='13:00';
+ const snapshot:Snapshot={term:{id:'term',startsOn:'2026-09-01',endsOn:'2026-09-30'},routes:input.routes,students:input.children.map(s=>({...s,name:s.id,reviewed:true})),drivers:input.drivers.map(d=>({...d,name:d.id})),vehicles:input.vehicles.map(v=>({...v,name:v.id})),batches:input.batches,travelTimes:input.travelTimes!,hash:'',days:[{date,matches:input.children.map(s=>({student_id:s.id,school_id:s.schoolId,time:'14:30'})),tasks:[],absentIds:[]}]};
+ const intent:Intent={startsOn:date,endsOn:date,changes:[{schoolId:'school-a',grades:['K','3'],time:'12:45'},{schoolId:'school-b',grades:['1'],time:'12:45'}],unavailableDriverIds:[],unavailableVehicleIds:[],lockedRouteIds:[],preferExistingDrivers:true,noAdditionalDrivers:false,question:''};
+ const result=calculatePlan(snapshot,intent);assert.ok(result.candidates.length,result.conflicts.join(';'));
+ assert.equal(result.candidates[0].days[0].after[0].driverId,'backup');
+ assert.ok(!result.candidates[0].days[0].after.some(plan=>plan.driverId==='usual'));
+});
+
 test('AI rescheduling preserves a shared early pickup pool across participating vehicles',()=>{
  const input=extraFixture();input.routes.push({...structuredClone(input.routes[0]),id:'route-2',driverId:'backup',vehicleId:'spare'});
  for(let n=2;n<=5;n++)input.children.push({id:`k${n}`,schoolId:'school-a',programId:'program',grade:'K',reviewed:true});

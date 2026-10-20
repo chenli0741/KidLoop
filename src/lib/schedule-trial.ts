@@ -119,6 +119,18 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   }
  }
  plans.push(...allocateEarlyTrips(input,date,earlyRequests,plans,issues));
+ // A shared pickup pool may be larger than the combined spare seats even though
+ // every fixed rider still has a safe seat. Publish the work that can actually
+ // be performed and leave only the overflow riders unassigned for admin review;
+ // do not cancel every participating driver's trip.
+ const presentPlans=plans.map(p=>({...p,students:p.students.filter(s=>!input.absences.some(a=>a.date===date&&a.studentId===s.studentId))}));
+ const dropped=retainFeasibleSharedRiders(presentPlans,input.vehicles);
+ if(dropped?.length){
+  const ids=new Set(dropped);
+  for(const p of plans)p.students=p.students.filter(s=>!ids.has(s.studentId));
+  for(const routeId of new Set(presentPlans.filter(p=>p.students.some(s=>ids.has(s.studentId))).map(p=>p.routeId)))
+   issues.push({code:'PARTIAL_CAPACITY',routeId,advisory:true,message:`可执行行程已生成；${dropped.length} 名共享接送学生因座位不足待安排 / Available rides generated; ${dropped.length} shared riders remain unassigned due to capacity`});
+ }
  const active=plans.filter(p=>p.students.length&&!(input.routes.find(r=>r.id===p.routeId)?.routeType==='TEMPORARY'&&issues.some(i=>i.routeId===p.routeId&&i.code==='RESOURCE')))
   .sort((a,b)=>a.stops[0].time.localeCompare(b.stops[0].time)||a.routeId.localeCompare(b.routeId));
  for(const [studentId,{child}] of expected){
@@ -144,6 +156,25 @@ export function trialDay(input:TrialInput,date:string):TrialDay {
   if(capacity!==true)for(const p of component)issues.push({code:capacity===null?'UNCHECKED':'CAPACITY',routeId:p.routeId,message:capacity===null?'容量试算尚未确定，需要核对 / Capacity check needs review':'接送安排座位不足 / Insufficient seats'});
  }
  return {date,plans:active,issues,expected:[...expected.keys()].filter(id=>!input.absences.some(a=>a.date===date&&a.studentId===id)).length,holiday:!schoolOpen&&!issues.length,checked};
+}
+
+/**
+ * Keep the largest deterministic subset of a shared rider pool that fits after
+ * fixed riders reserve their seats. Returns null when fixed riders themselves
+ * are infeasible, so the existing hard capacity blocker remains authoritative.
+ */
+export function retainFeasibleSharedRiders(plans:TrialPlan[],vehicles:TrialInput['vehicles']):string[]|null {
+ if(checkCapacity(plans,vehicles)===true)return [];
+ const occurrences=new Map<string,TrialPlan[]>();
+ for(const plan of plans)for(const student of plan.students)occurrences.set(student.studentId,[...occurrences.get(student.studentId)??[],plan]);
+ const shared=[...occurrences].filter(([id,owners])=>owners.length>1&&owners.every(plan=>Boolean(plan.shared[id]))).map(([id])=>id).sort();
+ if(!shared.length)return null;
+ const sharedIds=new Set(shared),retained=new Set<string>();
+ const projected=()=>plans.map(plan=>({...plan,students:plan.students.filter(student=>!sharedIds.has(student.studentId)||retained.has(student.studentId))}));
+ if(checkCapacity(projected(),vehicles)!==true)return null;
+ const dropped:string[]=[];
+ for(const id of shared){retained.add(id);if(checkCapacity(projected(),vehicles)!==true){retained.delete(id);dropped.push(id);}}
+ return dropped;
 }
 // Exact feasibility by segment. Shared riders may board any participating vehicle;
 // bounded search never reports success when it has not established a feasible allocation.

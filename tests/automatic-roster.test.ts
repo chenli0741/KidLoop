@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {automaticRoster} from '../src/lib/automatic-roster';
-import {trialDay,checkCapacity,type TrialInput} from '../src/lib/schedule-trial';
+import {trialDay,checkCapacity,retainFeasibleSharedRiders,type TrialInput} from '../src/lib/schedule-trial';
 const stops=[{id:'s',schoolId:'school',programId:null,name:'School',address:'A',time:'14:00',pickupTime:'14:00'},{id:'c',schoolId:'cherry',programId:null,name:'Cherry',address:'B',time:'14:15',pickupTime:'14:00'},{id:'p',schoolId:null,programId:'program',name:'Program',address:'C',time:'14:30'}];
 const children=[{id:'early',schoolId:'school',programId:'program',grade:'K',reviewed:true},{id:'normal',schoolId:'school',programId:'program',grade:'1',reviewed:true},{id:'cherry-child',schoolId:'cherry',programId:'program',grade:'1',reviewed:true}];
 const rules=[{schoolId:'school',grades:['K'],weekdays:[5],pickupTime:'12:30'},{schoolId:'school',grades:['1'],weekdays:[5],pickupTime:'14:00'},{schoolId:'cherry',grades:['1'],weekdays:[5],pickupTime:'14:00'}];
@@ -37,6 +37,18 @@ test('capacity uses segments and fixed reservations across multiple shared cars'
  const ellis={...sixteen,vehicleId:'v2',students:[...sixteen.students,...Array.from({length:3},(_,i)=>({studentId:'ellis'+i,pickupStopId:'c',dropoffStopId:'p'}))]};
  assert.equal(checkCapacity([cherry,ellis],[{id:'v',active:true,status:'AVAILABLE',capacity:13},{id:'v2',active:true,status:'AVAILABLE',capacity:13}]),true);
  assert.equal(checkCapacity([cherry,ellis],[{id:'v',active:true,status:'AVAILABLE',capacity:10},{id:'v2',active:true,status:'AVAILABLE',capacity:10}]),false);
+});
+
+test('capacity overflow keeps feasible shared riders instead of canceling every trip',()=>{
+ const p=trialDay(input(),'2026-09-11').plans[0];
+ const shared=Array.from({length:8},(_,i)=>({studentId:`shared${i}`,pickupStopId:'s',dropoffStopId:'p'}));
+ const one={...p,routeId:'one',vehicleId:'v',students:[...shared,...Array.from({length:10},(_,i)=>({studentId:`one-fixed${i}`,pickupStopId:'c',dropoffStopId:'p'}))],shared:Object.fromEntries(shared.map(s=>[s.studentId,'batch']))};
+ const two={...p,routeId:'two',vehicleId:'v2',students:[...shared,...Array.from({length:13},(_,i)=>({studentId:`two-fixed${i}`,pickupStopId:'c',dropoffStopId:'p'}))],shared:Object.fromEntries(shared.map(s=>[s.studentId,'batch']))};
+ const vehicles=[{id:'v',active:true,status:'AVAILABLE',capacity:13},{id:'v2',active:true,status:'AVAILABLE',capacity:13}];
+ const dropped=retainFeasibleSharedRiders([one,two],vehicles);
+ assert.equal(dropped?.length,5);
+ const kept=new Set(shared.map(s=>s.studentId).filter(id=>!dropped?.includes(id)));
+ assert.equal(checkCapacity([one,two].map(plan=>({...plan,students:plan.students.filter(s=>!s.studentId.startsWith('shared')||kept.has(s.studentId))})),vehicles),true);
 });
 
 test('a later driver cannot silently collect an earlier dismissal batch',()=>{
