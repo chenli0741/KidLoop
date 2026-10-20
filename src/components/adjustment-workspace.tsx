@@ -228,7 +228,7 @@ export function AdjustmentWorkspace({
     })),
     ...draft.intent.changes.map((item) => ({
       key: `time:${item.schoolId}:${item.grades.join(",")}:${item.time}`,
-      value: `${catalog.schools[item.schoolId] ?? item.schoolId} · ${draft.intent!.startsOn}${draft.intent!.endsOn === draft.intent!.startsOn ? "" : ` — ${draft.intent!.endsOn}`} · ${t("年级", "Grades")} ${item.grades.join(", ")} · ${item.time}`,
+      value: `${catalog.schools[item.schoolId] ?? item.schoolId} · ${draft.intent!.startsOn}${draft.intent!.endsOn === draft.intent!.startsOn ? "" : ` — ${draft.intent!.endsOn}`} · ${item.grades.length === 9 ? t("全部年级", "All grades") : `${t("年级", "Grades")} ${item.grades.join(", ")}`} · ${item.time}`,
     })),
     ...(draft.intent.studentChanges ?? []).map((item) => ({
       key: `student:${item.studentId}:${item.startsOn}:${item.endsOn}:${item.attending}`,

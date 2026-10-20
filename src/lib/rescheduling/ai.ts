@@ -83,14 +83,43 @@ export function resolveIntentSchools(
     );
     return qualified.length === 1 && qualified[0].id === selected.id ? [] : sameName;
   })].map((student) => ({ id: student.id, name: `${student.name} · ${student.schoolName} · ${student.grade}` })));
-  const directChanges = intent.changes.map((item) => ({ ...item, schoolId: resolve(item.schoolId) }));
-  const onlyOneSchool = /(^|\s)(only|just)(\s|$)|只|仅|单独/iu.test(messages.join(" "));
   const allGrades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7"];
+  const routeAliases = (route: RouteCatalogItem) => {
+    const last = route.stops.at(-1);
+    const city = last?.address.split(",").map((part) => part.trim()).at(-2) ?? "";
+    return [route.name, route.notes ?? "", last?.name ?? "", city]
+      .flatMap((value) => [comparable(value), ...value.split(/[^\p{L}\p{N}]+/u).map(comparable)])
+      .filter((value) => value.length >= 4 && !["line", "route", "线路"].includes(value));
+  };
+  const namedLineRoutes = routes.filter((route) =>
+    route.routeType === "RECURRING" && route.startsOn <= intent.endsOn && route.endsOn >= intent.startsOn && routeAliases(route).some((alias) => conversation.includes(alias)),
+  );
+  const explicitTime = messages.join(" ").match(/(?:^|\D)([01]?\d|2[0-3]):([0-5]\d)(?:\D|$)/)?.slice(1).join(":").padStart(5, "0") ?? "";
+  let directChanges = intent.changes.map((item) => ({
+    ...item,
+    schoolId: resolve(item.schoolId),
+    grades: item.grades.length ? item.grades : allGrades,
+  }));
+  // When the user names one anchor school, do not trust additional schools
+  // invented by the provider. Expand the configured line from that anchor below.
+  if (mentioned.length === 1 && directChanges.length) {
+    const anchored = directChanges.filter((item) => item.schoolId === mentioned[0].id);
+    directChanges = anchored.length
+      ? anchored
+      : [{ ...directChanges[0], schoolId: mentioned[0].id }];
+  } else if (mentioned.length === 0 && namedLineRoutes.length && explicitTime) {
+    directChanges = [...new Set(namedLineRoutes.flatMap((route) => route.stops.map((stop) => stop.schoolId).filter((id): id is string => Boolean(id))))]
+      .map((schoolId) => ({ schoolId, grades: allGrades, time: explicitTime }));
+  }
+  const onlyOneSchool = /(^|\s)(only|just)(\s|$)|只|仅|单独/iu.test(messages.join(" "));
   const mentionedDrivers = drivers.filter((driver) => conversation.includes(comparable(driver.name)));
   let ambiguousLine = "";
   const expandedChanges = directChanges.flatMap((item) => {
     if (onlyOneSchool || item.grades.length !== allGrades.length || !allGrades.every((grade) => item.grades.includes(grade))) return [item];
-    let matchingRoutes = routes.filter((route) => route.routeType === "RECURRING" && route.startsOn <= intent.endsOn && route.endsOn >= intent.startsOn && route.stops.some((stop) => stop.schoolId === item.schoolId));
+    let matchingRoutes = routes.filter((route) => {
+      const firstPickup = route.stops.find((stop) => stop.schoolId);
+      return route.routeType === "RECURRING" && route.startsOn <= intent.endsOn && route.endsOn >= intent.startsOn && firstPickup?.schoolId === item.schoolId;
+    });
     if (mentionedDrivers.length === 1 && matchingRoutes.some((route) => route.driverId === mentionedDrivers[0].id))
       matchingRoutes = matchingRoutes.filter((route) => route.driverId === mentionedDrivers[0].id);
     const namedRoutes = matchingRoutes.filter((route) => [route.name, route.notes ?? ""].map(comparable).filter(Boolean).some((name) => conversation.includes(name)));
@@ -121,7 +150,7 @@ export function resolveIntentSchools(
     studentChanges: dedupe(studentChanges, (item) => `${item.studentId}:${item.startsOn}:${item.endsOn}:${item.attending}`),
     question: ambiguous.length
       ? `找到多个同名学生，请说明学校或年级：${ambiguous.map((student) => student.name).join("；")}`
-      : ambiguousLine || intent.question,
+      : ambiguousLine || (namedLineRoutes.length && explicitTime ? "" : intent.question),
   };
 }
 
