@@ -33,6 +33,18 @@ test('restoring the regular calendar discards a model-generated blank time chang
  assert.equal(normalized.restorations?.length,1);
 });
 
+test('an explicit dismissal time removes a contradictory restore-regular instruction',()=>{
+ const intent:Intent={
+  ...base,
+  closures:[],
+  restorations:[{schoolId:'school',startsOn:'2026-10-09',endsOn:'2026-10-09'}],
+  changes:[{schoolId:'school',grades:['TK','K','1','2','3','4','5','6','7'],time:'12:45'}],
+ };
+ const normalized=normalizeIntent(intent);
+ assert.deepEqual(normalized.restorations,[]);
+ assert.deepEqual(normalized.changes,intent.changes);
+});
+
 test('an unambiguous school named in the request repairs blank provider school IDs',()=>{
  const intent:Intent={
   ...base,closures:[],

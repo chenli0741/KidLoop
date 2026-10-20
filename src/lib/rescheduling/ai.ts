@@ -224,9 +224,19 @@ export function normalizeIntent(intent: Intent): Intent {
       )
       .map((restoration) => restoration.schoolId),
   );
-  return fullyClosed.size || fullyRestored.size
+  const explicitlyTimed = new Set(
+    intent.changes
+      .filter((change) => change.time && !fullyClosed.has(change.schoolId))
+      .map((change) => change.schoolId),
+  );
+  return fullyClosed.size || fullyRestored.size || explicitlyTimed.size
     ? {
         ...intent,
+        // A concrete dismissal time and "restore regular pickup" cannot both
+        // apply to the same school. The explicit time is the actionable fact.
+        restorations: (intent.restorations ?? []).filter(
+          (restoration) => !explicitlyTimed.has(restoration.schoolId),
+        ),
         // A full closure has no dismissal time. Some model responses also emit
         // a blank/off time change for the same school; it is redundant and invalid.
         changes: intent.changes.filter(
