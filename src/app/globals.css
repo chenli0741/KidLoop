@@ -401,6 +401,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #5b9d80; outline-offs
 .request-card > div { display: flex; align-items: center; gap: 12px; }
 .request-card p { margin: 10px 0; font-size: 14px; line-height: 1.6; }
 .request-card small { color: var(--muted); }
+.driver-no-pickup { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 12px 0; padding: 10px 14px; border: 1px solid #e4d9bb; border-radius: 12px; background: #fffdf6; font-size: 14px; line-height: 1.4; }
+.driver-no-pickup strong { color: var(--danger); }
 .rider-parent-note { grid-column: 2 / -1; padding: 10px; border-radius: 8px; background: #fff5d9; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .account-list { display: grid; gap: 16px; }
 .account-card { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: white; }

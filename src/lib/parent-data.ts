@@ -69,3 +69,25 @@ export async function getParentRequests(date: string) {
   `, [date, user.role === "DRIVER" ? user.driverId : null]);
   return result.rows;
 }
+
+export async function getDriverAbsences(date: string) {
+  const user = await requireUser(["DRIVER"]);
+  const result = await query<{ studentName: string }>(`
+    select distinct st.name as "studentName"
+    from student_day_plans dp
+    join students st on st.id=dp.student_id
+    where dp.service_date=$1::date and dp.absent
+      and exists (
+        select 1
+        from trip_students ts
+        join trips t on t.id=ts.trip_id
+        join driver_shifts sh on sh.id=t.shift_id
+        where ts.student_id=dp.student_id
+          and t.scheduled_date=dp.service_date
+          and sh.driver_id=$2
+          and t.status not in ('DRAFT','CANCELED')
+      )
+    order by st.name
+  `, [date, user.driverId]);
+  return result.rows.map(row => row.studentName);
+}

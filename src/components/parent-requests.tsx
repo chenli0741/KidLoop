@@ -1,8 +1,16 @@
 import { MessageSquareText } from "lucide-react";
-import { getParentRequests } from "@/lib/parent-data";
+import { getDriverAbsences, getParentRequests } from "@/lib/parent-data";
 import { text, type Locale } from "@/lib/i18n";
 
-export async function ParentRequests({ date, locale }: { date: string; locale: Locale }) {
+export async function ParentRequests({ date, locale, driverSummary = false }: { date: string; locale: Locale; driverSummary?: boolean }) {
+  if (driverSummary) {
+    const names = await getDriverAbsences(date);
+    if (!names.length) return null;
+    return <section className="driver-no-pickup" aria-label={text(locale, "今天不接的学生", "Students not riding today")}>
+      <strong>{text(locale, "今天不接：", "No pickup today:")}</strong>
+      <span>{names.join(locale === "zh" ? "、" : ", ")}</span>
+    </section>;
+  }
   const requests = await getParentRequests(date);
   if (!requests.length) return null;
   return <section className="content-section parent-requests"><div className="section-heading"><h2>{text(locale, "家长请假与留言", "Parent absences & notes")}</h2><MessageSquareText size={20} /></div>
